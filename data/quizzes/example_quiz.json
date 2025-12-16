@@ -1,0 +1,80 @@
+{
+  "quiz_id": "quiz_example_001",
+  "title": "Python Fundamentals Quiz",
+  "source_material": "python_intro.md",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "single_choice",
+      "question_text": "What is the primary purpose of the `def` keyword in Python?",
+      "options": [
+        "To define a variable",
+        "To define a function",
+        "To define a class",
+        "To define a module"
+      ],
+      "correct_answer": "To define a function",
+      "source_reference": "Section 1.1: Functions",
+      "metadata": {
+        "topic": "functions",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q2",
+      "question_type": "multiple_choice",
+      "question_text": "Which of the following are mutable data types in Python? (Select all that apply)",
+      "options": [
+        "List",
+        "Tuple",
+        "Dictionary",
+        "String"
+      ],
+      "correct_answer": ["List", "Dictionary"],
+      "source_reference": "Section 2.3: Data Types",
+      "metadata": {
+        "topic": "data_types",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q3",
+      "question_type": "true_false",
+      "question_text": "In Python, the `pass` statement does nothing and is used as a placeholder.",
+      "options": ["True", "False"],
+      "correct_answer": "True",
+      "source_reference": "Section 3.2: Control Flow",
+      "metadata": {
+        "topic": "control_flow",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q4",
+      "question_type": "single_choice",
+      "question_text": "What will be the output of the following code?\n\n```python\nx = [1, 2, 3]\ny = x\ny.append(4)\nprint(len(x))\n```",
+      "options": [
+        "3",
+        "4",
+        "5",
+        "Error"
+      ],
+      "correct_answer": "4",
+      "source_reference": "Section 2.3: Data Types",
+      "metadata": {
+        "topic": "data_types",
+        "difficulty_level": "hard"
+      }
+    }
+  ],
+  "metadata": {
+    "target_audience": "undergraduate",
+    "estimated_time_minutes": 10,
+    "learning_objectives": [
+      "Understand basic Python syntax",
+      "Identify mutable vs immutable types",
+      "Apply knowledge of Python functions"
+    ]
+  },
+  "created_at": "2024-01-15T10:00:00"
+}

@@ -1,0 +1,116 @@
+"""Clarity metric implementation."""
+
+import re
+from typing import Any, List, Optional
+
+from ..models.quiz import Quiz, QuizQuestion
+from .base import BaseMetric, MetricScope
+
+
+class ClarityMetric(BaseMetric):
+    """Evaluates the clarity of quiz questions and answer options.
+
+    This metric assesses how clear, unambiguous, and well-written
+    the questions are.
+    """
+
+    @property
+    def name(self) -> str:
+        return "clarity"
+
+    @property
+    def version(self) -> str:
+        return "1.0"
+
+    @property
+    def scope(self) -> MetricScope:
+        return MetricScope.QUESTION_LEVEL
+
+    def get_prompt(
+        self,
+        question: Optional[QuizQuestion] = None,
+        quiz: Optional[Quiz] = None,
+        source_text: Optional[str] = None,
+        **params: Any,
+    ) -> str:
+        """Generate clarity evaluation prompt.
+
+        Args:
+            question: Question to evaluate
+            quiz: Not used (question-level metric)
+            source_text: Not used
+            **params: No parameters for this metric
+
+        Returns:
+            Formatted prompt
+
+        Raises:
+            ValueError: If question is None
+        """
+        if question is None:
+            raise ValueError("ClarityMetric requires a question")
+
+        prompt = f"""Evaluate the clarity of the following quiz question.
+
+Question Type: {question.question_type.value}
+Question: {question.question_text}
+
+Options:
+"""
+        for i, option in enumerate(question.options, 1):
+            prompt += f"{i}. {option}\n"
+
+        prompt += """
+Provide a clarity score from 0 to 100, where:
+- 0-20: Very Unclear (ambiguous, confusing, poorly written)
+- 21-40: Unclear (some confusion, vague wording)
+- 41-60: Moderately Clear (understandable but could improve)
+- 61-80: Clear (well-written, minimal ambiguity)
+- 81-100: Very Clear (precise, unambiguous, excellent)
+
+Consider:
+1. Question Clarity:
+   - Is the question easy to understand?
+   - Is the wording precise and unambiguous?
+   - Is it free from grammatical errors?
+
+2. Answer Options:
+   - Are options clearly distinct?
+   - Is there no overlap or ambiguity between options?
+   - Are options of similar length and complexity?
+   - Are there no "trick" wordings?
+
+3. Overall Quality:
+   - Is the question professionally written?
+   - Would a student clearly understand what's being asked?
+   - Is there a single, clearly correct answer?
+
+Respond with ONLY a number between 0 and 100.
+"""
+
+        return prompt
+
+    def parse_response(self, llm_response: str) -> float:
+        """Parse clarity score from LLM response.
+
+        Args:
+            llm_response: Raw LLM response
+
+        Returns:
+            Score between 0 and 100
+
+        Raises:
+            ValueError: If score cannot be extracted
+        """
+        response = llm_response.strip()
+
+        # Try to find a number
+        match = re.search(r'\b(\d+(?:\.\d+)?)\b', response)
+        if match:
+            score = float(match.group(1))
+            if 0 <= score <= 100:
+                return score
+
+        raise ValueError(
+            f"Could not parse clarity score from response: {llm_response}"
+        )
