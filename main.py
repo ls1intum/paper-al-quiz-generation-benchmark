@@ -8,6 +8,7 @@ from pathlib import Path
 
 from src.analysis.aggregator import ResultsAggregator
 from src.analysis.reporter import ResultsReporter
+from src.metrics import GrammaticalCorrectnessMetric
 from src.metrics.registry import MetricRegistry
 from src.metrics.difficulty import DifficultyMetric
 from src.metrics.coverage import CoverageMetric
@@ -22,6 +23,7 @@ def register_metrics() -> None:
     MetricRegistry.register(DifficultyMetric)
     MetricRegistry.register(CoverageMetric)
     MetricRegistry.register(ClarityMetric)
+    MetricRegistry.register(GrammaticalCorrectnessMetric)
 
 
 def main() -> int:
