@@ -5,19 +5,19 @@ title: AI Quiz Generation Benchmark Documentation
 hide_table_of_contents: false
 ---
 
-# AI Quiz Generation Benchmark
+# Quiz Generation Benchmark
 
-**A Framework for Evaluating AI-Generated Quizzes Using LLMs as Judges**
+**A Framework for Evaluating Quizzes Using LLMs as Judges**
 
 ---
 
 ## Overview
 
-This benchmark framework provides a rigorous, extensible approach to evaluating AI-generated multiple-choice questions using multiple LLM-based quality metrics. The system is **stateless**, **modular**, and designed for **extensibility** and **reproducibility**.
+This benchmark framework provides a rigorous, extensible approach to evaluating quiz questions using multiple LLM-based quality metrics. The system is **stateless**, **modular**, and designed for **extensibility** and **reproducibility**.
 
 ### What This Framework Does
 
-Systematically evaluate the quality of AI-generated quizzes using research-backed metrics:
+Systematically evaluate the quality of quizzes using research-backed metrics:
 
 - **Alignment with Learning Objectives**: Ensure questions assess intended outcomes
 - **Cognitive Level Appropriateness**: Evaluate Bloom's taxonomy levels
