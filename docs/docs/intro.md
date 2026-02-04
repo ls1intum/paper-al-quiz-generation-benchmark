@@ -7,85 +7,57 @@ hide_table_of_contents: false
 
 # AI Quiz Generation Benchmark
 
-**Complete Documentation for Evaluating AI-Generated Quizzes Using LLMs as Judges**
-
----
-
-## 📋 Table of Contents
-
-- [Overview](#overview)
-- [System Goals](#system-goals)
-- [Quick Start](#quick-start)
-  - [Installation](#installation)
-  - [Configuration](#configuration)
-  - [Running Your First Benchmark](#running-your-first-benchmark)
-  - [Viewing Results](#viewing-results)
-- [Complete Usage Guide](#complete-usage-guide)
-  - [Environment Variables](#environment-variables)
-  - [Benchmark Configuration](#benchmark-configuration)
-  - [Data Preparation](#data-preparation)
-  - [Running Benchmarks](#running-benchmarks)
-  - [Understanding Results](#understanding-results)
-  - [Command-Line Options](#command-line-options)
-- [Customization](#customization)
-  - [Adding Custom Metrics](#adding-custom-metrics)
-  - [Adding Custom Evaluators](#adding-custom-evaluators)
-  - [Customizing Analysis](#customizing-analysis)
-- [Architecture](#architecture)
-  - [System Overview](#system-overview)
-  - [Component Design](#component-design)
-  - [Project Structure](#project-structure)
-  - [Workflow](#workflow)
-- [Best Practices](#best-practices)
-- [Project Status](#project-status)
-- [Troubleshooting](#troubleshooting)
+**A Framework for Evaluating AI-Generated Quizzes Using LLMs as Judges**
 
 ---
 
 ## Overview
 
-This benchmark framework evaluates AI-generated quizzes using multiple LLM-based metrics. The system is **stateless**, **modular**, and designed for **extensibility**.
+This benchmark framework provides a rigorous, extensible approach to evaluating AI-generated multiple-choice questions using multiple LLM-based quality metrics. The system is **stateless**, **modular**, and designed for **extensibility** and **reproducibility**.
 
 ### What This Framework Does
 
-Evaluate the quality of AI-generated quizzes using configurable metrics such as:
-- **Difficulty**: Cognitive complexity assessment
-- **Coverage**: Breadth and depth of content coverage
-- **Clarity**: Question and answer clarity
-- **Validity**: Alignment with learning objectives
-- **And more**: Easily extensible with custom metrics
+Systematically evaluate the quality of AI-generated quizzes using research-backed metrics:
+
+- **Alignment with Learning Objectives**: Ensure questions assess intended outcomes
+- **Cognitive Level Appropriateness**: Evaluate Bloom's taxonomy levels
+- **Clarity and Precision**: Assess linguistic quality and unambiguity
+- **Answer Key Correctness**: Verify single correct answer and clear distractors
+- **Distractor Quality**: Evaluate plausibility based on common misconceptions
+- **Homogeneous Options**: Check parallel structure across answer choices
+- **Absence of Cueing**: Detect inadvertent clues to correct answers
+- **Grammatical Correctness**: Ensure proper language usage throughout
 
 ### Key Features
 
-✅ **Multiple LLM Support** - Azure OpenAI, OpenAI API, Anthropic Claude, and OpenAI-compatible local models
-
-✅ **Flexible Configuration** - YAML-based configs for easy experimentation
-
-✅ **Statistical Rigor** - Multiple runs with aggregation (mean, median, std dev)
-
-✅ **Reproducible Results** - Versioned configs, deterministic evaluation (temperature=0.0)
-
-✅ **Clean Architecture** - Type-safe Python with clear interfaces
-
-✅ **Production Ready** - Complete with examples, tests, and documentation
+✅ **Multiple LLM Support** — Azure OpenAI, OpenAI API, Anthropic Claude, and OpenAI-compatible local models  
+✅ **Research-Based Metrics** — Implements quality criteria from assessment literature  
+✅ **Flexible Configuration** — YAML-based configs for easy experimentation  
+✅ **Statistical Rigor** — Multiple runs with aggregation (mean, median, standard deviation)  
+✅ **Reproducible Results** — Versioned configs, deterministic evaluation (temperature=0.0)  
+✅ **Clean Architecture** — Type-safe Python with clear interfaces  
+✅ **Production-Oriented** — Complete with examples, tests, and comprehensive documentation
 
 ### Terminology
 
-- **Metric**: A measurement of quiz quality (e.g., difficulty, coverage, clarity)
-- **Evaluator**: An LLM provider that executes metric assessments
-- **Benchmark Run**: A complete evaluation cycle with specific configuration
-- **Quiz**: A collection of questions generated from source material
-- **Question**: Individual quiz item (multiple-choice, single-choice, true/false)
+| Term | Definition |
+|------|------------|
+| **Metric** | A measurement of quiz quality (e.g., alignment, clarity, distractor quality) |
+| **Evaluator** | An LLM provider that executes metric assessments |
+| **Benchmark Run** | A complete evaluation cycle with specific configuration |
+| **Quiz** | A collection of questions generated from source material |
+| **Question** | Individual quiz item (multiple-choice, single-choice, true/false) |
+| **Distractor** | An incorrect answer option designed to identify misconceptions |
 
 ---
 
 ## System Goals
 
-1. **Evaluate quiz quality** using configurable metrics (difficulty, coverage, etc.)
+1. **Evaluate quiz quality** using configurable, research-based metrics
 2. **Support multiple LLM providers** (Azure OpenAI, OpenAI, Anthropic, open-source)
-3. **Enable flexible configuration** for different benchmark runs
-4. **Provide reproducible results** with versioning and aggregation
-5. **Maintain clean architecture** with clear interfaces and type safety
+3. **Enable flexible configuration** for different benchmark runs and research questions
+4. **Provide reproducible results** with versioning, statistical aggregation, and deterministic evaluation
+5. **Maintain clean architecture** with clear interfaces, type safety, and extensibility
 
 ---
 
@@ -129,6 +101,7 @@ nano .env
 ```
 
 Example `.env` file:
+
 ```bash
 # OpenAI (direct API)
 OPENAI_API_KEY=sk-your-key-here
@@ -162,13 +135,19 @@ evaluators:
     max_tokens: 500
 
 metrics:
-  - name: "difficulty"
+  - name: "alignment"
     version: "1.0"
     evaluators: ["gpt4"]
     parameters:
-      rubric: "bloom_taxonomy"
-      target_audience: "undergraduate"
-
+      learning_objectives: "auto_extract"
+      
+  - name: "cognitive_level"
+    version: "1.0"
+    evaluators: ["gpt4"]
+    parameters:
+      taxonomy: "bloom"
+      target_level: "apply"
+      
   - name: "clarity"
     version: "1.0"
     evaluators: ["gpt4"]
@@ -257,12 +236,17 @@ evaluators:
     max_tokens: 500
 
 metrics:
-  - name: "difficulty"
+  - name: "alignment"
     version: "1.0"
     evaluators: ["gpt4"]
     parameters:
-      rubric: "bloom_taxonomy"
-      target_audience: "undergraduate"
+      learning_objectives: "auto_extract"
+      
+  - name: "distractor_quality"
+    version: "1.0"
+    evaluators: ["gpt4"]
+    parameters:
+      misconception_based: true
 
 inputs:
   quiz_directory: "data/quizzes"
@@ -289,13 +273,13 @@ evaluators:
     model: "gpt-4"
     temperature: 0.0
     max_tokens: 500
-
+    
   gpt35:
     provider: "openai"
     model: "gpt-3.5-turbo"
     temperature: 0.0
     max_tokens: 500
-
+    
   claude_opus:
     provider: "anthropic"
     model: "claude-3-opus-20240229"
@@ -303,27 +287,35 @@ evaluators:
     max_tokens: 500
 
 metrics:
-  # Test difficulty with multiple evaluators
-  - name: "difficulty"
+  # Test alignment with multiple evaluators
+  - name: "alignment"
     version: "1.0"
     evaluators: ["gpt4", "gpt35", "claude_opus"]
     parameters:
-      rubric: "bloom_taxonomy"
-      target_audience: "undergraduate"
+      learning_objectives: "auto_extract"
     enabled: true
-
-  # Test coverage with single best model
-  - name: "coverage"
+    
+  # Test cognitive level with best model
+  - name: "cognitive_level"
     version: "1.0"
     evaluators: ["gpt4"]
     parameters:
-      granularity: "balanced"
+      taxonomy: "bloom"
+      target_level: "apply"
     enabled: true
-
+    
   # Test clarity across models
   - name: "clarity"
     version: "1.0"
     evaluators: ["gpt4", "claude_opus"]
+    enabled: true
+    
+  # Test distractor quality
+  - name: "distractor_quality"
+    version: "1.0"
+    evaluators: ["gpt4"]
+    parameters:
+      misconception_based: true
     enabled: true
 
 inputs:
@@ -345,6 +337,10 @@ Quizzes must be in JSON format with this schema:
   "quiz_id": "unique_identifier",
   "title": "Human-readable title",
   "source_material": "filename.md",
+  "learning_objectives": [
+    "Students will be able to...",
+    "Students will understand..."
+  ],
   "questions": [
     {
       "question_id": "unique_question_id",
@@ -353,6 +349,7 @@ Quizzes must be in JSON format with this schema:
       "options": ["Option 1", "Option 2", "..."],
       "correct_answer": "For SC/TF" || ["For", "MC"],
       "source_reference": "Optional reference to source",
+      "bloom_level": "Optional: remember|understand|apply|analyze|evaluate|create",
       "metadata": {}
     }
   ],
@@ -450,6 +447,7 @@ python main.py --config config/my_benchmark.yaml --output-prefix experiment_001
 2. **Data Loading**
    - Loads all quizzes from `quiz_directory`
    - Loads corresponding source materials
+   - Validates data schemas
 
 3. **Evaluation Loop**
    - For each run (1 to `runs`)
@@ -469,7 +467,7 @@ python main.py --config config/my_benchmark.yaml --output-prefix experiment_001
 5. **Output**
    - Saves raw results JSON
    - Saves aggregated results JSON
-   - Saves text summary
+   - Saves human-readable summary
 
 #### Progress Monitoring
 
@@ -477,33 +475,34 @@ The framework prints progress information:
 
 ```
 Registering metrics...
-Available metrics: ['difficulty', 'coverage', 'clarity']
+Available metrics: ['alignment', 'cognitive_level', 'clarity', 'distractor_quality']
 
 Loading configuration from config/benchmark_example.yaml...
 Configuration loaded: example-benchmark v1.0.0
-Runs: 3
-Evaluators: ['gpt4', 'gpt35']
-Metrics: ['difficulty', 'clarity']
+  Runs: 3
+  Evaluators: ['gpt4', 'gpt35']
+  Metrics: ['alignment', 'clarity', 'distractor_quality']
 
 Initializing benchmark runner...
-Initialized evaluator: gpt4 (gpt-4)
-Initialized evaluator: gpt35 (gpt-3.5-turbo)
-Initialized metric: difficulty v1.0
-Initialized metric: clarity v1.0
+  Initialized evaluator: gpt4 (gpt-4)
+  Initialized evaluator: gpt35 (gpt-3.5-turbo)
+  Initialized metric: alignment v1.0
+  Initialized metric: clarity v1.0
+  Initialized metric: distractor_quality v1.0
 
 Starting benchmark execution...
 Loading quizzes from data/quizzes...
-Loaded 1 quizzes
+  Loaded 1 quizzes
 
 ============================================================
 Starting Run 1/3
 ============================================================
-
 Evaluating quiz: Python Fundamentals Quiz (quiz_example_001)
-  Running difficulty with gpt4...
-  Running difficulty with gpt35...
+  Running alignment with gpt4...
+  Running alignment with gpt35...
   Running clarity with gpt4...
   Running clarity with gpt35...
+  Running distractor_quality with gpt4...
 ...
 ```
 
@@ -513,9 +512,9 @@ Evaluating quiz: Python Fundamentals Quiz (quiz_example_001)
 
 After execution, you'll find three files in `data/results/`:
 
-1. **`results_<timestamp>.json`** - Raw results from all evaluations
-2. **`aggregated_<timestamp>.json`** - Statistical aggregations
-3. **`summary_<timestamp>.txt`** - Human-readable report
+1. **`results_<timestamp>.json`** — Raw results from all evaluations
+2. **`aggregated_<timestamp>.json`** — Statistical aggregations
+3. **`summary_<timestamp>.txt`** — Human-readable report
 
 #### Reading the Summary
 
@@ -528,23 +527,32 @@ Version: 1.0.0
 Total Runs: 3
 Quizzes Evaluated: 1
 
-DIFFICULTY
+ALIGNMENT WITH LEARNING OBJECTIVES
 ----------------------------------------------------------------------
-
   Evaluator: gpt-4
-    Mean:   67.25    # Average difficulty score
-    Median: 68.00    # Middle value (robust to outliers)
-    Std Dev: 5.44    # Consistency (lower = more consistent)
-    Min:    60.00    # Lowest score observed
-    Max:    73.00    # Highest score observed
+    Mean:   82.50    # Average alignment score
+    Median: 83.00    # Middle value (robust to outliers)
+    Std Dev: 4.12    # Consistency (lower = more consistent)
+    Min:    76.00    # Lowest score observed
+    Max:    88.00    # Highest score observed
     N:      12       # Total number of evaluations
-
+    
   Evaluator: gpt-3.5-turbo
-    Mean:   64.50
-    Median: 65.00
-    Std Dev: 6.12
-    Min:    55.00
-    Max:    72.00
+    Mean:   79.25
+    Median: 80.00
+    Std Dev: 5.67
+    Min:    71.00
+    Max:    86.00
+    N:      12
+
+DISTRACTOR QUALITY
+----------------------------------------------------------------------
+  Evaluator: gpt-4
+    Mean:   71.33
+    Median: 72.00
+    Std Dev: 6.89
+    Min:    61.00
+    Max:    81.00
     N:      12
 ```
 
@@ -557,12 +565,12 @@ DIFFICULTY
 
 **Standard Deviation**
 - **Low (< 5)**: Consistent evaluations
-- **Medium (5-10)**: Some variation
-- **High (> 10)**: High variance, may need more runs
+- **Medium (5-10)**: Some variation (acceptable)
+- **High (> 10)**: High variance, may need more runs or prompt refinement
 
 **Comparing Evaluators**
 - Similar scores → models agree on metric
-- Different scores → models have different perspectives
+- Different scores → models have different perspectives or capabilities
 - Check std dev to assess reliability
 
 #### Raw Results Structure
@@ -576,13 +584,15 @@ DIFFICULTY
   "run_number": 1,
   "metrics": [
     {
-      "metric_name": "difficulty",
+      "metric_name": "alignment",
       "metric_version": "1.0",
-      "score": 67.0,
+      "score": 82.0,
       "evaluator_model": "gpt-4",
       "quiz_id": "quiz_example_001",
       "question_id": "q1",
-      "parameters": {...},
+      "parameters": {
+        "learning_objectives": "auto_extract"
+      },
       "evaluated_at": "2024-01-15T10:30:00",
       "raw_response": "LLM's actual response..."
     }
@@ -591,6 +601,739 @@ DIFFICULTY
   "completed_at": "2024-01-15T10:35:00"
 }
 ```
+
+---
+
+## Supported Quality Metrics
+
+### 1. Alignment with Learning Objectives
+
+**Purpose**: Verify questions accurately assess intended learning outcomes and match instructional goals.
+
+**References**: Haladyna et al. [10], Sireci [17]
+
+**Scope**: Question-level
+
+**Parameters**:
+- `learning_objectives`: Source of objectives ("auto_extract", "provided", or list)
+- `alignment_threshold`: Minimum acceptable alignment score (default: 70)
+
+**Evaluation Criteria**:
+- Direct assessment of stated objectives
+- Coverage of key concepts
+- Appropriate depth and breadth
+
+**Example Configuration**:
+```yaml
+- name: "alignment"
+  version: "1.0"
+  evaluators: ["gpt4"]
+  parameters:
+    learning_objectives: "auto_extract"
+    alignment_threshold: 75
+```
+
+---
+
+### 2. Cognitive Level Appropriateness
+
+**Purpose**: Ensure questions target appropriate levels of Bloom's taxonomy.
+
+**Bloom's Taxonomy Levels**:
+1. **Remember**: Recall facts and basic concepts
+2. **Understand**: Explain ideas or concepts
+3. **Apply**: Use information in new situations
+4. **Analyze**: Draw connections among ideas
+5. **Evaluate**: Justify a decision or course of action
+6. **Create**: Produce new or original work
+
+**References**: Anderson & Krathwohl [2], Haladyna & Rodriguez [11]
+
+**Scope**: Question-level
+
+**Parameters**:
+- `taxonomy`: "bloom" or "webb"
+- `target_level`: Expected cognitive level
+- `tolerance`: Allow ±1 level deviation
+
+**Example Configuration**:
+```yaml
+- name: "cognitive_level"
+  version: "1.0"
+  evaluators: ["gpt4"]
+  parameters:
+    taxonomy: "bloom"
+    target_level: "apply"
+    tolerance: 1
+```
+
+---
+
+### 3. Clarity and Precision
+
+**Purpose**: Assess whether question stems and answer options use clear, unambiguous language without unnecessary complexity.
+
+**References**: Downing [8], Haladyna et al. [10]
+
+**Scope**: Question-level
+
+**Evaluation Criteria**:
+- Language complexity appropriate for audience
+- Absence of ambiguous phrasing
+- Clear, concise wording
+- No unnecessary jargon
+- Proper use of terminology
+
+**Example Configuration**:
+```yaml
+- name: "clarity"
+  version: "1.0"
+  evaluators: ["gpt4", "claude_opus"]
+  parameters:
+    target_audience: "undergraduate"
+    complexity_threshold: "moderate"
+```
+
+---
+
+### 4. Answer Key Correctness
+
+**Purpose**: Verify exactly one option is unambiguously correct (or clearly best) while all distractors are unambiguously incorrect.
+
+**References**: Haladyna et al. [10], Haladyna & Rodriguez [11]
+
+**Scope**: Question-level
+
+**Evaluation Criteria**:
+- One clearly correct answer
+- All distractors are definitively incorrect
+- No ambiguity in correctness
+- Correct answer is verifiable from source material
+
+**Example Configuration**:
+```yaml
+- name: "answer_correctness"
+  version: "1.0"
+  evaluators: ["gpt4"]
+  parameters:
+    verify_source: true
+    require_unambiguous: true
+```
+
+---
+
+### 5. Distractor Quality
+
+**Purpose**: Evaluate whether incorrect options are plausible to students lacking mastery but clearly wrong to knowledgeable students; should be based on common misconceptions.
+
+**References**: Gierl et al. [9], Haladyna & Rodriguez [11]
+
+**Scope**: Question-level
+
+**Evaluation Criteria**:
+- Plausibility to novices
+- Based on documented misconceptions
+- Not obviously incorrect
+- Discriminates between knowledge levels
+- Avoids "all of the above" or "none of the above"
+
+**Example Configuration**:
+```yaml
+- name: "distractor_quality"
+  version: "1.0"
+  evaluators: ["gpt4"]
+  parameters:
+    misconception_based: true
+    plausibility_threshold: 60
+    discrimination_required: true
+```
+
+---
+
+### 6. Homogeneous Options
+
+**Purpose**: Ensure all answer choices are parallel in grammatical structure and homogeneous in content type.
+
+**References**: Downing [8], Haladyna et al. [10]
+
+**Scope**: Question-level
+
+**Evaluation Criteria**:
+- Parallel grammatical structure
+- Similar length and complexity
+- Consistent content type
+- Same level of specificity
+- Uniform formatting
+
+**Example Configuration**:
+```yaml
+- name: "homogeneity"
+  version: "1.0"
+  evaluators: ["gpt4"]
+  parameters:
+    check_grammar: true
+    check_length: true
+    check_specificity: true
+```
+
+---
+
+### 7. Absence of Cueing
+
+**Purpose**: Detect grammatical, semantic, or structural clues that inadvertently reveal the correct answer.
+
+**References**: Downing [8], Haladyna et al. [10]
+
+**Scope**: Question-level
+
+**Common Cues to Detect**:
+- Grammatical inconsistencies (e.g., "an" before consonant)
+- Length differences (correct answer often longest)
+- Specificity differences (correct answer more detailed)
+- Absolute terms ("always", "never") in distractors
+- Verbal associations between stem and correct answer
+- Convergence cues (correct answer includes elements of all options)
+
+**Example Configuration**:
+```yaml
+- name: "cueing_absence"
+  version: "1.0"
+  evaluators: ["gpt4"]
+  parameters:
+    check_grammar: true
+    check_length: true
+    check_specificity: true
+    check_absolutes: true
+    check_associations: true
+```
+
+---
+
+### 8. Grammatical Correctness
+
+**Purpose**: Ensure both stem and options are grammatically correct and properly punctuated.
+
+**References**: Haladyna et al. [10], Haladyna & Rodriguez [11]
+
+**Scope**: Question-level
+
+**Evaluation Criteria**:
+- Proper grammar in stem
+- Proper grammar in all options
+- Correct punctuation
+- Subject-verb agreement
+- Consistent tense usage
+
+**Example Configuration**:
+```yaml
+- name: "grammar"
+  version: "1.0"
+  evaluators: ["gpt4"]
+  parameters:
+    strict_mode: true
+    check_punctuation: true
+```
+
+---
+
+## Architecture
+
+### System Overview
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│                           INPUT LAYER                            │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│      ┌──────────────────┐              ┌──────────────────┐      │
+│      │  Source Material │              │ Learning         │      │
+│      │  (Markdown)      │              │ Objectives       │      │
+│      │                  │              │                  │      │
+│      │  • Lectures      │              │ • Competencies   │      │
+│      │  • Textbooks     │              │ • Goals          │      │
+│      │  • Exercises     │              │ • Outcomes       │      │
+│      └──────────────────┘              └──────────────────┘      │
+│                                                                  │
+└────────────────────────────────┬─────────────────────────────────┘
+                                 │
+                                 │ (External Quiz Generation - not included)
+                                 │
+                                 ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                          QUIZ ARTIFACTS                          │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│     ┌──────────────────────────────────────────────────────┐     │
+│     │   Generated Quizzes (Standardized JSON Format)       │     │
+│     │                                                      │     │
+│     │  • Question ID, Type, Text                           │     │
+│     │  • Options & Correct Answers                         │     │
+│     │  • Source References                                 │     │
+│     │  • Metadata (Bloom level, difficulty, etc.)          │     │
+│     └──────────────────────────────────────────────────────┘     │
+│                                                                  │
+└───────────────────────────────┬──────────────────────────────────┘
+                                │
+                                ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                  BENCHMARK SYSTEM CORE                           │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─────────────────┐         ┌──────────────────────┐            │
+│  │  Configuration  │────────▶│  Benchmark Runner    │            │
+│  │  Loader (YAML)  │         │                      │            │
+│  └─────────────────┘         │  • Orchestration     │            │
+│                              │  • Multi-run Logic   │            │
+│                              │  • Result Collection │            │
+│                              └───────────┬──────────┘            │
+│                                          │                       │
+│                                          ▼                       │
+│                               ┌──────────────────────┐           │
+│                               │  Metric Engine       │           │
+│                               │                      │           │
+│                               │  • Metric Registry   │           │
+│                               │  • Prompt Generation │           │
+│                               │  • Response Parsing  │           │
+│                               └──────────┬───────────┘           │
+│                                          │                       │
+│                         ┌────────────────┼────────────────┐      │
+│                         │                │                │      │
+│                    ┌────▼─────┐     ┌────▼────┐      ┌────▼────┐ │
+│                    │Alignment │     │Clarity  │      │Distrac- │ │
+│                    │          │     │         │      │tor Qual.│ │
+│                    └────┬─────┘     └────┬────┘      └────┬────┘ │
+│                         │                │                │      │
+│                    ┌────▼─────┐     ┌────▼────┐      ┌────▼────┐ │
+│                    │Cognitive │     │Answer   │      │Cueing   │ │
+│                    │Level     │     │Correct. │      │Absence  │ │
+│                    └────┬─────┘     └────┬────┘      └────┬────┘ │
+│                         │                │                │      │
+│                         └────────────────│────────────────┘      │
+│                                          │                       │
+│                                          ▼                       │
+│                                  ┌─────────────────┐             │
+│                                  │  LLM Strategy   │             │
+│                                  │  (Provider      │             │
+│                                  │   Abstraction)  │             │
+│                                  └────────┬────────┘             │
+│                                           │                      │
+│                         ┌─────────────────┼─────────────────┐    │
+│                         │                 │                 │    │
+│                    ┌────▼────┐       ┌────▼────┐      ┌────▼────┐│                 
+│                    │ OpenAI  │       │ Direct  │      │ Claude  ││
+│                    └─────────┘       └─────────┘      └─────────┘│
+│                                                                  │
+│                         ┌─────────────────┐                      │
+│                         │  Results        │                      │
+│                         │  Aggregator     │                      │
+│                         │                 │                      │
+│                         │  • Statistics   │                      │
+│                         │  • Reports      │                      │
+│                         │  • Visualization│                      │
+│                         └────────┬────────┘                      │
+│                                  │                               │
+└──────────────────────────────────┼───────────────────────────────┘
+                                   │
+                                   ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                            OUTPUT LAYER                          │
+├──────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│            ┌──────────────────┐    ┌──────────────────┐          │
+│            │  Raw Results     │    │  Aggregated      │          │
+│            │  (JSON)          │    │  Statistics      │          │
+│            │                  │    │  (JSON)          │          │
+│            │  • All runs      │    │                  │          │
+│            │  • Timestamps    │    │  • Mean, Median  │          │
+│            │  • Raw responses │    │  • Std Dev       │          │
+│            └──────────────────┘    │  • Min, Max      │          │
+│                                    └──────────────────┘          │
+│                                                                  │
+│             ┌─────────────────────────────────────────┐          │
+│             │  Human-Readable Summary (TXT)           │          │
+│             │                                         │          │
+│             │  • Metric-by-metric breakdown           │          │
+│             │  • Evaluator comparisons                │          │
+│             │  • Statistical summaries                │          │
+│             └─────────────────────────────────────────┘          │
+│                                                                  │
+└─────────────────────────────────────────────────v────────────────┘
+```
+
+### Component Design
+
+#### 1. Data Models (`src/models/`)
+
+**Quiz Schema**
+
+```python
+from dataclasses import dataclass
+from typing import List, Dict, Any, Optional, Union, Literal
+from datetime import datetime
+
+@dataclass
+class QuizQuestion:
+    question_id: str
+    question_type: Literal["multiple_choice", "single_choice", "true_false"]
+    question_text: str
+    options: List[str]
+    correct_answer: Union[str, List[str]]
+    source_reference: Optional[str] = None
+    bloom_level: Optional[str] = None
+    metadata: Dict[str, Any] = None
+
+@dataclass
+class Quiz:
+    quiz_id: str
+    title: str
+    source_material: str
+    questions: List[QuizQuestion]
+    learning_objectives: Optional[List[str]] = None
+    metadata: Dict[str, Any] = None
+    created_at: datetime = None
+```
+
+**Result Schema**
+
+```python
+@dataclass
+class MetricResult:
+    metric_name: str
+    metric_version: str
+    score: float  # 0-100
+    evaluator_model: str
+    question_id: Optional[str]
+    quiz_id: str
+    parameters: Dict[str, Any]
+    evaluated_at: datetime
+    raw_response: Optional[str] = None
+    evaluation_details: Optional[Dict[str, Any]] = None
+
+@dataclass
+class BenchmarkResult:
+    benchmark_id: str
+    benchmark_version: str
+    config_hash: str
+    quiz_id: str
+    run_number: int
+    metrics: List[MetricResult]
+    started_at: datetime
+    completed_at: datetime
+    metadata: Dict[str, Any] = None
+```
+
+#### 2. Metric Interface (`src/metrics/`)
+
+```python
+from abc import ABC, abstractmethod
+from enum import Enum
+from typing import Optional, Dict, Any
+
+class MetricScope(Enum):
+    QUESTION_LEVEL = "question"
+    QUIZ_LEVEL = "quiz"
+
+class BaseMetric(ABC):
+    """Abstract base class for all quality metrics"""
+    
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """Metric identifier (e.g., 'alignment', 'clarity')"""
+        pass
+    
+    @property
+    @abstractmethod
+    def version(self) -> str:
+        """Metric version for result tracking"""
+        pass
+    
+    @property
+    @abstractmethod
+    def scope(self) -> MetricScope:
+        """Whether metric operates on questions or entire quiz"""
+        pass
+    
+    @property
+    @abstractmethod
+    def description(self) -> str:
+        """Human-readable description of what this metric measures"""
+        pass
+    
+    @abstractmethod
+    def get_prompt(self,
+                   question: Optional[QuizQuestion] = None,
+                   quiz: Optional[Quiz] = None,
+                   source_text: Optional[str] = None,
+                   **params) -> str:
+        """Generate LLM prompt for evaluation"""
+        pass
+    
+    @abstractmethod
+    def parse_response(self, llm_response: str) -> float:
+        """Parse LLM response to extract 0-100 score"""
+        pass
+    
+    def validate_parameters(self, params: Dict[str, Any]) -> bool:
+        """Optional: Validate metric-specific parameters"""
+        return True
+```
+
+#### 3. LLM Provider Abstraction (`src/evaluators/`)
+
+```python
+from abc import ABC, abstractmethod
+from typing import Dict, Any
+
+class LLMProvider(ABC):
+    """Abstract base class for LLM providers using Strategy pattern"""
+    
+    @abstractmethod
+    def generate(self,
+                 prompt: str,
+                 temperature: float = 0.0,
+                 max_tokens: int = 1000,
+                 **kwargs) -> str:
+        """Generate response from LLM"""
+        pass
+    
+    @property
+    @abstractmethod
+    def model_name(self) -> str:
+        """Return model identifier for result tracking"""
+        pass
+    
+    @property
+    @abstractmethod
+    def provider_type(self) -> str:
+        """Return provider type (e.g., 'openai', 'anthropic')"""
+        pass
+```
+
+#### 4. Benchmark Runner (`src/runners/`)
+
+```python
+from typing import List, Dict, Any
+
+class BenchmarkRunner:
+    """Orchestrates benchmark execution"""
+    
+    def __init__(self, config: BenchmarkConfig):
+        self.config = config
+        self.metrics: Dict[str, BaseMetric] = {}
+        self.evaluators: Dict[str, LLMProvider] = {}
+        
+    def register_metric(self, metric: BaseMetric) -> None:
+        """Register a metric for evaluation"""
+        pass
+        
+    def register_evaluator(self, name: str, evaluator: LLMProvider) -> None:
+        """Register an LLM evaluator"""
+        pass
+    
+    def run(self, quizzes: List[Quiz]) -> List[BenchmarkResult]:
+        """Execute benchmark for all quizzes across all runs"""
+        pass
+    
+    def evaluate_quiz(self, 
+                     quiz: Quiz, 
+                     run_number: int) -> BenchmarkResult:
+        """Evaluate single quiz with all configured metrics"""
+        pass
+```
+
+### Project Structure
+
+```
+paper-al-quiz-generation-benchmark/
+│
+├── src/
+│   ├── __init__.py
+│   │
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── quiz.py              # Quiz and Question schemas
+│   │   ├── result.py            # Result schemas
+│   │   └── config.py            # Configuration models
+│   │
+│   ├── metrics/
+│   │   ├── __init__.py
+│   │   ├── base.py              # BaseMetric interface
+│   │   ├── alignment.py         # Learning objective alignment
+│   │   ├── cognitive_level.py   # Bloom's taxonomy evaluation
+│   │   ├── clarity.py           # Language clarity assessment
+│   │   ├── answer_correctness.py # Answer key validation
+│   │   ├── distractor_quality.py # Distractor plausibility
+│   │   ├── homogeneity.py       # Option parallelism check
+│   │   ├── cueing_absence.py    # Inadvertent clue detection
+│   │   ├── grammar.py           # Grammatical correctness
+│   │   └── registry.py          # Metric registration/discovery
+│   │
+│   ├── evaluators/
+│   │   ├── __init__.py
+│   │   ├── base.py              # LLMProvider interface
+│   │   ├── azure_openai.py      # Azure OpenAI implementation
+│   │   ├── openai.py            # OpenAI direct API
+│   │   ├── anthropic.py         # Anthropic Claude
+│   │   ├── openai_compatible.py # Generic OpenAI-compatible
+│   │   └── factory.py           # LLMProviderFactory
+│   │
+│   ├── runners/
+│   │   ├── __init__.py
+│   │   └── benchmark.py         # BenchmarkRunner orchestration
+│   │
+│   ├── analysis/
+│   │   ├── __init__.py
+│   │   ├── aggregator.py        # Statistical aggregation
+│   │   ├── reporter.py          # Report generation
+│   │   └── visualizer.py        # (Future) Result visualization
+│   │
+│   └── utils/
+│       ├── __init__.py
+│       ├── config_loader.py     # YAML config loading
+│       ├── io.py                # File I/O utilities
+│       └── validation.py        # Data validation helpers
+│
+├── data/
+│   ├── inputs/                  # Source markdown files
+│   │   └── example_lecture.md
+│   │
+│   ├── quizzes/                 # Generated quizzes (JSON)
+│   │   └── example_quiz.json
+│   │
+│   └── results/                 # Benchmark results
+│       ├── results_<timestamp>.json
+│       ├── aggregated_<timestamp>.json
+│       └── summary_<timestamp>.txt
+│
+├── config/
+│   ├── benchmark_example.yaml
+│   ├── comprehensive_eval.yaml
+│   └── .env.example
+│
+├── tests/
+│   ├── __init__.py
+│   ├── test_models.py
+│   ├── test_metrics.py
+│   ├── test_evaluators.py
+│   ├── test_integration.py
+│   └── fixtures/
+│       ├── sample_quizzes.json
+│       └── sample_sources.md
+│
+├── docs/
+│   ├── metrics/                 # Detailed metric documentation
+│   │   ├── alignment.md
+│   │   ├── cognitive_level.md
+│   │   └── ...
+│   │
+│   ├── examples/                # Usage examples
+│   │   └── custom_metric.md
+│   │
+│   └── api/                     # API documentation
+│       └── reference.md
+│
+├── .env                         # Local environment (not in git)
+├── .gitignore
+├── pyproject.toml
+├── requirements.txt
+├── README.md                    # This file
+└── main.py                      # CLI entry point
+```
+
+### Workflow Diagram
+
+```
+┌──────────────┐
+│ Start        │
+└──────┬───────┘
+       │
+       ▼
+┌──────────────────────┐
+│ Load Configuration   │
+│ • YAML parsing       │
+│ • Environment vars   │
+└──────┬───────────────┘
+       │
+       ▼
+┌──────────────────────┐
+│ Initialize System    │
+│ • Register metrics   │
+│ • Create evaluators  │
+│ • Validate config    │
+└──────┬───────────────┘
+       │
+       ▼
+┌──────────────────────┐
+│ Load Data            │
+│ • Read quizzes       │
+│ • Load sources       │
+│ • Validate schemas   │
+└──────┬───────────────┘
+       │
+       ▼
+┌──────────────────────┐
+│ For each run (1..N)  │◄────────┐
+└──────┬───────────────┘         │
+       │                         │
+       ▼                         │
+┌──────────────────────┐         │
+│ For each quiz        │◄────┐   │
+└──────┬───────────────┘     │   │
+       │                     │   │
+       ▼                     │   │
+┌──────────────────────┐     │   │
+│ For each metric      │◄─┐  │   │
+└──────┬───────────────┘  │  │   │
+       │                  │  │   │
+       ▼                  │  │   │
+┌──────────────────────┐  │  │   │
+│ For each evaluator   │  │  │   │
+│                      │  │  │   │
+│ • Generate prompt    │  │  │   │
+│ • Call LLM           │  │  │   │
+│ • Parse response     │  │  │   │
+│ • Store result       │  │  │   │
+└──────┬───────────────┘  │  │   │
+       │                  │  │   │
+       └──────────────────┘  │   │
+       │                     │   │
+       └─────────────────────┘   │
+       │                         │
+       └─────────────────────────┘
+       │
+       ▼
+┌──────────────────────┐
+│ Aggregate Results    │
+│ • Group by metric    │
+│ • Calculate stats    │
+│ • Generate reports   │
+└──────┬───────────────┘
+       │
+       ▼
+┌──────────────────────┐
+│ Save Outputs         │
+│ • Raw JSON           │
+│ • Aggregated JSON    │
+│ • Text summary       │
+└──────┬───────────────┘
+       │
+       ▼
+┌──────────────┐
+│ End          │
+└──────────────┘
+```
+
+### Key Design Decisions
+
+1. **Stateless Design**: No persistent state between runs; all context provided in configuration
+2. **Strategy Pattern**: Easy swapping of LLM providers per metric without code changes
+3. **Type Safety**: Full type hints with Python dataclasses for compile-time error detection
+4. **Deterministic Evaluation**: Fixed temperature=0.0, versioned configs, timestamped results
+5. **Extensibility**: Clear interfaces for metrics and evaluators; plugin architecture
+6. **Reproducibility**: Config hashing, version tracking, complete result metadata
+7. **Separation of Concerns**: Distinct layers for data, metrics, evaluation, and analysis
+8. **Research-Based**: Metrics grounded in educational assessment literature
 
 ---
 
@@ -604,34 +1347,64 @@ Create a new file `src/metrics/validity.py`:
 
 ```python
 from .base import BaseMetric, MetricScope
+from src.models.quiz import QuizQuestion, Quiz
+from typing import Optional
 
 class ValidityMetric(BaseMetric):
+    """Evaluates whether question measures what it intends to measure"""
+    
     @property
     def name(self) -> str:
         return "validity"
-
+    
     @property
     def version(self) -> str:
         return "1.0"
-
+    
     @property
     def scope(self) -> MetricScope:
         return MetricScope.QUESTION_LEVEL
-
-    def get_prompt(self, question=None, **params):
-        return f"""Rate the validity of this question on a 0-100 scale.
+    
+    @property
+    def description(self) -> str:
+        return "Assesses construct validity: does the question measure the intended knowledge or skill?"
+    
+    def get_prompt(self, 
+                   question: Optional[QuizQuestion] = None,
+                   quiz: Optional[Quiz] = None,
+                   source_text: Optional[str] = None,
+                   **params) -> str:
+        
+        learning_objective = params.get('learning_objective', '')
+        
+        return f"""Evaluate the construct validity of this assessment question.
+        
 Question: {question.question_text}
-Answer options: {', '.join(question.options)}
-Correct answer: {question.correct_answer}
+Options: {', '.join(question.options)}
+Correct Answer: {question.correct_answer}
+
+Learning Objective: {learning_objective}
+
+Source Material:
+{source_text[:500] if source_text else 'Not provided'}
+
+Rate the validity on a 0-100 scale:
+- 0-25: Question does not measure the intended construct
+- 26-50: Question partially measures intended construct but has major validity issues
+- 51-75: Question measures intended construct with minor validity concerns
+- 76-100: Question has strong construct validity
 
 Respond with only a number 0-100."""
-
+    
     def parse_response(self, llm_response: str) -> float:
         import re
+        # Extract first number found in response
         match = re.search(r'\b(\d+(?:\.\d+)?)\b', llm_response)
         if match:
-            return float(match.group(1))
-        raise ValueError("Could not parse score")
+            score = float(match.group(1))
+            # Clamp to 0-100 range
+            return max(0.0, min(100.0, score))
+        raise ValueError(f"Could not parse score from response: {llm_response}")
 ```
 
 #### Step 2: Register Metric
@@ -642,20 +1415,26 @@ In `main.py`:
 from src.metrics.validity import ValidityMetric
 
 def register_metrics():
-    MetricRegistry.register(DifficultyMetric)
-    MetricRegistry.register(CoverageMetric)
+    """Register all available metrics"""
+    MetricRegistry.register(AlignmentMetric)
+    MetricRegistry.register(CognitiveLevelMetric)
     MetricRegistry.register(ClarityMetric)
-    MetricRegistry.register(ValidityMetric)  # Add this
+    MetricRegistry.register(DistractorQualityMetric)
+    MetricRegistry.register(ValidityMetric)  # Add your new metric
 ```
 
-#### Step 3: Use in Config
+#### Step 3: Use in Configuration
 
 ```yaml
 metrics:
   - name: "validity"
     version: "1.0"
     evaluators: ["gpt4"]
+    parameters:
+      learning_objective: "auto_extract"
 ```
+
+---
 
 ### Adding Custom Evaluators
 
@@ -665,21 +1444,52 @@ Create `src/evaluators/custom_provider.py`:
 
 ```python
 from .base import LLMProvider
+import requests
 
 class CustomProvider(LLMProvider):
+    """Custom LLM provider implementation"""
+    
     def __init__(self, api_key: str, endpoint: str, model: str):
         self.api_key = api_key
         self.endpoint = endpoint
         self.model = model
-
-    def generate(self, prompt: str, temperature: float = 0.0, 
-                 max_tokens: int = 1000, **kwargs) -> str:
-        # Implement your API call here
-        pass
-
+    
+    def generate(self, 
+                 prompt: str, 
+                 temperature: float = 0.0, 
+                 max_tokens: int = 1000, 
+                 **kwargs) -> str:
+        """Call your custom API"""
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            **kwargs
+        }
+        
+        response = requests.post(
+            f"{self.endpoint}/completions",
+            headers=headers,
+            json=payload,
+            timeout=60
+        )
+        
+        response.raise_for_status()
+        return response.json()["choices"][0]["text"]
+    
     @property
     def model_name(self) -> str:
         return self.model
+    
+    @property
+    def provider_type(self) -> str:
+        return "custom"
 ```
 
 #### Step 2: Register in Factory
@@ -700,334 +1510,73 @@ class LLMProviderFactory:
                 endpoint=os.getenv("CUSTOM_ENDPOINT"),
                 model=provider_config["model"]
             )
-        # ... other providers
+        elif provider_type == "openai":
+            # ... existing providers
+            pass
 ```
 
-#### Step 3: Use in Config
+#### Step 3: Use in Configuration
 
 ```yaml
 evaluators:
-  my_custom:
+  my_custom_model:
     provider: "custom"
-    model: "my-model-name"
+    model: "my-model-v1"
     temperature: 0.0
     max_tokens: 500
 ```
 
+---
+
 ### Customizing Analysis
 
-You can write custom analysis scripts:
+You can write custom analysis scripts to extract insights:
 
 ```python
 import json
-from src.models.result import BenchmarkResult, MetricResult
+import pandas as pd
+from pathlib import Path
 
 # Load results
-with open('data/results/results_20240115_103000.json') as f:
+results_file = Path("data/results/results_20240115_103000.json")
+with open(results_file) as f:
     results_data = json.load(f)
 
-# Custom analysis
+# Convert to DataFrame for analysis
+records = []
 for result in results_data:
     quiz_id = result['quiz_id']
+    run_num = result['run_number']
+    
     for metric in result['metrics']:
-        if metric['metric_name'] == 'difficulty':
-            print(f"Quiz {quiz_id}, Q{metric['question_id']}: {metric['score']}")
+        records.append({
+            'quiz_id': quiz_id,
+            'run': run_num,
+            'metric': metric['metric_name'],
+            'evaluator': metric['evaluator_model'],
+            'question_id': metric.get('question_id'),
+            'score': metric['score']
+        })
+
+df = pd.DataFrame(records)
+
+# Analysis examples
+print("Average scores by metric:")
+print(df.groupby('metric')['score'].mean())
+
+print("\nEvaluator agreement:")
+pivot = df.pivot_table(
+    values='score', 
+    index=['quiz_id', 'question_id', 'metric'],
+    columns='evaluator',
+    aggfunc='mean'
+)
+print(pivot.corr())
+
+print("\nQuestions with highest variance:")
+variance = df.groupby(['quiz_id', 'question_id', 'metric'])['score'].var()
+print(variance.nlargest(10))
 ```
-
----
-
-## Architecture
-
-### System Overview
-
-```
-┌─────────────────┐
-│  Input Sources  │ (Markdown files: lectures, exercises, competencies)
-└────────┬────────┘
-         │
-         │ (External Quiz Generation - not part of this system)
-         │
-         ▼
-┌─────────────────┐
-│Generated Quizzes│ (Standardized JSON format)
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────────────────────────────────────────┐
-│            BENCHMARK SYSTEM                          │
-│                                                      │
-│  ┌──────────────┐      ┌─────────────────┐         │
-│  │   Config     │──────▶│  Benchmark      │         │
-│  │   Loader     │      │  Runner         │         │
-│  └──────────────┘      └────────┬────────┘         │
-│                                  │                   │
-│                        ┌─────────▼────────┐         │
-│                        │  Metric Engine   │         │
-│                        └────────┬─────────┘         │
-│                                 │                    │
-│          ┌──────────────────────┼──────────┐        │
-│          │                      │          │        │
-│     ┌────▼─────┐          ┌────▼────┐ ┌───▼────┐  │
-│     │ Metric A │          │Metric B │ │Metric C│  │
-│     └────┬─────┘          └────┬────┘ └───┬────┘  │
-│          │                     │           │        │
-│          └──────────┬──────────┴───────────┘        │
-│                     │                                │
-│              ┌──────▼──────┐                        │
-│              │  LLM        │                        │
-│              │  Strategy   │                        │
-│              └──────┬──────┘                        │
-│                     │                                │
-│       ┌─────────────┼─────────────┐                 │
-│       │             │             │                 │
-│  ┌────▼────┐  ┌────▼────┐  ┌────▼────┐            │
-│  │ Azure   │  │ OpenAI  │  │Anthropic│            │
-│  │ OpenAI  │  │   API   │  │  Claude │            │
-│  └─────────┘  └─────────┘  └─────────┘            │
-│                                                      │
-│              ┌──────────────┐                       │
-│              │   Results    │                       │
-│              │  Aggregator  │                       │
-│              └──────┬───────┘                       │
-└─────────────────────┼────────────────────────────────┘
-                      │
-                      ▼
-              ┌───────────────┐
-              │ JSON Results  │ (Timestamped, versioned)
-              └───────────────┘
-```
-
-### Component Design
-
-#### 1. Data Models (`src/models/`)
-
-**Quiz Schema**
-```python
-@dataclass
-class QuizQuestion:
-    question_id: str
-    question_type: Literal["multiple_choice", "single_choice", "true_false"]
-    question_text: str
-    options: List[str]
-    correct_answer: Union[str, List[str]]
-    source_reference: Optional[str]
-    metadata: Dict[str, Any]
-
-@dataclass
-class Quiz:
-    quiz_id: str
-    title: str
-    source_material: str
-    questions: List[QuizQuestion]
-    metadata: Dict[str, Any]
-    created_at: datetime
-```
-
-**Result Schema**
-```python
-@dataclass
-class MetricResult:
-    metric_name: str
-    metric_version: str
-    score: float  # 0-100
-    evaluator_model: str
-    question_id: Optional[str]
-    quiz_id: str
-    parameters: Dict[str, Any]
-    evaluated_at: datetime
-    raw_response: Optional[str]
-
-@dataclass
-class BenchmarkResult:
-    benchmark_id: str
-    benchmark_version: str
-    config_hash: str
-    quiz_id: str
-    metrics: List[MetricResult]
-    started_at: datetime
-    completed_at: datetime
-    metadata: Dict[str, Any]
-```
-
-#### 2. Metric Interface (`src/metrics/`)
-
-```python
-from abc import ABC, abstractmethod
-from enum import Enum
-
-class MetricScope(Enum):
-    QUESTION_LEVEL = "question"
-    QUIZ_LEVEL = "quiz"
-
-class BaseMetric(ABC):
-    """Abstract base class for all metrics"""
-
-    @property
-    @abstractmethod
-    def name(self) -> str:
-        """Metric identifier"""
-        pass
-
-    @property
-    @abstractmethod
-    def version(self) -> str:
-        """Metric version for result tracking"""
-        pass
-
-    @property
-    @abstractmethod
-    def scope(self) -> MetricScope:
-        """Whether metric operates on questions or entire quiz"""
-        pass
-
-    @abstractmethod
-    def get_prompt(self,
-                   question: Optional[QuizQuestion] = None,
-                   quiz: Optional[Quiz] = None,
-                   source_text: Optional[str] = None,
-                   **params) -> str:
-        """Generate LLM prompt for evaluation"""
-        pass
-
-    @abstractmethod
-    def parse_response(self, llm_response: str) -> float:
-        """Parse LLM response to extract 0-100 score"""
-        pass
-```
-
-#### 3. LLM Provider Abstraction (`src/evaluators/`)
-
-```python
-from abc import ABC, abstractmethod
-
-class LLMProvider(ABC):
-    """Abstract base class for LLM providers using Strategy pattern"""
-
-    @abstractmethod
-    def generate(self,
-                 prompt: str,
-                 temperature: float = 0.0,
-                 max_tokens: int = 1000,
-                 **kwargs) -> str:
-        """Generate response from LLM"""
-        pass
-
-    @property
-    @abstractmethod
-    def model_name(self) -> str:
-        """Return model identifier"""
-        pass
-```
-
-#### 4. Benchmark Runner (`src/runners/`)
-
-```python
-class BenchmarkRunner:
-    """Orchestrates benchmark execution"""
-
-    def __init__(self, config: BenchmarkConfig):
-        self.config = config
-        self.metrics: Dict[str, BaseMetric] = {}
-        self.evaluators: Dict[str, LLMProvider] = {}
-
-    def run(self, quizzes: List[Quiz]) -> List[BenchmarkResult]:
-        """Execute benchmark for all quizzes"""
-        pass
-
-    def evaluate_quiz(self, quiz: Quiz, run_number: int) -> BenchmarkResult:
-        """Evaluate single quiz with all configured metrics"""
-        pass
-```
-
-### Project Structure
-
-```
-paper-al-quiz-generation-benchmark/
-├── src/
-│   ├── __init__.py
-│   ├── models/
-│   │   ├── __init__.py
-│   │   ├── quiz.py           # Quiz and Question schemas
-│   │   ├── result.py         # Result schemas
-│   │   └── config.py         # Configuration models
-│   ├── metrics/
-│   │   ├── __init__.py
-│   │   ├── base.py           # BaseMetric interface
-│   │   ├── difficulty.py     # Difficulty metric implementation
-│   │   ├── coverage.py       # Coverage metric implementation
-│   │   ├── clarity.py        # Clarity metric implementation
-│   │   └── registry.py       # Metric registration and discovery
-│   ├── evaluators/
-│   │   ├── __init__.py
-│   │   ├── base.py           # LLMProvider interface
-│   │   ├── azure_openai.py
-│   │   ├── openai.py
-│   │   ├── anthropic.py
-│   │   ├── openai_compatible.py
-│   │   └── factory.py        # LLMProviderFactory
-│   ├── runners/
-│   │   ├── __init__.py
-│   │   └── benchmark.py      # BenchmarkRunner
-│   ├── analysis/
-│   │   ├── __init__.py
-│   │   ├── aggregator.py     # Results aggregation
-│   │   └── reporter.py       # Report generation
-│   └── utils/
-│       ├── __init__.py
-│       ├── config_loader.py  # YAML config loading
-│       └── io.py             # File I/O utilities
-├── data/
-│   ├── inputs/               # Source markdown files
-│   ├── quizzes/              # Generated quizzes (JSON)
-│   └── results/              # Benchmark results
-├── config/
-│   ├── benchmark_example.yaml
-│   └── .env.example
-├── tests/
-│   ├── __init__.py
-│   ├── test_models.py
-│   ├── test_metrics.py
-│   ├── test_evaluators.py
-│   └── test_integration.py
-├── .env
-├── .gitignore
-├── pyproject.toml
-├── requirements.txt
-└── main.py                   # CLI entry point
-```
-
-### Workflow
-
-1. **Setup**: Install dependencies, configure API keys
-2. **Prepare Data**: Add markdown source files and quiz JSONs
-3. **Run Benchmark**: Execute with YAML config
-4. **View Results**: Analyze JSON results and text summaries
-
-### Key Design Decisions
-
-1. **Stateless Design**: No persistent state between runs; all context in config
-2. **Strategy Pattern**: Easy swapping of LLM providers per metric
-3. **Type Safety**: Full type hints with Python dataclasses
-4. **Deterministic**: Fixed temperature=0.0, versioned configs, timestamped results
-5. **Extensible**: Clear interfaces for metrics and evaluators
-6. **Reproducible**: Config hashing, version tracking, complete result metadata
-
-### Supported Metrics
-
-#### Difficulty (Question-Level)
-- Bloom's Taxonomy evaluation
-- Webb's Depth of Knowledge
-- Parameterizable rubric and target audience
-
-#### Coverage (Quiz-Level)
-- Breadth and depth analysis
-- Source material alignment
-- Configurable granularity
-
-#### Clarity (Question-Level)
-- Question wording assessment
-- Answer option quality
-- Ambiguity detection
 
 ---
 
@@ -1035,185 +1584,183 @@ paper-al-quiz-generation-benchmark/
 
 ### 1. Configuration Management
 
-- **Use descriptive names**: `config/gpt4_vs_claude_difficulty.yaml`
-- **Version your configs**: Include version in benchmark config
-- **Document parameters**: Add comments in YAML explaining choices
+✅ **DO**:
+- Use descriptive names: `config/gpt4_vs_claude_alignment.yaml`
+- Include version in benchmark config for tracking
+- Add comments in YAML explaining parameter choices
+- Keep separate configs for experiments vs. production
+
+❌ **DON'T**:
+- Overwrite configs without versioning
+- Use generic names like `config1.yaml`
+- Hard-code parameters in source code
 
 ### 2. Reproducibility
 
-- **Set temperature to 0.0**: For deterministic results
-- **Use multiple runs**: At least 3-5 for reliable statistics
-- **Save configurations**: Keep YAML files in version control
-- **Record model versions**: Specify exact model names
+✅ **DO**:
+- Set temperature to 0.0 for deterministic results
+- Use at least 3-5 runs for reliable statistics
+- Save all configurations in version control
+- Specify exact model names (e.g., `gpt-4-0613`, not just `gpt-4`)
+- Record timestamps and config hashes in results
+
+❌ **DON'T**:
+- Use temperature > 0 without documenting why
+- Run benchmarks only once
+- Delete old result files
+- Use "latest" model versions without recording specifics
 
 ### 3. Cost Management
 
-- **Start small**: Test with 1-2 questions before full run
-- **Use cheaper models first**: gpt-3.5-turbo for initial testing
-- **Monitor API usage**: Check your provider dashboards
-- **Cache results**: Save outputs to avoid re-running
+✅ **DO**:
+- Start with 1-2 questions for testing
+- Use cheaper models (gpt-3.5-turbo) for development
+- Monitor API usage dashboards
+- Cache results to avoid re-running
+- Set `max_tokens` appropriately for each metric
+
+❌ **DON'T**:
+- Run full benchmarks during development
+- Use GPT-4 for all testing
+- Ignore rate limits
+- Re-run unnecessarily
 
 ### 4. Data Quality
 
-- **Validate quizzes**: Ensure JSON format is correct
-- **Check source alignment**: Verify source_material paths exist
-- **Review questions**: Ensure questions are well-formed
-- **Test incrementally**: Add quizzes gradually
+✅ **DO**:
+- Validate JSON schemas before running
+- Ensure source_material paths exist
+- Review questions for well-formedness
+- Test with small dataset first
+- Include learning objectives when available
+
+❌ **DON'T**:
+- Skip validation steps
+- Assume JSON is well-formed
+- Run benchmarks on untested data
 
 ### 5. Metric Selection
 
-- **Choose relevant metrics**: Not all metrics apply to all quizzes
-- **Start with core metrics**: Difficulty, coverage, clarity
-- **Add domain-specific metrics**: Create custom metrics for your needs
-- **Validate metric prompts**: Test prompts manually first
+✅ **DO**:
+- Choose metrics relevant to your research question
+- Start with core metrics (alignment, clarity, cognitive level)
+- Create domain-specific metrics for specialized content
+- Test metric prompts manually before automation
+- Document metric rationale in config comments
+
+❌ **DON'T**:
+- Enable all metrics without purpose
+- Use metrics inappropriate for question type
+- Deploy untested custom metrics
 
 ### 6. Result Interpretation
 
-- **Look at trends**: Compare across multiple quizzes
-- **Check consistency**: Low std dev indicates reliable metric
-- **Cross-validate**: Use multiple evaluators for important metrics
-- **Review outliers**: Examine questions with extreme scores
-- **Context matters**: Scores depend on target audience and domain
+✅ **DO**:
+- Look at trends across multiple quizzes
+- Check for consistency (low std dev = reliable)
+- Cross-validate with multiple evaluators
+- Review outliers and raw LLM responses
+- Consider context (domain, audience, objectives)
 
----
-
-## Project Status
-
-### ✅ Implementation Complete
-
-All planned components have been implemented and are ready to use.
-
-#### Core Components
-
-✅ **Data Models** (`src/models/`) - Quiz, Question, Result schemas with validation
-
-✅ **LLM Evaluators** (`src/evaluators/`) - Azure OpenAI, OpenAI, Anthropic, OpenAI-compatible
-
-✅ **Metrics** (`src/metrics/`) - Difficulty, Coverage, Clarity with extensible interface
-
-✅ **Benchmark Runner** (`src/runners/`) - Complete orchestration of evaluation workflow
-
-✅ **Analysis & Reporting** (`src/analysis/`) - Statistical aggregation and report generation
-
-✅ **Utilities** (`src/utils/`) - Config loading, JSON I/O
-
-✅ **Main Application** (`main.py`) - CLI entry point with full argument parsing
-
-#### Documentation
-
-✅ Comprehensive README
-✅ Detailed architecture documentation
-✅ Quick start guide
-✅ Complete usage reference
-
-#### Configuration & Examples
-
-✅ Example configuration files
-✅ Example quiz and source material
-✅ Environment template
-
-#### Testing
-
-✅ Unit tests for data models
-✅ Test infrastructure ready for expansion
-
-### 📊 Key Features
-
-- **Clean Architecture** - Strategy pattern, type-safe Python
-- **Flexible Configuration** - YAML-based benchmark configs
-- **Statistical Rigor** - Multiple runs with aggregation
-- **Extensibility** - Easy to add metrics and providers
-- **Production Ready** - Complete with examples and tests
-
-### 🚀 Ready to Use
-
-The framework is **production-ready** and can be used immediately:
-
-```bash
-# Install
-pip install -r requirements.txt
-
-# Configure
-cp config/.env.example .env
-# Add your API keys to .env
-
-# Run
-python main.py --config config/benchmark_example.yaml
-
-# View results
-cat data/results/summary_*.txt
-```
-
-### 📦 Dependencies
-
-All managed via `requirements.txt`:
-- LangChain (LLM abstraction)
-- Pydantic (data validation)
-- PyYAML (config loading)
-- python-dotenv (environment management)
-- OpenAI SDK
-- Anthropic SDK
-- pytest (testing)
+❌ **DON'T**:
+- Over-interpret single data points
+- Ignore high variance warnings
+- Trust one evaluator blindly
+- Compare scores across different metrics
 
 ---
 
 ## Troubleshooting
 
-### "Module not found" errors
+### Common Issues
+
+#### "Module not found" errors
 
 ```bash
-# Make sure you're in the virtual environment
-source venv/bin/activate
+# Ensure virtual environment is activated
+source venv/bin/activate  # or venv\Scripts\activate on Windows
 
 # Reinstall dependencies
-pip install -r requirements.txt
+pip install -r requirements.txt --upgrade
 ```
 
-### API Key errors
+#### API Key errors
 
-- Check that your `.env` file is in the root directory
-- Verify your API keys are correct
-- Make sure the provider in your YAML matches what's configured in `.env`
+**Symptoms**: `AuthenticationError`, `Invalid API key`
 
-### No quizzes found
+**Solutions**:
+1. Verify `.env` file is in project root
+2. Check API keys are correct (no extra spaces)
+3. Ensure provider in YAML matches `.env` configuration
+4. Test API key manually with provider's playground
 
-- Ensure quiz JSON files are in `data/quizzes/`
-- Check that the JSON format is valid
-- Verify `source_material` field points to an existing file in `data/inputs/`
+#### No quizzes found
 
-### High variance in results?
+**Symptoms**: `Loaded 0 quizzes`
 
-- Increase number of runs
-- Check prompt clarity
-- Try different evaluators
+**Solutions**:
+1. Verify quiz JSON files are in correct directory
+2. Check JSON format validity: `python -m json.tool data/quizzes/quiz.json`
+3. Ensure `source_material` field references existing file
+4. Review directory paths in config YAML
 
-### Unexpected scores?
+#### High variance in results
 
-- Review raw LLM responses in results JSON
-- Test metric prompt manually
-- Verify source material quality
+**Symptoms**: Std dev > 10
 
-### API errors?
+**Possible causes**:
+- Ambiguous metric prompts
+- Complex questions with multiple interpretations
+- Insufficient runs
 
-- Check API key validity
-- Verify rate limits
-- Ensure sufficient credits
+**Solutions**:
+- Increase number of runs (5-10)
+- Refine metric prompt for clarity
+- Review raw LLM responses for patterns
+- Try different evaluator models
 
-### Memory issues?
+#### Unexpected scores
 
+**Symptoms**: Scores don't match manual assessment
+
+**Diagnostic steps**:
+1. Review raw LLM responses in `results_*.json`
+2. Test metric prompt manually in LLM playground
+3. Verify source material quality and completeness
+4. Check if questions align with learning objectives
+5. Compare across multiple evaluators
+
+#### API rate limit errors
+
+**Symptoms**: `RateLimitError`, `429 Too Many Requests`
+
+**Solutions**:
+- Add delays between API calls (implement in provider)
+- Use batch processing with smaller batches
+- Check your tier limits with provider
+- Spread evaluation across longer time period
+
+#### Memory issues
+
+**Symptoms**: `MemoryError`, system slowdown
+
+**Solutions**:
 - Process quizzes in batches
-- Reduce max_tokens
-- Use lighter models
+- Reduce `max_tokens` in config
+- Use lighter models (gpt-3.5-turbo vs gpt-4)
+- Clear results between runs
 
 ---
 
 ## Example Workflows
 
-### Workflow 1: Quick Evaluation
+### Workflow 1: Quick Single-Model Evaluation
+
+**Use case**: Fast evaluation during development
 
 ```bash
 # 1. Create minimal config
-cat > config/quick_test.yaml << EOF
+cat > config/quick_test.yaml << 'EOF'
 benchmark:
   name: "quick-test"
   version: "1.0.0"
@@ -1227,104 +1774,287 @@ evaluators:
     max_tokens: 500
 
 metrics:
-  - name: "difficulty"
+  - name: "clarity"
     version: "1.0"
     evaluators: ["gpt35"]
 
 inputs:
   quiz_directory: "data/quizzes"
   source_directory: "data/inputs"
+
 outputs:
   results_directory: "data/results"
 EOF
 
-# 2. Run
+# 2. Run benchmark
 python main.py --config config/quick_test.yaml
 
 # 3. View results
-cat data/results/summary_*.txt
+cat data/results/summary_*.txt | tail -20
 ```
 
-### Workflow 2: Comprehensive Comparison
+---
+
+### Workflow 2: Comprehensive Multi-Model Comparison
+
+**Use case**: Research paper evaluation, model selection
 
 ```bash
-# Use comprehensive config with multiple evaluators
-python main.py --config config/comprehensive.yaml --output-prefix comparison_v1
+# 1. Use comprehensive config
+python main.py \
+  --config config/comprehensive_eval.yaml \
+  --output-prefix experiment_comparison_v1
 
-# Analyze results
-python -c "
+# 2. Analyze evaluator agreement
+python << 'EOF'
 import json
-with open('data/results/aggregated_comparison_v1.json') as f:
-    data = json.load(f)
-    for metric, values in data['aggregations'].items():
-        print(f'{metric}: {values[\"mean\"]:.2f} ± {values[\"std_dev\"]:.2f}')
-"
+import pandas as pd
+from pathlib import Path
+
+# Load results
+results = json.load(open('data/results/aggregated_experiment_comparison_v1.json'))
+
+# Extract evaluator comparisons
+for metric_name, metric_data in results['aggregations'].items():
+    print(f"\n{metric_name}:")
+    for evaluator, stats in metric_data.items():
+        print(f"  {evaluator}: {stats['mean']:.2f} ± {stats['std_dev']:.2f}")
+EOF
+
+# 3. Generate comparison report
+python scripts/generate_comparison_report.py \
+  --input data/results/aggregated_experiment_comparison_v1.json \
+  --output reports/model_comparison.pdf
 ```
 
-### Workflow 3: Iterative Development
+---
+
+### Workflow 3: Iterative Metric Development
+
+**Use case**: Developing and refining a new custom metric
 
 ```bash
-# 1. Test new metric with one evaluator
-python main.py --config config/test_new_metric.yaml
+# 1. Create test config with new metric
+cat > config/test_new_metric.yaml << 'EOF'
+benchmark:
+  name: "metric-development"
+  version: "0.1.0"
+  runs: 3
 
-# 2. Review results
-cat data/results/summary_*.txt
+evaluators:
+  gpt4:
+    provider: "openai"
+    model: "gpt-4"
+    temperature: 0.0
+    max_tokens: 500
 
-# 3. Refine metric implementation
-# Edit src/metrics/my_metric.py
+metrics:
+  - name: "my_new_metric"
+    version: "0.1"
+    evaluators: ["gpt4"]
+    parameters:
+      custom_param: "value"
 
-# 4. Re-run
-python main.py --config config/test_new_metric.yaml
+inputs:
+  quiz_directory: "data/quizzes/test_subset"
+  source_directory: "data/inputs"
 
-# 5. Compare results
-diff data/results/summary_*.txt
+outputs:
+  results_directory: "data/results"
+EOF
+
+# 2. Run initial test
+python main.py --config config/test_new_metric.yaml --output-prefix dev_v1
+
+# 3. Review results and identify issues
+cat data/results/summary_dev_v1.txt
+
+# 4. Refine metric implementation
+# Edit src/metrics/my_new_metric.py
+
+# 5. Re-run with new version
+# Update version in config to "0.2"
+python main.py --config config/test_new_metric.yaml --output-prefix dev_v2
+
+# 6. Compare versions
+python << 'EOF'
+import json
+
+v1 = json.load(open('data/results/aggregated_dev_v1.json'))
+v2 = json.load(open('data/results/aggregated_dev_v2.json'))
+
+print("Version comparison:")
+print(f"v0.1 mean: {v1['aggregations']['my_new_metric']['gpt4']['mean']:.2f}")
+print(f"v0.2 mean: {v2['aggregations']['my_new_metric']['gpt4']['mean']:.2f}")
+print(f"v0.1 std:  {v1['aggregations']['my_new_metric']['gpt4']['std_dev']:.2f}")
+print(f"v0.2 std:  {v2['aggregations']['my_new_metric']['gpt4']['std_dev']:.2f}")
+EOF
 ```
 
 ---
 
-## Getting Help
+### Workflow 4: Large-Scale Production Evaluation
 
-### Documentation Resources
+**Use case**: Evaluating production quiz generation system
 
-- This comprehensive guide covers all aspects of the framework
-- Check example files in `config/`, `data/quizzes/`, `data/inputs/`
-- Review configuration in `config/benchmark_example.yaml`
-- Examine source code in `src/` for implementation details
+```bash
+# 1. Prepare environment
+export BENCHMARK_ENV=production
+source .env.production
 
-### Common Questions
+# 2. Run production benchmark with full metrics
+python main.py \
+  --config config/production_full_eval.yaml \
+  --output-prefix prod_eval_$(date +%Y%m%d) \
+  --env .env.production
 
-**Q: How do I add a new metric?**
-A: See the [Adding Custom Metrics](#adding-custom-metrics) section above.
+# 3. Generate comprehensive reports
+python scripts/generate_report.py \
+  --results data/results/aggregated_prod_eval_*.json \
+  --format pdf \
+  --include-visualizations \
+  --output reports/production_evaluation_$(date +%Y%m%d).pdf
 
-**Q: Can I use local/open-source models?**
-A: Yes! Use the `openai_compatible` provider with any OpenAI-compatible API endpoint.
+# 4. Upload results to storage
+aws s3 cp \
+  data/results/ \
+  s3://quiz-benchmark-results/$(date +%Y/%m/%d)/ \
+  --recursive
 
-**Q: How many runs should I use?**
-A: Start with 3-5 runs. Increase if you see high variance (std dev > 10).
-
-**Q: Which model should I use as evaluator?**
-A: GPT-4 provides most reliable results. GPT-3.5-turbo is cheaper for testing. Compare multiple models for validation.
-
-**Q: How do I interpret the scores?**
-A: Scores are 0-100. Higher is better (more difficult, better coverage, clearer). Compare relative scores, not absolute values.
+# 5. Send notification
+python scripts/send_notification.py \
+  --channel slack \
+  --message "Production benchmark completed" \
+  --attach reports/production_evaluation_$(date +%Y%m%d).pdf
+```
 
 ---
 
-## Future Enhancement Ideas
+## Project Status
 
-The framework is complete but can be extended with:
+### 🚧 Currently In Development
 
-- Additional metrics (validity, discrimination, distractor quality)
+This benchmark framework is an **active research project** with ongoing development and refinement.
+
+#### ✅ Completed Components
+
+**Core Infrastructure**
+- ✅ Data models with full type safety
+- ✅ LLM provider abstraction (Azure OpenAI, OpenAI, Anthropic, OpenAI-compatible)
+- ✅ Benchmark orchestration and runner
+- ✅ Configuration management (YAML + environment variables)
+- ✅ Result aggregation and statistical analysis
+- ✅ CLI interface
+
+**Documentation**
+- ✅ Comprehensive usage guide
+- ✅ Architecture documentation
+- ✅ Quick start tutorial
+- ✅ API reference
+
+**Quality Assurance**
+- ✅ Unit test infrastructure
+- ✅ Example configurations
+- ✅ Sample data for testing
+
+#### 🏗️ In Progress
+
+**Metrics Implementation**
+- 🏗️ Alignment with Learning Objectives
+- 🏗️ Cognitive Level Appropriateness
+- 🏗️ Clarity and Precision
+- 🏗️ Answer Key Correctness
+- 🏗️ Distractor Quality
+- 🏗️ Homogeneous Options
+- 🏗️ Absence of Cueing
+- 🏗️ Grammatical Correctness
+
+**Validation & Testing**
+- 🏗️ Metric prompt optimization
+- 🏗️ Inter-rater reliability studies
+- 🏗️ Comparison with human expert ratings
+- 🏗️ Statistical validation of metrics
+
+#### 📋 Planned Enhancements
+
+**Short Term**
+- Batch processing optimization
 - Caching layer for LLM responses
-- Database backend option
+- Enhanced error handling and recovery
+- Progress bar for long-running benchmarks
+
+**Medium Term**
 - Web UI for result visualization
-- Comparison reports between benchmark versions
-- Export to CSV/Excel
-- Integration with quiz generation systems
-- Batch processing optimizations
-- Support for more LLM providers
-- Automated metric validation
+- Database backend (optional)
+- Export to CSV/Excel formats
 - Statistical significance testing
+- Comparison reports between benchmark versions
+
+**Long Term**
+- Integration with quiz generation pipelines
+- Real-time evaluation API
+- Additional metric library
+- Multi-language support
+- Automated metric calibration
+
+### 📊 Current Capabilities
+
+**What Works Now**:
+- Running benchmarks with any LLM provider
+- Custom metric development and integration
+- Multi-run statistical aggregation
+- Result export (JSON, TXT)
+- Reproducible evaluation workflows
+
+**What's Being Refined**:
+- Metric prompt engineering for optimal accuracy
+- Evaluation consistency across different LLM providers
+- Correlation with human expert judgments
+- Statistical methodologies for aggregation
+
+### 🎯 Research Goals
+
+This framework supports several ongoing research objectives:
+
+1. **Automated Quality Assessment**: Developing reliable LLM-based metrics for quiz quality
+2. **Evaluator Comparison**: Understanding strengths/weaknesses of different LLMs as judges
+3. **Metric Validation**: Correlating automated metrics with expert human assessment
+4. **Best Practices**: Identifying optimal prompting strategies for educational assessment
+
+### 🤝 Contributing
+
+This is a research project and we welcome contributions:
+
+- **Metric Development**: Propose new quality metrics based on assessment literature
+- **Prompt Engineering**: Improve metric prompts for better accuracy
+- **Validation Studies**: Compare automated scores with human expert ratings
+- **Use Cases**: Share your benchmark configurations and findings
+
+### 📬 Feedback & Contact
+
+We value feedback from researchers and practitioners:
+
+- **Issues**: Report bugs or suggest features via GitLab issues
+- **Discussions**: Share findings or ask questions in GitLab discussions
+- **Collaboration**: Contact [your-email] for research collaboration
+
+---
+
+## References
+
+### Educational Assessment Literature
+
+[2] Anderson, L. W., & Krathwohl, D. R. (2001). *A taxonomy for learning, teaching, and assessing: A revision of Bloom's taxonomy of educational objectives*. Addison Wesley Longman, Inc.
+
+[8] Downing, S. M. (2005). The effects of violating standard item writing principles on tests and students: The consequences of using flawed test items on achievement examinations in medical education. *Advances in Health Sciences Education*, 10(2), 133–143. https://doi.org/10.1007/s10459-004-4019-5
+
+[9] Gierl, M. J., Bulut, O., Guo, Q., & Zhang, X. (2017). Developing, analyzing, and using distractors for multiple-choice tests in education: A comprehensive review. *Review of Educational Research*, 87(6), 1082–1116. https://doi.org/10.3102/0034654317726529
+
+[10] Haladyna, T. M., Downing, S. M., & Rodriguez, M. C. (2002). A review of multiple-choice item-writing guidelines for classroom assessment. *Applied Measurement in Education*, 15(3), 309–333. https://doi.org/10.1207/S15324818AME1503_5
+
+[11] Haladyna, T. M., & Rodriguez, M. C. (2013). *Developing and validating test items*. Routledge. https://doi.org/10.4324/9780203850381
+
+[17] Sireci, S. G. (1998). The construct of content validity. *Social Indicators Research*, 45(1-3), 83–117.
 
 ---
 
@@ -1334,10 +2064,12 @@ If you use this framework in your research, please cite:
 
 ```bibtex
 @software{quiz_benchmark_2024,
-  title = {AI Quiz Generation Benchmark Framework},
-  author = {[Your Name]},
+  title = {AI Quiz Generation Benchmark: A Framework for Evaluating AI-Generated Educational Assessments},
+  author = {[Your Name/Team]},
   year = {2024},
-  url = {[Your Repository URL]}
+  version = {1.0.0-beta},
+  url = {[Your Repository URL]},
+  note = {Research software under active development}
 }
 ```
 
@@ -1349,15 +2081,14 @@ If you use this framework in your research, please cite:
 
 ---
 
-## Contact
+## Acknowledgments
 
-For questions, issues, or contributions, please:
-
-- Open an issue on GitLab: [Your Repository URL]
-- Contact: [Your Email]
+This framework builds on established principles from educational measurement and leverages modern LLM capabilities for automated assessment. We acknowledge the foundational work in educational assessment literature that informs our quality metrics.
 
 ---
 
-**Status**: ✅ **COMPLETE AND READY FOR USE**
+**Status**: 🚧 **ACTIVE DEVELOPMENT** — Framework operational, metrics under validation
 
-All requirements have been implemented with clean architecture, full type safety, and comprehensive documentation.
+**Version**: 1.0.0-beta
+
+**Last Updated**: February 2024
