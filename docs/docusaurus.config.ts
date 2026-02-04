@@ -11,11 +11,11 @@ const config: Config = {
   },
 
   // Set the production url of your site here
-  url: 'https://maiafilip.github.io', //should be changed to Max?
+  url: 'https://ls1intum.github.io',
   baseUrl: '/paper-al-quiz-generation-benchmark/',
 
   // GitHub pages deployment config
-  organizationName: 'maiafilip', //should be changed to Max?
+  organizationName: 'ls1',
   projectName: 'paper-al-quiz-generation-benchmark',
 
   onBrokenLinks: 'throw',
