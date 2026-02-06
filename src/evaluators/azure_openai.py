@@ -1,15 +1,20 @@
-"""Azure OpenAI provider implementation."""
+"""Azure OpenAI provider implementation using the v1 API."""
 
 import os
 from typing import Any, Optional
 
-from langchain_openai import AzureChatOpenAI
+from langchain_openai import ChatOpenAI
 
 from .base import LLMProvider
 
 
 class AzureOpenAIProvider(LLMProvider):
-    """Azure OpenAI implementation of LLM provider."""
+    """Azure OpenAI implementation of LLM provider using the v1 API.
+
+    This implementation uses the new Azure OpenAI v1 API (GA August 2025)
+    which provides a unified interface compatible with the standard OpenAI client.
+    No api_version parameter is required with this approach.
+    """
 
     def __init__(
         self,
@@ -27,26 +32,27 @@ class AzureOpenAIProvider(LLMProvider):
             **kwargs: Additional parameters
 
         Environment variables required:
-            AZURE_OPENAI_ENDPOINT: Azure OpenAI endpoint URL
+            AZURE_OPENAI_ENDPOINT: Azure OpenAI endpoint URL (without /openai/v1 suffix)
             AZURE_OPENAI_API_KEY: API key
-            AZURE_OPENAI_API_VERSION: API version (optional)
         """
         super().__init__(model, temperature, max_tokens, **kwargs)
 
         endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
         api_key = os.getenv("AZURE_OPENAI_API_KEY")
-        api_version = os.getenv("AZURE_OPENAI_API_VERSION", "2024-02-15-preview")
 
         if not endpoint or not api_key:
             raise ValueError(
                 "AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY must be set in environment"
             )
 
-        self.llm = AzureChatOpenAI(
-            azure_deployment=model,
-            azure_endpoint=endpoint,
+        # Construct the v1 API base URL
+        # Remove trailing slash if present, then append /openai/v1
+        base_url = endpoint.rstrip("/") + "/openai/v1"
+
+        self.llm = ChatOpenAI(
+            model=model,
+            base_url=base_url,
             api_key=api_key,
-            api_version=api_version,
             temperature=temperature,
             max_tokens=max_tokens,
             **kwargs,
@@ -74,8 +80,14 @@ class AzureOpenAIProvider(LLMProvider):
         if temperature is not None or max_tokens is not None:
             temp = temperature if temperature is not None else self.temperature
             tokens = max_tokens if max_tokens is not None else self.max_tokens
-            llm = AzureChatOpenAI(
-                azure_deployment=self.model,
+
+            endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+            base_url = endpoint.rstrip("/") + "/openai/v1"
+
+            llm = ChatOpenAI(
+                model=self.model,
+                base_url=base_url,
+                api_key=os.getenv("AZURE_OPENAI_API_KEY"),
                 temperature=temp,
                 max_tokens=tokens,
                 **{**self.additional_params, **kwargs},
