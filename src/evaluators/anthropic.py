@@ -38,10 +38,10 @@ class AnthropicProvider(LLMProvider):
 
         self._api_key = SecretStr(api_key)
         self.llm = ChatAnthropic(
-            model_name=model,
-            anthropic_api_key=self._api_key,
+            model=model,
+            api_key=self._api_key,
             temperature=temperature,
-            max_tokens_to_sample=max_tokens,
+            max_tokens=max_tokens,
             **kwargs,
         )
 
@@ -68,10 +68,10 @@ class AnthropicProvider(LLMProvider):
             temp = temperature if temperature is not None else self.temperature
             tokens = max_tokens if max_tokens is not None else self.max_tokens
             llm = ChatAnthropic(
-                model_name=self.model,
-                anthropic_api_key=self._api_key,
+                model=self.model,
+                api_key=self._api_key,
                 temperature=temp,
-                max_tokens_to_sample=tokens,
+                max_tokens=tokens,
                 **{**self.additional_params, **kwargs},
             )
             response = llm.invoke(prompt)
