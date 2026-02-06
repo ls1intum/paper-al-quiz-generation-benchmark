@@ -1,0 +1,29 @@
+name: Main Branch CI/CD
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: main-cicd
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Test & Lint
+    uses: ./.github/workflows/test.yml
+
+  docs-build:
+    name: Build Documentation
+    uses: ./.github/workflows/docs-build.yml
+
+  docs-deploy:
+    name: Deploy Documentation
+    needs: [test, docs-build]
+    uses: ./.github/workflows/docs-deploy.yml
