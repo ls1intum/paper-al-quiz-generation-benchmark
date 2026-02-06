@@ -4,7 +4,6 @@ import os
 from typing import Any, Optional
 
 from langchain_anthropic import ChatAnthropic
-from pydantic import SecretStr
 
 from .base import LLMProvider
 
@@ -32,16 +31,14 @@ class AnthropicProvider(LLMProvider):
         """
         super().__init__(model, temperature, max_tokens, **kwargs)
 
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
+        if not os.getenv("ANTHROPIC_API_KEY"):
             raise ValueError("ANTHROPIC_API_KEY must be set in environment")
 
-        self._api_key = SecretStr(api_key)
+        # ChatAnthropic reads ANTHROPIC_API_KEY from environment automatically
         self.llm = ChatAnthropic(
-            model=model,
-            api_key=self._api_key,
+            model_name=model,
             temperature=temperature,
-            max_tokens=max_tokens,
+            max_tokens=max_tokens,  # type: ignore[call-arg]
             **kwargs,
         )
 
@@ -68,10 +65,9 @@ class AnthropicProvider(LLMProvider):
             temp = temperature if temperature is not None else self.temperature
             tokens = max_tokens if max_tokens is not None else self.max_tokens
             llm = ChatAnthropic(
-                model=self.model,
-                api_key=self._api_key,
+                model_name=self.model,
                 temperature=temp,
-                max_tokens=tokens,
+                max_tokens=tokens,  # type: ignore[call-arg]
                 **{**self.additional_params, **kwargs},
             )
             response = llm.invoke(prompt)

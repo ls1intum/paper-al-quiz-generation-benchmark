@@ -29,7 +29,7 @@ jobs:
         run: black --check src/
 
       - name: Run MyPy
-        run: mypy src/ --ignore-missing-imports
+        run: mypy src/
 
   test:
     name: Test
