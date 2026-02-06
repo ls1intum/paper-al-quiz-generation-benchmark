@@ -24,7 +24,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'contributor-guide/architecture',
         'contributor-guide/customization',
-        'contributor-guide/project-status',
+        'contributor-guide/testing',
       ],
     },
   ],
