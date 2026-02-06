@@ -15,6 +15,14 @@ A comprehensive, stateless benchmark framework for evaluating AI-generated quizz
 
 ### 1. Installation
 
+**Python Version**
+
+This project targets **Python 3.13**. Please use Python 3.13 or newer.
+
+**CI**
+
+The GitHub Actions test workflow runs on Python 3.13.
+
 ```bash
 # Clone the repository
 git clone <repository-url>

@@ -7,7 +7,7 @@ name = "quiz-benchmark"
 version = "1.0.0"
 description = "Benchmark framework for evaluating AI-generated quizzes"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.13"
 authors = [
     {name = "Maximilian Anzinger"}
 ]
@@ -34,10 +34,10 @@ dev = [
 
 [tool.black]
 line-length = 100
-target-version = ['py310']
+target-version = ['py313']
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
@@ -50,7 +50,7 @@ follow_imports = "skip"
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py313"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

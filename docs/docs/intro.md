@@ -69,7 +69,7 @@ Get your quiz benchmark running in 5 minutes!
 
 #### Prerequisites
 
-- Python 3.10 or higher
+- Python 3.13 or higher
 - pip package manager
 - API keys for at least one LLM provider
 

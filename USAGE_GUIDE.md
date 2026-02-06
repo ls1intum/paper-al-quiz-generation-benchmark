@@ -16,7 +16,7 @@ This guide covers all aspects of using the Quiz Generation Benchmark Framework.
 
 ### Prerequisites
 
-- Python 3.10 or higher
+- Python 3.13 or higher
 - pip package manager
 - API keys for at least one LLM provider
 
