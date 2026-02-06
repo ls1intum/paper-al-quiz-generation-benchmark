@@ -10,7 +10,7 @@ from ..evaluators.factory import LLMProviderFactory
 from ..metrics.base import BaseMetric, MetricScope
 from ..metrics.registry import MetricRegistry
 from ..models.config import BenchmarkConfig
-from ..models.quiz import Quiz
+from ..models.quiz import Quiz, QuizQuestion
 from ..models.result import BenchmarkResult, MetricResult
 from ..utils.config_loader import ConfigLoader
 from ..utils.io import IOUtils
@@ -195,7 +195,7 @@ class BenchmarkRunner:
         metric: BaseMetric,
         evaluator: LLMProvider,
         quiz: Quiz,
-        question: any,
+        question: QuizQuestion,
         source_text: Optional[str],
         parameters: Dict,
     ) -> Optional[MetricResult]:

@@ -1,6 +1,6 @@
 """Results reporting module."""
 
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from ..models.result import AggregatedResults, BenchmarkResult
 
@@ -157,7 +157,7 @@ class ResultsReporter:
         return "\n".join(lines)
 
     @staticmethod
-    def export_to_dict(aggregated: AggregatedResults) -> Dict:
+    def export_to_dict(aggregated: AggregatedResults) -> Dict[str, Any]:
         """Export aggregated results to a simple dictionary format.
 
         Args:
@@ -166,7 +166,7 @@ class ResultsReporter:
         Returns:
             Dictionary with results
         """
-        export = {
+        export: Dict[str, Any] = {
             "benchmark_name": aggregated.benchmark_config_name,
             "version": aggregated.benchmark_version,
             "total_runs": aggregated.total_runs,

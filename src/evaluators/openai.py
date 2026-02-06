@@ -4,6 +4,7 @@ import os
 from typing import Any, Optional
 
 from langchain_openai import ChatOpenAI
+from pydantic import SecretStr
 
 from .base import LLMProvider
 
@@ -35,11 +36,12 @@ class OpenAIProvider(LLMProvider):
         if not api_key:
             raise ValueError("OPENAI_API_KEY must be set in environment")
 
+        self._api_key = SecretStr(api_key)
         self.llm = ChatOpenAI(
             model=model,
-            api_key=api_key,
+            api_key=self._api_key,
             temperature=temperature,
-            max_tokens=max_tokens,
+            max_completion_tokens=max_tokens,
             **kwargs,
         )
 
@@ -67,12 +69,16 @@ class OpenAIProvider(LLMProvider):
             tokens = max_tokens if max_tokens is not None else self.max_tokens
             llm = ChatOpenAI(
                 model=self.model,
+                api_key=self._api_key,
                 temperature=temp,
-                max_tokens=tokens,
+                max_completion_tokens=tokens,
                 **{**self.additional_params, **kwargs},
             )
             response = llm.invoke(prompt)
         else:
             response = self.llm.invoke(prompt)
 
-        return response.content
+        content = response.content
+        if isinstance(content, str):
+            return content
+        return str(content)
