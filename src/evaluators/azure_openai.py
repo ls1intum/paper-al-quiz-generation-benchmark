@@ -4,7 +4,6 @@ import os
 from typing import Any, Optional
 
 from langchain_openai import ChatOpenAI
-from pydantic import SecretStr
 
 from .base import LLMProvider
 
@@ -48,13 +47,12 @@ class AzureOpenAIProvider(LLMProvider):
 
         # Construct the v1 API base URL
         # Remove trailing slash if present, then append /openai/v1
-        self._base_url = endpoint.rstrip("/") + "/openai/v1"
-        self._api_key = SecretStr(api_key)
+        base_url = endpoint.rstrip("/") + "/openai/v1"
 
         self.llm = ChatOpenAI(
             model=model,
-            base_url=self._base_url,
-            api_key=self._api_key,
+            base_url=base_url,
+            api_key=api_key,
             temperature=temperature,
             max_completion_tokens=max_tokens,
             **kwargs,
@@ -83,10 +81,13 @@ class AzureOpenAIProvider(LLMProvider):
             temp = temperature if temperature is not None else self.temperature
             tokens = max_tokens if max_tokens is not None else self.max_tokens
 
+            endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+            base_url = endpoint.rstrip("/") + "/openai/v1"
+
             llm = ChatOpenAI(
                 model=self.model,
-                base_url=self._base_url,
-                api_key=self._api_key,
+                base_url=base_url,
+                api_key=os.getenv("AZURE_OPENAI_API_KEY"),
                 temperature=temp,
                 max_completion_tokens=tokens,
                 **{**self.additional_params, **kwargs},

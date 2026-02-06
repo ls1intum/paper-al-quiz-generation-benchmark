@@ -46,10 +46,9 @@ cp config/.env.example .env
 The `.env` file stores your API credentials:
 
 ```bash
-# Azure OpenAI (for enterprise deployments)
+# Azure OpenAI (for enterprise deployments, using v1 API)
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
 AZURE_OPENAI_API_KEY=your-api-key
-AZURE_OPENAI_API_VERSION=2024-02-15-preview
 
 # OpenAI (direct API)
 OPENAI_API_KEY=sk-your-key-here

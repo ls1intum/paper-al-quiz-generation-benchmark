@@ -172,10 +172,9 @@ outputs:
 ### Environment Variables
 
 ```bash
-# Azure OpenAI
+# Azure OpenAI (v1 API - no api_version required)
 AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
 AZURE_OPENAI_API_KEY=your-api-key
-AZURE_OPENAI_API_VERSION=2024-02-15-preview
 
 # OpenAI
 OPENAI_API_KEY=your-api-key
