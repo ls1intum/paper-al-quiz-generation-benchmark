@@ -3,10 +3,10 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import List
 
 from ..models.quiz import Quiz, QuizQuestion, QuestionType
-from ..models.result import BenchmarkResult, MetricResult, AggregatedResults
+from ..models.result import BenchmarkResult, AggregatedResults
 
 
 class IOUtils:
@@ -111,9 +111,7 @@ class IOUtils:
             return f.read()
 
     @staticmethod
-    def save_results(
-        results: List[BenchmarkResult], output_path: str, pretty: bool = True
-    ) -> None:
+    def save_results(results: List[BenchmarkResult], output_path: str, pretty: bool = True) -> None:
         """Save benchmark results to JSON file.
 
         Args:

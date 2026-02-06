@@ -60,8 +60,7 @@ class MetricRegistry:
         metric_class = cls.get(metric_name)
         if metric_class is None:
             raise ValueError(
-                f"Unknown metric: {metric_name}. "
-                f"Available metrics: {cls.list_metrics()}"
+                f"Unknown metric: {metric_name}. " f"Available metrics: {cls.list_metrics()}"
             )
 
         return metric_class()

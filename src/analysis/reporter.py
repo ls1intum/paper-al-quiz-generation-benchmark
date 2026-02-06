@@ -20,7 +20,7 @@ class ResultsReporter:
         """
         lines = []
         lines.append("=" * 70)
-        lines.append(f"BENCHMARK RESULTS SUMMARY")
+        lines.append("BENCHMARK RESULTS SUMMARY")
         lines.append("=" * 70)
         lines.append(f"Configuration: {aggregated.benchmark_config_name}")
         lines.append(f"Version: {aggregated.benchmark_version}")
@@ -51,9 +51,7 @@ class ResultsReporter:
         return "\n".join(lines)
 
     @staticmethod
-    def generate_comparison_report(
-        aggregated: AggregatedResults, metric_name: str
-    ) -> str:
+    def generate_comparison_report(aggregated: AggregatedResults, metric_name: str) -> str:
         """Generate a comparison report for a specific metric across evaluators.
 
         Args:
@@ -103,9 +101,7 @@ class ResultsReporter:
         return "\n".join(lines)
 
     @staticmethod
-    def generate_quiz_report(
-        results: List[BenchmarkResult], quiz_id: str
-    ) -> str:
+    def generate_quiz_report(results: List[BenchmarkResult], quiz_id: str) -> str:
         """Generate a detailed report for a specific quiz.
 
         Args:

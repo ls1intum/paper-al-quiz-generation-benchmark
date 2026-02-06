@@ -135,12 +135,10 @@ Respond with ONLY a number between 0 and 100.
         response = llm_response.strip()
 
         # Try to find a number
-        match = re.search(r'\b(\d+(?:\.\d+)?)\b', response)
+        match = re.search(r"\b(\d+(?:\.\d+)?)\b", response)
         if match:
             score = float(match.group(1))
             if 0 <= score <= 100:
                 return score
 
-        raise ValueError(
-            f"Could not parse coverage score from response: {llm_response}"
-        )
+        raise ValueError(f"Could not parse coverage score from response: {llm_response}")
