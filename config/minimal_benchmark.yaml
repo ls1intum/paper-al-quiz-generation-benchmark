@@ -1,0 +1,25 @@
+benchmark:
+  name: "minimal-benchmark"
+  version: "1.0.0"
+  runs: 1  # Number of times to repeat the evaluation
+
+evaluators:
+  gpt5:
+    provider: "azure_openai"
+    model: "gpt-5"  # Your Azure deployment name
+    temperature: 0.0
+    max_tokens: 500
+
+metrics:
+  - name: "clarity"
+    version: "1.0"
+    evaluators: ["gpt5"]
+    enabled: true
+
+inputs:
+  quiz_directory: "data/quizzes"
+  source_directory: "data/inputs"
+
+outputs:
+  results_directory: "data/results"
+  aggregate: true
