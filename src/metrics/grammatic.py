@@ -125,63 +125,60 @@ class GrammaticalCorrectnessMetric(BaseMetric):
 
         quiz_content = self._format_quiz_for_prompt(quiz)
 
-        criteria = """1. GRAMMAR: Subject-verb agreement, verb tense, sentence structure
-                      2. PUNCTUATION: Proper use of commas, periods, question marks, quotation marks
-                      3. SPELLING: Correct spelling of all words (including technical terms)
-                      4. CAPITALIZATION: Proper nouns, sentence beginnings, titles
-                      5. CLARITY: Sentence is clear and unambiguous
-                      6. CONSISTENCY: Consistent style and terminology throughout"""
-
-        error_definitions = """
-        Error Severity Levels:
-        - Critical (weight 1.0): Errors that make the text incomprehensible or change meaning
-        - Major (weight 0.5): Clear grammatical errors that disrupt reading flow
-        - Minor (weight 0.2): Small issues like minor punctuation or capitalization
-        """
-        prompt = """
+        prompt = f"""You are evaluating the grammatical correctness of quiz content.
+    
+        Language: {language}
+        
+        Error Severity Levels (for your reference):
+        - Critical (weight {error_weights['critical']}): Errors that make the text incomprehensible or change meaning
+        - Major (weight {error_weights['major']}): Clear grammatical errors that disrupt reading flow
+        - Minor (weight {error_weights['minor']}): Small issues like minor punctuation or capitalization
+        
+        {quiz_content}
+            
         Provide a grammatical correctness score from 0 to 100, where:
         - 0-20: Severe Issues (multiple major grammar errors, incomprehensible)
         - 21-40: Significant Issues (several errors affecting clarity)
         - 41-60: Moderate Issues (noticeable errors but understandable)
         - 61-80: Minor Issues (few small errors, typos, or punctuation)
         - 81-100: Excellent (no grammatical errors, professional quality)
-
+    
         Evaluate these aspects:
-
+    
         1. Grammar:
-           - Subject-verb agreement
-           - Proper tense usage
-           - Correct article usage (a/an/the)
-           - Pronoun agreement and clarity
-           - Proper sentence structure
-
+        - Subject-verb agreement
+        - Proper tense usage
+        - Correct article usage (a/an/the)
+        - Pronoun agreement and clarity
+        - Proper sentence structure
+    
         2. Spelling:
-           - Correct spelling of all words
-           - Proper capitalization
-           - No typos or character errors
-
+        - Correct spelling of all words
+        - Proper capitalization
+        - No typos or character errors
+    
         3. Punctuation:
-           - Correct use of commas, periods, question marks
-           - Proper use of apostrophes and quotation marks
-           - Appropriate punctuation for lists
-
+        - Correct use of commas, periods, question marks
+        - Proper use of apostrophes and quotation marks
+        - Appropriate punctuation for lists
+    
         4. Sentence Structure:
-           - Complete sentences (no fragments or run-ons)
-           - Clear and logical structure
-           - Parallel construction in lists
-
+        - Complete sentences (no fragments or run-ons)
+        - Clear and logical structure
+        - Parallel construction in lists
+    
         5. Technical Writing Standards:
-           - Consistent formatting
-           - Professional tone maintained
-           - Appropriate technical terminology
-
+        - Consistent formatting
+        - Professional tone maintained
+        - Appropriate technical terminology
+    
         Guidelines:
         - Evaluate ALL parts: question text AND all answer options
         - A single error in any option affects the score
         - Technical terms should be spelled correctly
         - Consider standard grammar rules
         - Deduct points proportionally to severity and frequency
-
+    
         Respond with ONLY a number between 0 and 100.
         """
 
@@ -199,6 +196,10 @@ class GrammaticalCorrectnessMetric(BaseMetric):
         Raises:
             ValueError: If score cannot be extracted
         """
+        print(f"DEBUG - Raw LLM Response: '{llm_response}'")
+        print(f"DEBUG - Response length: {len(llm_response)}")
+        print(f"DEBUG - Response type: {type(llm_response)}")
+
         response = llm_response.strip()
 
         # Try to find a number
