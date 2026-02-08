@@ -4,6 +4,7 @@ import os
 from typing import Any, Optional
 
 from langchain_openai import ChatOpenAI
+from pydantic import SecretStr
 
 from .base import LLMProvider
 
@@ -37,7 +38,8 @@ class OpenAICompatibleProvider(LLMProvider):
         super().__init__(model, temperature, max_tokens, **kwargs)
 
         self.base_url = base_url or os.getenv("CUSTOM_LLM_ENDPOINT")
-        self.api_key = api_key or os.getenv("CUSTOM_LLM_API_KEY", "not-required")
+        api_key_str = api_key or os.getenv("CUSTOM_LLM_API_KEY", "not-required")
+        self._api_key = SecretStr(api_key_str) if api_key_str else None
 
         if not self.base_url:
             raise ValueError(
@@ -47,9 +49,9 @@ class OpenAICompatibleProvider(LLMProvider):
         self.llm = ChatOpenAI(
             model=model,
             base_url=self.base_url,
-            api_key=self.api_key,
+            api_key=self._api_key,
             temperature=temperature,
-            max_tokens=max_tokens,
+            max_completion_tokens=max_tokens,
             **kwargs,
         )
 
@@ -78,13 +80,16 @@ class OpenAICompatibleProvider(LLMProvider):
             llm = ChatOpenAI(
                 model=self.model,
                 base_url=self.base_url,
-                api_key=self.api_key,
+                api_key=self._api_key,
                 temperature=temp,
-                max_tokens=tokens,
+                max_completion_tokens=tokens,
                 **{**self.additional_params, **kwargs},
             )
             response = llm.invoke(prompt)
         else:
             response = self.llm.invoke(prompt)
 
-        return response.content
+        content = response.content
+        if isinstance(content, str):
+            return content
+        return str(content)

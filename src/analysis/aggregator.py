@@ -8,7 +8,6 @@ from ..models.result import (
     AggregatedResults,
     BenchmarkResult,
     MetricAggregation,
-    MetricResult,
 )
 
 

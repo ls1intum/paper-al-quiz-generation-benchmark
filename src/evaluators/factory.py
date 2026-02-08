@@ -1,6 +1,6 @@
 """Factory for creating LLM providers."""
 
-from typing import Any, Dict
+from typing import Any, Dict, Type
 
 from ..models.config import EvaluatorConfig
 from .anthropic import AnthropicProvider
@@ -13,7 +13,7 @@ from .openai_compatible import OpenAICompatibleProvider
 class LLMProviderFactory:
     """Factory class for creating LLM providers from configuration."""
 
-    _PROVIDER_MAP = {
+    _PROVIDER_MAP: Dict[str, Type[LLMProvider]] = {
         "azure_openai": AzureOpenAIProvider,
         "openai": OpenAIProvider,
         "anthropic": AnthropicProvider,

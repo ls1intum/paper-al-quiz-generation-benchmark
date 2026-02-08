@@ -54,7 +54,7 @@ class AzureOpenAIProvider(LLMProvider):
             base_url=base_url,
             api_key=api_key,
             temperature=temperature,
-            max_tokens=max_tokens,
+            max_completion_tokens=max_tokens,
             **kwargs,
         )
 
@@ -89,11 +89,14 @@ class AzureOpenAIProvider(LLMProvider):
                 base_url=base_url,
                 api_key=os.getenv("AZURE_OPENAI_API_KEY"),
                 temperature=temp,
-                max_tokens=tokens,
+                max_completion_tokens=tokens,
                 **{**self.additional_params, **kwargs},
             )
             response = llm.invoke(prompt)
         else:
             response = self.llm.invoke(prompt)
 
-        return response.content
+        content = response.content
+        if isinstance(content, str):
+            return content
+        return str(content)

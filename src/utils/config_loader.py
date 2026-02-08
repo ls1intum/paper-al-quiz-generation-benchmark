@@ -1,7 +1,6 @@
 """Configuration loading utilities."""
 
 import hashlib
-import os
 from pathlib import Path
 from typing import Any, Dict
 
@@ -47,7 +46,7 @@ class ConfigLoader:
             raise FileNotFoundError(f"Config file not found: {config_path}")
 
         with open(path, "r") as f:
-            config_dict = yaml.safe_load(f)
+            config_dict: Dict[str, Any] = yaml.safe_load(f)
 
         return config_dict
 

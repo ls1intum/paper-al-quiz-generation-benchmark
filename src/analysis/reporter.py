@@ -1,6 +1,6 @@
 """Results reporting module."""
 
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from ..models.result import AggregatedResults, BenchmarkResult
 
@@ -20,7 +20,7 @@ class ResultsReporter:
         """
         lines = []
         lines.append("=" * 70)
-        lines.append(f"BENCHMARK RESULTS SUMMARY")
+        lines.append("BENCHMARK RESULTS SUMMARY")
         lines.append("=" * 70)
         lines.append(f"Configuration: {aggregated.benchmark_config_name}")
         lines.append(f"Version: {aggregated.benchmark_version}")
@@ -51,9 +51,7 @@ class ResultsReporter:
         return "\n".join(lines)
 
     @staticmethod
-    def generate_comparison_report(
-        aggregated: AggregatedResults, metric_name: str
-    ) -> str:
+    def generate_comparison_report(aggregated: AggregatedResults, metric_name: str) -> str:
         """Generate a comparison report for a specific metric across evaluators.
 
         Args:
@@ -103,9 +101,7 @@ class ResultsReporter:
         return "\n".join(lines)
 
     @staticmethod
-    def generate_quiz_report(
-        results: List[BenchmarkResult], quiz_id: str
-    ) -> str:
+    def generate_quiz_report(results: List[BenchmarkResult], quiz_id: str) -> str:
         """Generate a detailed report for a specific quiz.
 
         Args:
@@ -161,7 +157,7 @@ class ResultsReporter:
         return "\n".join(lines)
 
     @staticmethod
-    def export_to_dict(aggregated: AggregatedResults) -> Dict:
+    def export_to_dict(aggregated: AggregatedResults) -> Dict[str, Any]:
         """Export aggregated results to a simple dictionary format.
 
         Args:
@@ -170,7 +166,7 @@ class ResultsReporter:
         Returns:
             Dictionary with results
         """
-        export = {
+        export: Dict[str, Any] = {
             "benchmark_name": aggregated.benchmark_config_name,
             "version": aggregated.benchmark_version,
             "total_runs": aggregated.total_runs,

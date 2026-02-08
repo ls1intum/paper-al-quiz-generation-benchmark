@@ -1,0 +1,36 @@
+name: PR Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: pr-checks-${{ github.head_ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test & Lint
+    uses: ./.github/workflows/test.yml
+
+  check-docs-changed:
+    name: Check if docs changed
+    runs-on: ubuntu-latest
+    outputs:
+      docs_changed: ${{ steps.filter.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for docs changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            docs:
+              - 'docs/**'
+
+  docs-build:
+    name: Build Documentation
+    needs: check-docs-changed
+    if: needs.check-docs-changed.outputs.docs_changed == 'true'
+    uses: ./.github/workflows/docs-build.yml
