@@ -7,6 +7,7 @@ from . import MetricParameter
 from ..models.quiz import Quiz, QuizQuestion
 from .base import BaseMetric, MetricScope
 
+
 class GrammaticalCorrectnessMetric(BaseMetric):
     """Evaluates the grammatical correctness of a quiz.
 
@@ -40,7 +41,7 @@ class GrammaticalCorrectnessMetric(BaseMetric):
                 param_type=str,
                 default="en",
                 description="Language for grammatical evaluation (affects error types checked)",
-            )
+            ),
         ]
 
     import json
@@ -51,11 +52,11 @@ class GrammaticalCorrectnessMetric(BaseMetric):
         formatted += f"CONTEXT: Quiz Title: {quiz.title}\n"
 
         # Quiz Metadata
-        if hasattr(quiz, 'metadata') and quiz.metadata:
-            audience = quiz.metadata.get('target_audience', 'General')
+        if hasattr(quiz, "metadata") and quiz.metadata:
+            audience = quiz.metadata.get("target_audience", "General")
             formatted += f"CONTEXT: Target Audience: {audience}\n"
-            if 'learning_objectives' in quiz.metadata:
-                objs = quiz.metadata['learning_objectives']
+            if "learning_objectives" in quiz.metadata:
+                objs = quiz.metadata["learning_objectives"]
                 formatted += f"CONTEXT: Learning Objectives: {', '.join(objs)}\n"
 
         formatted += "\n" + "=" * 40 + "\n\n"
@@ -79,11 +80,11 @@ class GrammaticalCorrectnessMetric(BaseMetric):
             formatted += "\n"
 
             # 3. Handle Source Reference cleanly
-            if hasattr(question, 'source_reference') and question.source_reference:
+            if hasattr(question, "source_reference") and question.source_reference:
                 formatted += f"**Reference:** {question.source_reference}\n"
 
             # 4. formatting metadata as lines, not JSON blob
-            if hasattr(question, 'metadata') and question.metadata:
+            if hasattr(question, "metadata") and question.metadata:
                 formatted += "**Metadata Tags:** "
                 # Join values to create a readable string, avoiding JSON syntax
                 tags = [f"{k}={v}" for k, v in question.metadata.items()]
@@ -203,7 +204,7 @@ class GrammaticalCorrectnessMetric(BaseMetric):
         response = llm_response.strip()
 
         # Try to find a number
-        match = re.search(r'\b(\d+(?:\.\d+)?)\b', response)
+        match = re.search(r"\b(\d+(?:\.\d+)?)\b", response)
         if match:
             score = float(match.group(1))
             if 0 <= score <= 100:
