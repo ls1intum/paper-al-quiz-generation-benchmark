@@ -35,19 +35,24 @@ metrics:
     parameters:
       rubric: "bloom_taxonomy"
       target_audience: "undergraduate"
-    enabled: true
+    enabled: false
 
   - name: "coverage"
     version: "1.0"
     evaluators: ["claude_opus"]
     parameters:
       granularity: "balanced"
+    enabled: false
+
+  - name: "grammatical_correctness"
+    version: "1.0"
+    evaluators: ["gpt4"]
     enabled: true
 
   - name: "clarity"
     version: "1.0"
     evaluators: ["gpt4", "claude_sonnet"]  # Compare different models
-    enabled: true
+    enabled: false
 
 inputs:
   quiz_directory: "data/quizzes"
