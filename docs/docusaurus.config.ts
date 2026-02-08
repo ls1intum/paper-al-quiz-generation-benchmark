@@ -32,7 +32,7 @@ const config: Config = {
       {
         docs: {
           routeBasePath: '/', // Serve docs at the site's root
-          sidebarPath: false, // Disable sidebar for single-page docs
+          sidebarPath: require.resolve('./sidebars.ts'),
         },
         blog: false, // Disable the blog feature
         theme: {
@@ -49,6 +49,23 @@ const config: Config = {
     navbar: {
       title: 'Quiz Benchmark',
       items: [
+        {
+          to: '/',
+          label: 'Home',
+          position: 'left',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'userManual',
+          label: 'User Manual',
+          position: 'left',
+        },
+        {
+          type: 'docSidebar',
+          sidebarId: 'contributorGuide',
+          label: 'Contributor Guide',
+          position: 'left',
+        },
         {
           href: 'https://github.com/ls1intum/paper-al-quiz-generation-benchmark',
           label: 'GitHub',
