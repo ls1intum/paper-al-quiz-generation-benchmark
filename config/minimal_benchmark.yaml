@@ -8,12 +8,18 @@ evaluators:
     provider: "azure_openai"
     model: "gpt-5"  # Your Azure deployment name
     temperature: 0.0
+    max_tokens: 1000
+
+  gpt4:
+    provider: "azure_openai"
+    model: "gpt-4o"
+    temperature: 0.0
     max_tokens: 500
 
 metrics:
-  - name: "clarity"
+  - name: "grammatical_correctness"
     version: "1.0"
-    evaluators: ["gpt5"]
+    evaluators: ["gpt4"]
     enabled: true
 
 inputs:

@@ -5,6 +5,7 @@ from .registry import MetricRegistry
 from .difficulty import DifficultyMetric
 from .coverage import CoverageMetric
 from .clarity import ClarityMetric
+from .grammatic import GrammaticalCorrectnessMetric
 
 __all__ = [
     "BaseMetric",
@@ -14,4 +15,5 @@ __all__ = [
     "DifficultyMetric",
     "CoverageMetric",
     "ClarityMetric",
+    "GrammaticalCorrectnessMetric",
 ]
