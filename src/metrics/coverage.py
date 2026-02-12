@@ -59,7 +59,7 @@ class CoverageMetric(BaseMetric):
 
         # Deterministic middle (always from center)
         mid_start = (len(source_text) - 1200) // 2  # Center point
-        mid = source_text[mid_start:mid_start + 1200]
+        mid = source_text[mid_start : mid_start + 1200]
 
         # Fixed outro (last 1100 chars)
         outro = source_text[-1100:]
@@ -81,11 +81,11 @@ class CoverageMetric(BaseMetric):
             return {"breadth": 30, "depth": 30, "balance": 20, "critical": 20}
 
     def get_prompt(
-            self,
-            question: Optional[QuizQuestion] = None,
-            quiz: Optional[Quiz] = None,
-            source_text: Optional[str] = None,
-            **params: Any,
+        self,
+        question: Optional[QuizQuestion] = None,
+        quiz: Optional[Quiz] = None,
+        source_text: Optional[str] = None,
+        **params: Any,
     ) -> str:
         """Generate a coverage evaluation prompt with structured JSON output."""
         if quiz is None:
@@ -101,11 +101,7 @@ class CoverageMetric(BaseMetric):
         source_sample = self._sample_source_text(source_text)
 
         # 2. Build a detailed quiz summary
-        quiz_summary_lines = [
-            f"Title: {quiz.title}",
-            f"Total Questions: {quiz.num_questions}",
-            ""
-        ]
+        quiz_summary_lines = [f"Title: {quiz.title}", f"Total Questions: {quiz.num_questions}", ""]
         for i, q in enumerate(quiz.questions, 1):
             # Include first 150 chars of question text to keep prompt manageable
             q_text = q.question_text[:150] + ("..." if len(q.question_text) > 150 else "")
@@ -230,14 +226,14 @@ Respond with ONLY the JSON object, no other text.
         response = llm_response.strip()
 
         # Remove Markdown code fences if present
-        response = re.sub(r'^```json?\s*\n', '', response, flags=re.MULTILINE)
-        response = re.sub(r'\n```\s*$', '', response, flags=re.MULTILINE)
+        response = re.sub(r"^```json?\s*\n", "", response, flags=re.MULTILINE)
+        response = re.sub(r"\n```\s*$", "", response, flags=re.MULTILINE)
 
         # ----- PRIMARY: JSON extraction -----
         try:
             # Find the first '{' and the last '}'
-            start = response.find('{')
-            end = response.rfind('}') + 1
+            start = response.find("{")
+            end = response.rfind("}") + 1
 
             if start != -1 and end > start:
                 json_str = response[start:end]
@@ -252,7 +248,9 @@ Respond with ONLY the JSON object, no other text.
                 # If final_score missing but sub_scores present, sum them
                 if "sub_scores" in data:
                     subs = data["sub_scores"]
-                    total = sum(float(subs.get(k, 0)) for k in ("breadth", "depth", "balance", "critical"))
+                    total = sum(
+                        float(subs.get(k, 0)) for k in ("breadth", "depth", "balance", "critical")
+                    )
                     if 0 <= total <= 100:
                         return round(total, 1)
         except (ValueError, KeyError, json.JSONDecodeError):
@@ -262,8 +260,8 @@ Respond with ONLY the JSON object, no other text.
         # ----- FALLBACK 1: explicit score patterns -----
         patterns = [
             r'"final_score"\s*:\s*(\d+(?:\.\d+)?)',
-            r'TOTAL\s+COVERAGE\s+SCORE\s*:?\s*(\d+(?:\.\d+)?)',
-            r'FINAL\s+SCORE\s*:?\s*(\d+(?:\.\d+)?)',
+            r"TOTAL\s+COVERAGE\s+SCORE\s*:?\s*(\d+(?:\.\d+)?)",
+            r"FINAL\s+SCORE\s*:?\s*(\d+(?:\.\d+)?)",
         ]
         for pat in patterns:
             match = re.search(pat, response, re.IGNORECASE)
@@ -273,14 +271,14 @@ Respond with ONLY the JSON object, no other text.
                     return round(score, 1)
 
         # ----- FALLBACK 2: look for "X/100" pattern -----
-        frac_match = re.search(r'(\d+(?:\.\d+)?)\s*/\s*100', response)
+        frac_match = re.search(r"(\d+(?:\.\d+)?)\s*/\s*100", response)
         if frac_match:
             score = float(frac_match.group(1))
             if 0 <= score <= 100:
                 return round(score, 1)
 
         # ----- FALLBACK 3: any number 0-100 that appears last -----
-        numbers = re.findall(r'\b(\d+(?:\.\d+)?)\b', response)
+        numbers = re.findall(r"\b(\d+(?:\.\d+)?)\b", response)
         for num in reversed(numbers):
             score = float(num)
             if 0 <= score <= 100:
