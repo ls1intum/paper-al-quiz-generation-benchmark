@@ -32,6 +32,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         description="Quiz Generation Benchmark Framework",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+    Examples:
+      # Run benchmark with default config
+      python main.py --config config/benchmark_example.yaml
+
+      # Specify custom .env file
+      python main.py --config config/benchmark_example.yaml --env .env.custom
+
+      # Skip aggregation
+      python main.py --config config/benchmark_example.yaml --no-aggregate
+            """,
     )
 
     parser.add_argument(
