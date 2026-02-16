@@ -41,6 +41,7 @@ class EvaluationResult:
         raw_response: Raw LLM response text
         metadata: Additional metric-specific data
     """
+
     score: float
     raw_response: str
     metadata: Dict[str, Any] = None
@@ -99,12 +100,12 @@ class BaseMetric(ABC):
         return []
 
     def evaluate(
-            self,
-            question: Optional[QuizQuestion] = None,
-            quiz: Optional[Quiz] = None,
-            source_text: Optional[str] = None,
-            llm_client: Optional[Any] = None,
-            **params: Any,
+        self,
+        question: Optional[QuizQuestion] = None,
+        quiz: Optional[Quiz] = None,
+        source_text: Optional[str] = None,
+        llm_client: Optional[Any] = None,
+        **params: Any,
     ) -> EvaluationResult:
         """
         Evaluate and return a score.
@@ -126,21 +127,12 @@ class BaseMetric(ABC):
             raise ValueError(f"{self.name} requires an llm_client")
 
         # Default behavior: single prompt evaluation
-        prompt = self.get_prompt(
-            question=question,
-            quiz=quiz,
-            source_text=source_text,
-            **params
-        )
+        prompt = self.get_prompt(question=question, quiz=quiz, source_text=source_text, **params)
 
         response = llm_client.generate(prompt)
         score = self.parse_response(response)
 
-        return EvaluationResult(
-            score=score,
-            raw_response=response,
-            metadata={}
-        )
+        return EvaluationResult(score=score, raw_response=response, metadata={})
 
     @abstractmethod
     def get_prompt(

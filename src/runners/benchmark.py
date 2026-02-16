@@ -128,21 +128,18 @@ class BenchmarkRunner:
         return source_texts
 
     def _evaluate_quiz_level(
-            self,
-            metric: BaseMetric,
-            evaluator: LLMProvider,
-            quiz: Quiz,
-            source_text: Optional[str],
-            parameters: Dict,
+        self,
+        metric: BaseMetric,
+        evaluator: LLMProvider,
+        quiz: Quiz,
+        source_text: Optional[str],
+        parameters: Dict,
     ) -> Optional[MetricResult]:
         """Evaluate entire quiz with a metric."""
         try:
             # Metrics handle their own logic
             result = metric.evaluate(
-                quiz=quiz,
-                source_text=source_text,
-                llm_client=evaluator,
-                **parameters
+                quiz=quiz, source_text=source_text, llm_client=evaluator, **parameters
             )
 
             return MetricResult(
@@ -161,13 +158,13 @@ class BenchmarkRunner:
             return None
 
     def _evaluate_question(
-            self,
-            metric: BaseMetric,
-            evaluator: LLMProvider,
-            quiz: Quiz,
-            question: QuizQuestion,
-            source_text: Optional[str],
-            parameters: Dict,
+        self,
+        metric: BaseMetric,
+        evaluator: LLMProvider,
+        quiz: Quiz,
+        question: QuizQuestion,
+        source_text: Optional[str],
+        parameters: Dict,
     ) -> Optional[MetricResult]:
         """Evaluate a single question with a metric."""
         try:
@@ -177,7 +174,7 @@ class BenchmarkRunner:
                 quiz=quiz,
                 source_text=source_text,
                 llm_client=evaluator,
-                **parameters
+                **parameters,
             )
 
             return MetricResult(
@@ -196,7 +193,7 @@ class BenchmarkRunner:
             return None
 
     def _evaluate_quiz(
-            self, quiz: Quiz, source_text: Optional[str], run_number: int
+        self, quiz: Quiz, source_text: Optional[str], run_number: int
     ) -> BenchmarkResult:
         """Evaluate a single quiz with all configured metrics.
 

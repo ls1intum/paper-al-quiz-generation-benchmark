@@ -47,9 +47,7 @@ class CoverageMetric(BaseMetric):
         else:  # balanced
             return {"breadth": 30, "depth": 30, "balance": 20, "critical": 20}
 
-    def _get_question_topic_prompt(
-            self, question: QuizQuestion, source_text: str
-    ) -> str:
+    def _get_question_topic_prompt(self, question: QuizQuestion, source_text: str) -> str:
         """Generate prompt for stage 1: extract topics from a single question."""
         return f"""Analyze what topics this quiz question tests from the source material.
 
@@ -76,11 +74,11 @@ class CoverageMetric(BaseMetric):
     Respond with ONLY the JSON object."""
 
     def _get_overall_coverage_prompt(
-            self,
-            source_text: str,
-            quiz: Quiz,
-            question_summaries: List[Dict[str, Any]],
-            granularity: str,
+        self,
+        source_text: str,
+        quiz: Quiz,
+        question_summaries: List[Dict[str, Any]],
+        granularity: str,
     ) -> str:
         """Generate prompt for stage 2: analyze overall coverage."""
         weights = self._get_weights(granularity)
@@ -159,12 +157,12 @@ class CoverageMetric(BaseMetric):
     """
 
     def evaluate(
-            self,
-            question: Optional[QuizQuestion] = None,
-            quiz: Optional[Quiz] = None,
-            source_text: Optional[str] = None,
-            llm_client: Optional[Any] = None,
-            **params: Any,
+        self,
+        question: Optional[QuizQuestion] = None,
+        quiz: Optional[Quiz] = None,
+        source_text: Optional[str] = None,
+        llm_client: Optional[Any] = None,
+        **params: Any,
     ) -> EvaluationResult:
         """Two-stage evaluation with response tracking."""
         if quiz is None:
@@ -184,20 +182,15 @@ class CoverageMetric(BaseMetric):
         for q in quiz.questions:
             prompt = self._get_question_topic_prompt(q, source_text)
             response = llm_client.generate(prompt)
-            stage1_responses.append({
-                'question_id': q.question_id,
-                'response': response
-            })
+            stage1_responses.append({"question_id": q.question_id, "response": response})
 
             try:
                 summary = self._parse_question_summary(response)
                 question_summaries.append(summary)
             except Exception:
-                question_summaries.append({
-                    "topics": [],
-                    "cognitive_level": "unknown",
-                    "reasoning": "Failed to parse"
-                })
+                question_summaries.append(
+                    {"topics": [], "cognitive_level": "unknown", "reasoning": "Failed to parse"}
+                )
 
         # STAGE 2: Analyze overall coverage
         overall_prompt = self._get_overall_coverage_prompt(
@@ -211,10 +204,10 @@ class CoverageMetric(BaseMetric):
             score=score,
             raw_response=overall_response,
             metadata={
-                'stage1_responses': stage1_responses,
-                'question_summaries': question_summaries,
-                'granularity': granularity
-            }
+                "stage1_responses": stage1_responses,
+                "question_summaries": question_summaries,
+                "granularity": granularity,
+            },
         )
 
     def _parse_question_summary(self, response: str) -> Dict[str, Any]:
@@ -238,14 +231,14 @@ class CoverageMetric(BaseMetric):
         **params: Any,
     ) -> str:
         """
-            Not applicable for two-stage coverage evaluation.
+        Not applicable for two-stage coverage evaluation.
 
-            Coverage metric uses a custom evaluate() method that orchestrates
-            multiple LLM calls. Use evaluate() directly instead.
+        Coverage metric uses a custom evaluate() method that orchestrates
+        multiple LLM calls. Use evaluate() directly instead.
 
-            Raises:
-                NotImplementedError: This metric uses custom evaluation logic
-            """
+        Raises:
+            NotImplementedError: This metric uses custom evaluation logic
+        """
         raise NotImplementedError(
             f"{self.name} uses a two-stage evaluation approach and does not "
             "support get_prompt(). Use evaluate() directly."
@@ -281,8 +274,7 @@ class CoverageMetric(BaseMetric):
                 if "sub_scores" in data:
                     subs = data["sub_scores"]
                     total = sum(
-                        float(subs.get(k, 0))
-                        for k in ("breadth", "depth", "balance", "critical")
+                        float(subs.get(k, 0)) for k in ("breadth", "depth", "balance", "critical")
                     )
                     if 0 <= total <= 100:
                         return round(total, 1)
