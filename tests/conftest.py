@@ -38,10 +38,38 @@ class MockLLMProvider(LLMProvider):
         max_tokens: Optional[int] = None,
         **kwargs: Any,
     ) -> str:
+        # If custom responses provided, use those
         if self._responses is not None:
             if not self._responses:
                 return "0"
             return self._responses.pop(0)
+
+        # Coverage Stage 1: Question topic extraction
+        if "Question #" in prompt and "cognitive_level" in prompt:
+            return """{
+                "topics": ["test_topic"],
+                "cognitive_level": "understanding",
+                "reasoning": "Mock question analysis"
+            }"""
+
+        # Coverage Stage 2: Overall coverage analysis
+        if "Scoring Framework" in prompt or ("sub_scores" in prompt and "final_score" in prompt):
+            return """{
+                "final_score": 67.5,
+                "sub_scores": {
+                    "breadth": 20.0,
+                    "depth": 22.5,
+                    "balance": 15.0,
+                    "critical": 10.0
+                },
+                "topics_in_source": ["topic1", "topic2"],
+                "topics_covered": ["topic1"],
+                "critical_concepts": ["concept1"],
+                "critical_covered": ["concept1"],
+                "reasoning": "Mock coverage analysis"
+            }"""
+
+        # Default: deterministic score based on prompt hash (for simple metrics)
         digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
         score = int(digest, 16) % 101
         return str(score)

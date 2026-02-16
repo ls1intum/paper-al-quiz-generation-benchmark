@@ -282,11 +282,13 @@ class CoverageMetric(BaseMetric):
         except (ValueError, KeyError, json.JSONDecodeError):
             pass
 
-        # ----- FALLBACK: explicit score patterns -----
+        # explicit score patterns
         patterns = [
             r'"final_score"\s*:\s*(\d+(?:\.\d+)?)',
             r"TOTAL\s+COVERAGE\s+SCORE\s*:?\s*(\d+(?:\.\d+)?)",
             r"FINAL\s+SCORE\s*:?\s*(\d+(?:\.\d+)?)",
+            r"Score:\s*(\d+(?:\.\d+)?)",
+            r"^\s*(\d+(?:\.\d+)?)\s*$",
         ]
         for pat in patterns:
             match = re.search(pat, response, re.IGNORECASE)
