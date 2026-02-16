@@ -1,17 +1,18 @@
-"""Coverage metric implementation - IMPROVED V1.1 (Deterministic)."""
+"""Coverage metric implementation."""
 
 import json
 import re
 from typing import Any, Dict, List, Optional
 from ..models.quiz import Quiz, QuizQuestion
-from .base import BaseMetric, MetricParameter, MetricScope
+from .base import BaseMetric, MetricParameter, MetricScope, EvaluationResult
 
 
 class CoverageMetric(BaseMetric):
     """Evaluates how well the quiz covers the source material.
 
-    This metric assesses breadth and depth of content coverage using
-    structured JSON output and deterministic sampling.
+    This metric uses a two-stage approach:
+    1. Extract topics from each question individually
+    2. Analyze overall coverage based on all extracted topics
     """
 
     @property
@@ -35,41 +36,7 @@ class CoverageMetric(BaseMetric):
                 default="balanced",
                 description="Coverage granularity (detailed, balanced, broad)",
             ),
-            MetricParameter(
-                name="use_example",
-                param_type=bool,
-                default=True,
-                description="Include an example in the prompt",
-            ),
         ]
-
-    def _sample_source_text(self, source_text: str, total_chars: int = 3500) -> str:
-        """
-        Extract a representative sample from the source text DETERMINISTICALLY:
-        - If text length ≤ total_chars, return whole text.
-        - Otherwise, take the first 1200 chars, middle 1200 chars, and last 1100 chars.
-
-        NOTE: Uses deterministic middle selection (not random) for consistent scores.
-        """
-        if len(source_text) <= total_chars:
-            return source_text
-
-        # Fixed intro (first 1200 chars)
-        intro = source_text[:1200]
-
-        # Deterministic middle (always from center)
-        mid_start = (len(source_text) - 1200) // 2  # Center point
-        mid = source_text[mid_start : mid_start + 1200]
-
-        # Fixed outro (last 1100 chars)
-        outro = source_text[-1100:]
-
-        sample = (
-            f"[BEGINNING OF SOURCE]\n{intro}\n\n"
-            f"[MIDDLE SECTION]\n{mid}\n\n"
-            f"[END OF SOURCE]\n{outro}"
-        )
-        return sample
 
     def _get_weights(self, granularity: str) -> Dict[str, int]:
         """Return weight distribution for the four sub-scores."""
@@ -80,6 +47,189 @@ class CoverageMetric(BaseMetric):
         else:  # balanced
             return {"breadth": 30, "depth": 30, "balance": 20, "critical": 20}
 
+    def _get_question_topic_prompt(
+            self, question: QuizQuestion, source_text: str
+    ) -> str:
+        """Generate prompt for stage 1: extract topics from a single question."""
+        return f"""Analyze what topics this quiz question tests from the source material.
+
+    **Source Material**:
+    {source_text}
+    
+    **Question #{question.question_id}**:
+    Type: {question.question_type.value}
+    Text: {question.question_text}
+    Options: {question.options if question.options else 'N/A'}
+    Correct Answer: {question.correct_answer}
+    
+     **Task**: Identify the specific topics/concepts this question tests.
+    
+    **Required JSON Format**:
+    ```json
+    {{
+        "topics": ["topic1", "topic2", ...],
+        "cognitive_level": "recall|understanding|application",
+        "reasoning": "Brief explanation of what the question tests"
+    }}
+    ```
+    
+    Respond with ONLY the JSON object."""
+
+    def _get_overall_coverage_prompt(
+            self,
+            source_text: str,
+            quiz: Quiz,
+            question_summaries: List[Dict[str, Any]],
+            granularity: str,
+    ) -> str:
+        """Generate prompt for stage 2: analyze overall coverage."""
+        weights = self._get_weights(granularity)
+
+        # Build summary of all questions and their topics
+        summaries_text = []
+        for i, summary in enumerate(question_summaries, 1):
+            topics = ", ".join(summary.get("topics", []))
+            level = summary.get("cognitive_level", "unknown")
+            summaries_text.append(f"Q{i} [{level}]: {topics}")
+
+        summaries_block = "\n".join(summaries_text)
+
+        return f"""You are an expert quiz evaluator. Assess how well this quiz covers the source material.
+
+    **CRITICAL: Your response must be ONLY a JSON object. No other text.**
+
+    **Calibration Guidelines**:
+    - Most good quizzes score 55-75 (this is NORMAL and EXPECTED)
+    - 75-85 = very good coverage
+    - 85-100 = exceptional, comprehensive coverage (rare)
+    - 40-55 = adequate but with gaps
+    - Below 40 = significant problems
+
+    **Source Material**:
+    {source_text}
+
+    **Quiz Overview**:
+    Title: {quiz.title}
+    Total Questions: {quiz.num_questions}
+
+    **Topics Tested by Each Question**:
+    {summaries_block}
+
+    **Scoring Framework (Granularity: {granularity})**:
+
+    1. **Breadth** (max {weights['breadth']} pts):
+       - List ALL distinct topics in the source material
+       - Count how many are tested by ≥1 question
+       - Score = (topics_covered / topics_total) × {weights['breadth']}
+
+    2. **Depth** (max {weights['depth']} pts):
+       - For each covered topic, note its cognitive level (recall=1, understanding=2, application=3)
+       - Calculate average cognitive level across all covered topics
+       - Score = (avg_level / 3.0) × {weights['depth']}
+
+    3. **Balance** (max {weights['balance']} pts):
+       - Are important topics given appropriate question weight?
+       - Are minor details over-represented?
+       - Score subjectively 0-{weights['balance']}
+
+    4. **Critical Coverage** (max {weights['critical']} pts):
+       - Identify 3-5 essential "must-know" concepts from the source
+       - Count how many are tested
+       - Score = (critical_covered / critical_total) × {weights['critical']}
+
+    **Required JSON Format**:
+    ```json
+    {{
+      "topics_in_source": ["topic1", "topic2", ...],
+      "topics_covered": ["topic1", ...],
+      "critical_concepts": ["concept1", ...],
+      "critical_covered": ["concept1", ...],
+      "reasoning": "Step-by-step explanation of scores",
+      "sub_scores": {{
+        "breadth": <0-{weights['breadth']}>,
+        "depth": <0-{weights['depth']}>,
+        "balance": <0-{weights['balance']}>,
+        "critical": <0-{weights['critical']}>
+      }},
+      "final_score": <sum of sub_scores>
+    }}
+    ```
+
+    Respond with ONLY the JSON object, no other text.
+    """
+
+    def evaluate(
+            self,
+            question: Optional[QuizQuestion] = None,
+            quiz: Optional[Quiz] = None,
+            source_text: Optional[str] = None,
+            llm_client: Optional[Any] = None,
+            **params: Any,
+    ) -> EvaluationResult:
+        """Two-stage evaluation with response tracking."""
+        if quiz is None:
+            raise ValueError("CoverageMetric requires a quiz")
+        if source_text is None:
+            raise ValueError("CoverageMetric requires source_text")
+        if llm_client is None:
+            raise ValueError("CoverageMetric requires an llm_client")
+
+        self.validate_params(**params)
+        granularity = self.get_param_value("granularity", **params)
+
+        # STAGE 1: Extract topics from each question
+        question_summaries = []
+        stage1_responses = []
+
+        for q in quiz.questions:
+            prompt = self._get_question_topic_prompt(q, source_text)
+            response = llm_client.generate(prompt)
+            stage1_responses.append({
+                'question_id': q.question_id,
+                'response': response
+            })
+
+            try:
+                summary = self._parse_question_summary(response)
+                question_summaries.append(summary)
+            except Exception:
+                question_summaries.append({
+                    "topics": [],
+                    "cognitive_level": "unknown",
+                    "reasoning": "Failed to parse"
+                })
+
+        # STAGE 2: Analyze overall coverage
+        overall_prompt = self._get_overall_coverage_prompt(
+            source_text, quiz, question_summaries, granularity
+        )
+        overall_response = llm_client.generate(overall_prompt)
+
+        score = self.parse_response(overall_response)
+
+        return EvaluationResult(
+            score=score,
+            raw_response=overall_response,
+            metadata={
+                'stage1_responses': stage1_responses,
+                'question_summaries': question_summaries,
+                'granularity': granularity
+            }
+        )
+
+    def _parse_question_summary(self, response: str) -> Dict[str, Any]:
+        """Parse JSON response from question topic extraction."""
+        response = response.strip()
+        response = re.sub(r"^```json?\s*\n", "", response, flags=re.MULTILINE)
+        response = re.sub(r"\n```\s*$", "", response, flags=re.MULTILINE)
+
+        start = response.find("{")
+        end = response.rfind("}") + 1
+        if start != -1 and end > start:
+            return json.loads(response[start:end])
+
+        raise ValueError("Could not parse question summary JSON")
+
     def get_prompt(
         self,
         question: Optional[QuizQuestion] = None,
@@ -87,136 +237,19 @@ class CoverageMetric(BaseMetric):
         source_text: Optional[str] = None,
         **params: Any,
     ) -> str:
-        """Generate a coverage evaluation prompt with structured JSON output."""
-        if quiz is None:
-            raise ValueError("CoverageMetric requires a quiz")
-        if source_text is None:
-            raise ValueError("CoverageMetric requires source_text")
+        """
+            Not applicable for two-stage coverage evaluation.
 
-        self.validate_params(**params)
-        granularity = self.get_param_value("granularity", **params)
-        use_example = self.get_param_value("use_example", **params)
+            Coverage metric uses a custom evaluate() method that orchestrates
+            multiple LLM calls. Use evaluate() directly instead.
 
-        # 1. Get a representative sample of the source text (DETERMINISTIC)
-        source_sample = self._sample_source_text(source_text)
-
-        # 2. Build a detailed quiz summary
-        quiz_summary_lines = [f"Title: {quiz.title}", f"Total Questions: {quiz.num_questions}", ""]
-        for i, q in enumerate(quiz.questions, 1):
-            # Include first 150 chars of question text to keep prompt manageable
-            q_text = q.question_text[:150] + ("..." if len(q.question_text) > 150 else "")
-            quiz_summary_lines.append(f"{i}. [{q.question_type.value}] {q_text}")
-        quiz_summary = "\n".join(quiz_summary_lines)
-
-        # 3. Get weights for this granularity
-        weights = self._get_weights(granularity)
-
-        # 4. Few-shot example (optional)
-        example_block = ""
-        if use_example:
-            example_block = """
---- EXAMPLE ---
-**Source (excerpt)**:
-"Photosynthesis occurs in chloroplasts and has two main stages: light-dependent reactions (in thylakoid membranes) and the Calvin cycle (in stroma). Light reactions use chlorophyll to capture light energy and produce ATP and NADPH. The Calvin cycle uses these products to fix CO2 into glucose. Key factors affecting photosynthesis rate include light intensity, CO2 concentration, temperature, and water availability. Major pigments are chlorophyll a, chlorophyll b, and carotenoids."
-
-**Quiz (5 questions)**:
-1. [MCQ] Where does the Calvin cycle occur?
-2. [MCQ] What are the products of light reactions?
-3. [True/False] Chlorophyll is the only pigment in photosynthesis.
-4. [Short Answer] Name two factors that affect photosynthesis rate.
-5. [MCQ] What is the main function of the Calvin cycle?
-
-**Expected JSON Output**:
-```json
-{
-  "topics_source": [
-    "chloroplast structure",
-    "light-dependent reactions (location, products, mechanism)",
-    "Calvin cycle (location, function)",
-    "photosynthetic pigments (types)",
-    "limiting factors (light, CO2, temperature, water)"
-  ],
-  "topics_covered": [
-    "Calvin cycle location and function",
-    "light reactions products",
-    "photosynthetic pigments",
-    "limiting factors"
-  ],
-  "reasoning": "Source has 5 major topics. Quiz covers 4/5 (80% breadth). Depth is mixed: Q1,Q2,Q5 test recall; Q3 tests understanding (misconception); Q4 tests recall. Average depth ≈ 1.3/3. Balance is good - important topics get multiple questions. Critical coverage: Calvin cycle and light reactions both tested (core concepts present).",
-  "sub_scores": {
-    "breadth": 24,
-    "depth": 13,
-    "balance": 16,
-    "critical": 17
-  },
-  "final_score": 70
-}
-```
---- END EXAMPLE ---
-"""
-
-        # 5. Build the full prompt
-        prompt = f"""You are an expert quiz evaluator. Assess how well this quiz covers the source material.
-
-**CRITICAL: Your response must be ONLY a JSON object. No other text.**
-
-**Calibration Guidelines**:
-- Most good quizzes score 55-75 (this is NORMAL and EXPECTED)
-- 75-85 = very good coverage
-- 85-100 = exceptional, comprehensive coverage (rare)
-- 40-55 = adequate but with gaps
-- Below 40 = significant problems
-
-**Source Material Sample**:
-{source_sample}
-
-**Quiz to Evaluate**:
-{quiz_summary}
-
-**Scoring Framework (Granularity: {granularity})**:
-
-1. **Breadth** (max {weights['breadth']} pts):
-   - List ALL distinct topics in the source
-   - Count how many are tested by ≥1 question
-   - Score = (topics_covered / topics_total) × {weights['breadth']}
-
-2. **Depth** (max {weights['depth']} pts):
-   - Rate each covered topic: 1=recall, 2=understanding, 3=application
-   - Average these ratings
-   - Score = (avg_rating / 3.0) × {weights['depth']}
-
-3. **Balance** (max {weights['balance']} pts):
-   - Are important topics given appropriate question weight?
-   - Are minor details over-represented?
-   - Score subjectively 0-{weights['balance']}
-
-4. **Critical Coverage** (max {weights['critical']} pts):
-   - Identify 3-5 essential "must-know" concepts
-   - Count how many are tested
-   - Score = (critical_covered / critical_total) × {weights['critical']}
-
-{example_block}
-
-**Required JSON Format**:
-```json
-{{
-  "topics_source": ["topic1", "topic2", ...],
-  "topics_covered": ["topic1", ...],
-  "reasoning": "Step-by-step explanation of scores",
-  "sub_scores": {{
-    "breadth": <0-{weights['breadth']}>,
-    "depth": <0-{weights['depth']}>,
-    "balance": <0-{weights['balance']}>,
-    "critical": <0-{weights['critical']}>
-  }},
-  "final_score": <sum of sub_scores>
-}}
-```
-
-Respond with ONLY the JSON object, no other text.
-"""
-
-        return prompt
+            Raises:
+                NotImplementedError: This metric uses custom evaluation logic
+            """
+        raise NotImplementedError(
+            f"{self.name} uses a two-stage evaluation approach and does not "
+            "support get_prompt(). Use evaluate() directly."
+        )
 
     def parse_response(self, llm_response: str) -> float:
         """
@@ -231,7 +264,6 @@ Respond with ONLY the JSON object, no other text.
 
         # ----- PRIMARY: JSON extraction -----
         try:
-            # Find the first '{' and the last '}'
             start = response.find("{")
             end = response.rfind("}") + 1
 
@@ -249,15 +281,15 @@ Respond with ONLY the JSON object, no other text.
                 if "sub_scores" in data:
                     subs = data["sub_scores"]
                     total = sum(
-                        float(subs.get(k, 0)) for k in ("breadth", "depth", "balance", "critical")
+                        float(subs.get(k, 0))
+                        for k in ("breadth", "depth", "balance", "critical")
                     )
                     if 0 <= total <= 100:
                         return round(total, 1)
         except (ValueError, KeyError, json.JSONDecodeError):
-            # JSON parsing failed, continue to fallbacks
             pass
 
-        # ----- FALLBACK 1: explicit score patterns -----
+        # ----- FALLBACK: explicit score patterns -----
         patterns = [
             r'"final_score"\s*:\s*(\d+(?:\.\d+)?)',
             r"TOTAL\s+COVERAGE\s+SCORE\s*:?\s*(\d+(?:\.\d+)?)",
@@ -269,20 +301,6 @@ Respond with ONLY the JSON object, no other text.
                 score = float(match.group(1))
                 if 0 <= score <= 100:
                     return round(score, 1)
-
-        # ----- FALLBACK 2: look for "X/100" pattern -----
-        frac_match = re.search(r"(\d+(?:\.\d+)?)\s*/\s*100", response)
-        if frac_match:
-            score = float(frac_match.group(1))
-            if 0 <= score <= 100:
-                return round(score, 1)
-
-        # ----- FALLBACK 3: any number 0-100 that appears last -----
-        numbers = re.findall(r"\b(\d+(?:\.\d+)?)\b", response)
-        for num in reversed(numbers):
-            score = float(num)
-            if 0 <= score <= 100:
-                return round(score, 1)
 
         raise ValueError(
             f"Could not parse coverage score from response.\n"
