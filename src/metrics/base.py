@@ -1,7 +1,7 @@
 """Base metric interface."""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, List, Optional, Dict
 
@@ -44,9 +44,9 @@ class EvaluationResult:
 
     score: float
     raw_response: str
-    metadata: Dict[str, Any] = None
+    metadata: Dict[str, Any] = field(default_factory=dict)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.metadata is None:
             self.metadata = {}
 

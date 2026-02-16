@@ -219,7 +219,8 @@ class CoverageMetric(BaseMetric):
         start = response.find("{")
         end = response.rfind("}") + 1
         if start != -1 and end > start:
-            return json.loads(response[start:end])
+            parsed: Dict[str, Any] = json.loads(response[start:end])
+            return parsed
 
         raise ValueError("Could not parse question summary JSON")
 
