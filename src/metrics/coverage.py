@@ -4,7 +4,8 @@ import json
 import re
 from typing import Any, Dict, List, Optional
 from ..models.quiz import Quiz, QuizQuestion
-from .base import BaseMetric, MetricParameter, MetricScope, EvaluationResult
+from .base import BaseMetric, MetricParameter, MetricScope
+from ..models.result import EvaluationResult
 
 
 class CoverageMetric(BaseMetric):

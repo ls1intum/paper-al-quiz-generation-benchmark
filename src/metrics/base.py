@@ -4,8 +4,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, List, Optional, Dict
-
 from ..models.quiz import Quiz, QuizQuestion
+from ..models.result import EvaluationResult
 
 
 class MetricScope(str, Enum):
@@ -30,26 +30,6 @@ class MetricParameter:
     param_type: type
     default: Any
     description: str
-
-
-@dataclass
-class EvaluationResult:
-    """Result from a metric evaluation.
-
-    Attributes:
-        score: Numeric score (0-100)
-        raw_response: Raw LLM response text
-        metadata: Additional metric-specific data
-    """
-
-    score: float
-    raw_response: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
-
-    def __post_init__(self) -> None:
-        if self.metadata is None:
-            self.metadata = {}
-
 
 class BaseMetric(ABC):
     """Abstract base class for all metrics.

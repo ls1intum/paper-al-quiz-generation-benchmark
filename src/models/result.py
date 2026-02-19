@@ -38,6 +38,26 @@ class MetricResult:
 
 
 @dataclass
+class EvaluationResult:
+    """Result from a metric evaluation.
+
+    Attributes:
+        score: Numeric score (0-100)
+        raw_response: Raw LLM response text
+        metadata: Additional metric-specific data
+    """
+
+    score: float
+    raw_response: str
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.metadata is None:
+            self.metadata = {}
+
+
+
+@dataclass
 class BenchmarkResult:
     """Complete result from a single benchmark run.
 
