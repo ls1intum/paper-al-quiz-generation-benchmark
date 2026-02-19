@@ -56,7 +56,6 @@ class EvaluationResult:
             self.metadata = {}
 
 
-
 @dataclass
 class BenchmarkResult:
     """Complete result from a single benchmark run.

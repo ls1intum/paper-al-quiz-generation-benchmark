@@ -31,6 +31,7 @@ class MetricParameter:
     default: Any
     description: str
 
+
 class BaseMetric(ABC):
     """Abstract base class for all metrics.
 
