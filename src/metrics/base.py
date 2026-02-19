@@ -1,9 +1,9 @@
 """Base metric interface."""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any, List, Optional, Dict
+from typing import Any, List, Optional
 from ..models.quiz import Quiz, QuizQuestion
 from ..models.result import EvaluationResult
 
