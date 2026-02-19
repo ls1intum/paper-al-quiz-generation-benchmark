@@ -127,6 +127,71 @@ class BenchmarkRunner:
 
         return source_texts
 
+    def _evaluate_quiz_level(
+        self,
+        metric: BaseMetric,
+        evaluator: LLMProvider,
+        quiz: Quiz,
+        source_text: Optional[str],
+        parameters: Dict,
+    ) -> Optional[MetricResult]:
+        """Evaluate entire quiz with a metric."""
+        try:
+            # Metrics handle their own logic
+            result = metric.evaluate(
+                quiz=quiz, source_text=source_text, llm_client=evaluator, **parameters
+            )
+
+            return MetricResult(
+                metric_name=metric.name,
+                metric_version=metric.version,
+                score=result.score,
+                evaluator_model=evaluator.model_name,
+                quiz_id=quiz.quiz_id,
+                question_id=None,
+                parameters=parameters,
+                raw_response=result.raw_response,
+            )
+
+        except Exception as e:
+            print(f"    Error evaluating quiz: {e}")
+            return None
+
+    def _evaluate_question(
+        self,
+        metric: BaseMetric,
+        evaluator: LLMProvider,
+        quiz: Quiz,
+        question: QuizQuestion,
+        source_text: Optional[str],
+        parameters: Dict,
+    ) -> Optional[MetricResult]:
+        """Evaluate a single question with a metric."""
+        try:
+            # Metrics handle their own logic
+            result = metric.evaluate(
+                question=question,
+                quiz=quiz,
+                source_text=source_text,
+                llm_client=evaluator,
+                **parameters,
+            )
+
+            return MetricResult(
+                metric_name=metric.name,
+                metric_version=metric.version,
+                score=result.score,  # Extract score
+                evaluator_model=evaluator.model_name,
+                quiz_id=quiz.quiz_id,
+                question_id=question.question_id,
+                parameters=parameters,
+                raw_response=result.raw_response,  # Extract raw_response
+            )
+
+        except Exception as e:
+            print(f"    Error evaluating question {question.question_id}: {e}")
+            return None
+
     def _evaluate_quiz(
         self, quiz: Quiz, source_text: Optional[str], run_number: int
     ) -> BenchmarkResult:
@@ -189,97 +254,3 @@ class BenchmarkRunner:
             completed_at=completed_at,
             metadata={"quiz_title": quiz.title, "num_questions": quiz.num_questions},
         )
-
-    def _evaluate_question(
-        self,
-        metric: BaseMetric,
-        evaluator: LLMProvider,
-        quiz: Quiz,
-        question: QuizQuestion,
-        source_text: Optional[str],
-        parameters: Dict,
-    ) -> Optional[MetricResult]:
-        """Evaluate a single question with a metric.
-
-        Args:
-            metric: Metric to use
-            evaluator: LLM evaluator
-            quiz: Parent quiz
-            question: Question to evaluate
-            source_text: Source material
-            parameters: Metric parameters
-
-        Returns:
-            MetricResult or None if evaluation fails
-        """
-        try:
-            # Generate prompt
-            prompt = metric.get_prompt(
-                question=question, quiz=quiz, source_text=source_text, **parameters
-            )
-
-            # Get LLM response
-            response = evaluator.generate(prompt)
-
-            # Parse score
-            score = metric.parse_response(response)
-
-            return MetricResult(
-                metric_name=metric.name,
-                metric_version=metric.version,
-                score=score,
-                evaluator_model=evaluator.model_name,
-                quiz_id=quiz.quiz_id,
-                question_id=question.question_id,
-                parameters=parameters,
-                raw_response=response,
-            )
-
-        except Exception as e:
-            print(f"    Error evaluating question {question.question_id}: {e}")
-            return None
-
-    def _evaluate_quiz_level(
-        self,
-        metric: BaseMetric,
-        evaluator: LLMProvider,
-        quiz: Quiz,
-        source_text: Optional[str],
-        parameters: Dict,
-    ) -> Optional[MetricResult]:
-        """Evaluate entire quiz with a metric.
-
-        Args:
-            metric: Metric to use
-            evaluator: LLM evaluator
-            quiz: Quiz to evaluate
-            source_text: Source material
-            parameters: Metric parameters
-
-        Returns:
-            MetricResult or None if evaluation fails
-        """
-        try:
-            # Generate prompt
-            prompt = metric.get_prompt(quiz=quiz, source_text=source_text, **parameters)
-
-            # Get LLM response
-            response = evaluator.generate(prompt)
-
-            # Parse score
-            score = metric.parse_response(response)
-
-            return MetricResult(
-                metric_name=metric.name,
-                metric_version=metric.version,
-                score=score,
-                evaluator_model=evaluator.model_name,
-                quiz_id=quiz.quiz_id,
-                question_id=None,  # Quiz-level metric
-                parameters=parameters,
-                raw_response=response,
-            )
-
-        except Exception as e:
-            print(f"    Error evaluating quiz: {e}")
-            return None

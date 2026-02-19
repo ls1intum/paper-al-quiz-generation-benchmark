@@ -3,6 +3,7 @@
 
 import argparse
 import sys
+import json
 from datetime import datetime
 from pathlib import Path
 
@@ -32,16 +33,16 @@ def main() -> int:
         description="Quiz Generation Benchmark Framework",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
-  # Run benchmark with default config
-  python main.py --config config/benchmark_example.yaml
+    Examples:
+      # Run benchmark with default config
+      python main.py --config config/benchmark_example.yaml
 
-  # Specify custom .env file
-  python main.py --config config/benchmark_example.yaml --env .env.custom
+      # Specify custom .env file
+      python main.py --config config/benchmark_example.yaml --env .env.custom
 
-  # Skip aggregation
-  python main.py --config config/benchmark_example.yaml --no-aggregate
-        """,
+      # Skip aggregation
+      python main.py --config config/benchmark_example.yaml --no-aggregate
+            """,
     )
 
     parser.add_argument(
@@ -121,15 +122,73 @@ Examples:
             print(f"Saving aggregated results to {aggregated_file}...")
             IOUtils.save_aggregated_results(aggregated, str(aggregated_file))
 
-            # Generate and display summary
+            # Generate standard summary
             print("\n" + "=" * 70)
             summary = ResultsReporter.generate_summary(aggregated)
-            print(summary)
+
+            # Extract and Append Qualitative Reasoning
+            detailed_notes = []
+            detailed_notes.append("\n" + "=" * 70)
+            detailed_notes.append("DETAILED INSIGHTS (Qualitative Data)")
+            detailed_notes.append("=" * 70)
+
+            found_insights = False
+
+            # Helper to safely get attributes whether it's a dict or object
+            def safe_get(item, key, default=None):
+                if isinstance(item, dict):
+                    return item.get(key, default)
+                return getattr(item, key, default)
+
+            for result in results:
+                quiz_id = safe_get(result, 'quiz_id', 'Unknown Quiz')
+                metrics_list = safe_get(result, 'metrics', [])
+
+                for metric in metrics_list:
+                    metric_name = safe_get(metric, 'metric_name')
+                    raw_response = safe_get(metric, 'raw_response')
+
+                    # Check for Coverage metric specifically
+                    if metric_name == 'coverage':
+                        try:
+                            # Clean the markdown JSON string
+                            if isinstance(raw_response, str):
+                                clean_json = raw_response.replace("```json", "").replace("```", "").strip()
+                                # Parse JSON
+                                data = json.loads(clean_json)
+
+                                # Extract fields
+                                reasoning = data.get('reasoning')
+                                sub_scores = data.get('sub_scores')
+                                score = data.get('final_score')
+
+                                if reasoning:
+                                    found_insights = True
+                                    detailed_notes.append(f"\n[Quiz: {quiz_id}] Coverage Analysis:")
+                                    detailed_notes.append("-" * 40)
+                                    detailed_notes.append(f"Score: {score}")
+                                    detailed_notes.append(f"Reasoning:\n{reasoning}")
+
+                                    if sub_scores:
+                                        detailed_notes.append(f"Sub-scores: {sub_scores}")
+                                    detailed_notes.append("-" * 40)
+                        except Exception:
+                            # If parsing fails, skip silently
+                            continue
+
+            if found_insights:
+                # Append the detailed notes to the main summary string
+                summary_str = summary + "\n".join(detailed_notes)
+            else:
+                summary_str = summary
+
+            # Print the FULL summary (Statistics + Reasoning)
+            print(summary_str)
 
             # Save summary to text file
             summary_file = results_dir / f"summary_{output_prefix}.txt"
             with open(summary_file, "w") as f:
-                f.write(summary)
+                f.write(summary_str)
             print(f"\nSummary saved to {summary_file}")
 
         print("\n" + "=" * 70)

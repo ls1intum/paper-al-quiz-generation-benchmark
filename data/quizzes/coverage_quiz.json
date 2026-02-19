@@ -1,0 +1,156 @@
+{
+  "quiz_id": "quiz_comprehensive_001",
+  "title": "Python Fundamentals - Comprehensive Review",
+  "source_material": "python_intro.md",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "single_choice",
+      "question_text": "Which parameter syntax allows a function to accept an arbitrary number of keyword arguments?",
+      "options": [
+        "*args",
+        "**kwargs",
+        "*kwargs",
+        "args[]"
+      ],
+      "correct_answer": "**kwargs",
+      "source_reference": "Section 1.2: Function Arguments",
+      "metadata": {
+        "topic": "function_arguments",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q2",
+      "question_type": "single_choice",
+      "question_text": "Which collection type is defined as an 'ordered, immutable sequence'?",
+      "options": [
+        "List",
+        "Set",
+        "Tuple",
+        "Dictionary"
+      ],
+      "correct_answer": "Tuple",
+      "source_reference": "Section 2.2: Collection Types",
+      "metadata": {
+        "topic": "data_types",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q3",
+      "question_type": "single_choice",
+      "question_text": "What is the output of the following code snippet regarding control flow?\n\n```python\nfor i in range(4):\n    if i == 2:\n        continue\n    print(i, end=' ')\n```",
+      "options": [
+        "0 1 2 3",
+        "0 1 3",
+        "0 1",
+        "Error"
+      ],
+      "correct_answer": "0 1 3",
+      "source_reference": "Section 3.2: Loops and Control Statements",
+      "metadata": {
+        "topic": "loops",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q4",
+      "question_type": "single_choice",
+      "question_text": "Which of the following creates a list of squares for numbers 0 through 4 using a list comprehension?",
+      "options": [
+        "[x*2 for x in range(5)]",
+        "[x**2 for x in range(5)]",
+        "(x**2 for x in range(5))",
+        "{x: x**2 for x in range(5)}"
+      ],
+      "correct_answer": "[x**2 for x in range(5)]",
+      "source_reference": "Section 3.3: Loop Patterns",
+      "metadata": {
+        "topic": "list_comprehensions",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q5",
+      "question_type": "true_false",
+      "question_text": "In a conditional statement, the `elif` block is executed only if the preceding `if` statement is False.",
+      "options": [
+        "True",
+        "False"
+      ],
+      "correct_answer": "True",
+      "source_reference": "Section 3.1: Conditional Statements",
+      "metadata": {
+        "topic": "conditionals",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q6",
+      "question_type": "multiple_choice",
+      "question_text": "Which of the following data types are **immutable**? (Select all that apply)",
+      "options": [
+        "String",
+        "List",
+        "Tuple",
+        "Dictionary",
+        "Integer"
+      ],
+      "correct_answer": [
+        "String",
+        "Tuple",
+        "Integer"
+      ],
+      "source_reference": "Section 2.3: Mutability",
+      "metadata": {
+        "topic": "mutability",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q7",
+      "question_type": "single_choice",
+      "question_text": "What does the `break` statement do when encountered inside a loop?",
+      "options": [
+        "Skips the rest of the current iteration",
+        "Exits the loop entirely",
+        "Does nothing (placeholder)",
+        "Restarts the loop"
+      ],
+      "correct_answer": "Exits the loop entirely",
+      "source_reference": "Section 3.2: Loops and Control Statements",
+      "metadata": {
+        "topic": "control_flow",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q8",
+      "question_type": "single_choice",
+      "question_text": "Which code snippet correctly demonstrates modifying a mutable object via a reference?",
+      "options": [
+        "a = (1, 2); b = a; b.append(3)",
+        "a = [1, 2]; b = a; b.append(3)",
+        "a = \"hello\"; b = a; b = b + \" world\"",
+        "a = 5; b = a; b = 6"
+      ],
+      "correct_answer": "a = [1, 2]; b = a; b.append(3)",
+      "source_reference": "Section 2.3: Mutability",
+      "metadata": {
+        "topic": "mutability",
+        "difficulty_level": "hard"
+      }
+    }
+  ],
+  "metadata": {
+    "target_audience": "undergraduate",
+    "estimated_time_minutes": 15,
+    "learning_objectives": [
+      "Master Python control flow (loops, conditionals)",
+      "Understand complex data types and mutability",
+      "Utilize advanced function arguments"
+    ]
+  },
+  "created_at": "2024-02-12T14:30:00"
+}

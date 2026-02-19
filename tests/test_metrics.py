@@ -37,9 +37,10 @@ def make_quiz() -> Quiz:
 )
 @pytest.mark.parametrize(
     "metric_cls",
-    [DifficultyMetric, CoverageMetric, ClarityMetric],
+    [DifficultyMetric, ClarityMetric],  # Only simple metrics
 )
-def test_parse_response_success(metric_cls, response, expected):
+def test_simple_metric_parse_response_success(metric_cls, response, expected):
+    """Simple metrics should parse numeric responses."""
     metric = metric_cls()
     assert metric.parse_response(response) == expected
 
@@ -53,9 +54,10 @@ def test_parse_response_success(metric_cls, response, expected):
 )
 @pytest.mark.parametrize(
     "metric_cls",
-    [DifficultyMetric, CoverageMetric, ClarityMetric],
+    [DifficultyMetric, ClarityMetric],  # Only simple metrics
 )
-def test_parse_response_failure(metric_cls, response):
+def test_simple_metric_parse_response_failure(metric_cls, response):
+    """Simple metrics should reject invalid responses."""
     metric = metric_cls()
     with pytest.raises(ValueError):
         metric.parse_response(response)
@@ -73,14 +75,6 @@ def test_clarity_prompt_requires_question():
         metric.get_prompt()
 
 
-def test_coverage_prompt_requires_quiz_and_source():
-    metric = CoverageMetric()
-    with pytest.raises(ValueError):
-        metric.get_prompt(quiz=make_quiz())
-    with pytest.raises(ValueError):
-        metric.get_prompt(source_text="text")
-
-
 def test_difficulty_param_validation():
     metric = DifficultyMetric()
     question = make_question()
@@ -90,8 +84,78 @@ def test_difficulty_param_validation():
         metric.get_prompt(question=question, unknown_param="x")
 
 
+def test_coverage_parse_json_response():
+    """Coverage should parse JSON responses with final_score."""
+    metric = CoverageMetric()
+
+    json_response = """{
+        "final_score": 67.5,
+        "sub_scores": {
+            "breadth": 20.0,
+            "depth": 22.5,
+            "balance": 15.0,
+            "critical": 10.0
+        }
+    }"""
+
+    assert metric.parse_response(json_response) == 67.5
+
+
+def test_coverage_parse_simple_fallback():
+    """Coverage should fall back to parsing simple numbers."""
+    metric = CoverageMetric()
+
+    # Fallback patterns for compatibility
+    assert metric.parse_response("42") == 42.0
+    assert metric.parse_response("Score: 88") == 88.0
+    assert metric.parse_response("85.5") == 85.5
+
+
+def test_coverage_parse_invalid_response():
+    """Coverage should reject responses without valid scores."""
+    metric = CoverageMetric()
+
+    with pytest.raises(ValueError):
+        metric.parse_response("no number")
+
+    with pytest.raises(ValueError):
+        metric.parse_response("101")
+
+
+def test_coverage_get_prompt_not_implemented():
+    """Coverage should raise NotImplementedError for get_prompt()."""
+    metric = CoverageMetric()
+
+    with pytest.raises(NotImplementedError, match="two-stage evaluation"):
+        metric.get_prompt(quiz=make_quiz())
+
+
+def test_coverage_evaluate_requires_quiz():
+    """Coverage evaluate() should require quiz parameter."""
+    metric = CoverageMetric()
+
+    with pytest.raises(ValueError, match="requires a quiz"):
+        metric.evaluate(source_text="text", llm_client=None)
+
+
+def test_coverage_evaluate_requires_source_text():
+    """Coverage evaluate() should require source_text parameter."""
+    metric = CoverageMetric()
+
+    with pytest.raises(ValueError, match="requires source_text"):
+        metric.evaluate(quiz=make_quiz(), llm_client=None)
+
+
 def test_coverage_param_validation():
+    """Coverage should validate granularity parameter type."""
+    from tests.conftest import MockLLMProvider
+
     metric = CoverageMetric()
     quiz = make_quiz()
-    with pytest.raises(ValueError):
-        metric.get_prompt(quiz=quiz, source_text="text", granularity=10)
+    mock_llm = MockLLMProvider(model="mock-model")
+
+    # Invalid type (int instead of str)
+    with pytest.raises(ValueError, match="should be of type str"):
+        metric.evaluate(
+            quiz=quiz, source_text="text", llm_client=mock_llm, granularity=10  # Wrong type
+        )

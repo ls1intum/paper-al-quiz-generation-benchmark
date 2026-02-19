@@ -22,6 +22,11 @@ metrics:
     evaluators: ["gpt4"]
     enabled: true
 
+  - name: "coverage"
+    version: "1.1"
+    evaluators: [ "gpt4" ]
+    enabled: true
+
 inputs:
   quiz_directory: "data/quizzes"
   source_directory: "data/inputs"

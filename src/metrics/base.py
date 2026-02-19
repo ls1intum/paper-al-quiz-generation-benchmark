@@ -4,8 +4,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, List, Optional
-
 from ..models.quiz import Quiz, QuizQuestion
+from ..models.result import EvaluationResult
 
 
 class MetricScope(str, Enum):
@@ -79,6 +79,41 @@ class BaseMetric(ABC):
             List of MetricParameter objects
         """
         return []
+
+    def evaluate(
+        self,
+        question: Optional[QuizQuestion] = None,
+        quiz: Optional[Quiz] = None,
+        source_text: Optional[str] = None,
+        llm_client: Optional[Any] = None,
+        **params: Any,
+    ) -> EvaluationResult:
+        """
+        Evaluate and return a score.
+
+        Default implementation uses get_prompt() + parse_response().
+        Metrics can override this for custom evaluation logic (e.g., multi-stage).
+
+        Args:
+            question: Question to evaluate (for question-level metrics)
+            quiz: Quiz to evaluate (for quiz-level metrics)
+            source_text: Source material text
+            llm_client: LLM provider for generating responses
+            **params: Metric-specific parameters
+
+        Returns:
+            Numeric score (0-100)
+        """
+        if llm_client is None:
+            raise ValueError(f"{self.name} requires an llm_client")
+
+        # Default behavior: single prompt evaluation
+        prompt = self.get_prompt(question=question, quiz=quiz, source_text=source_text, **params)
+
+        response = llm_client.generate(prompt)
+        score = self.parse_response(response)
+
+        return EvaluationResult(score=score, raw_response=response, metadata={})
 
     @abstractmethod
     def get_prompt(
