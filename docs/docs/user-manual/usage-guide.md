@@ -63,6 +63,7 @@ Notes:
 - If multiple local evaluators use different `model` IDs, Ollama loads them as needed.
 - `ollama` resolves env vars in this order: `OLLAMA_ENDPOINT`/`OLLAMA_API_KEY`, then `CUSTOM_LLM_ENDPOINT`/`CUSTOM_LLM_API_KEY`.
 - The runner performs fail-early validation for `ollama`: endpoint configured, server reachable, and configured model names present in `/api/tags`.
+- If required models are missing, preflight attempts automatic pulls via `/api/pull` before aborting.
 
 ### Benchmark Configuration
 

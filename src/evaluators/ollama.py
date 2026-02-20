@@ -96,11 +96,20 @@ class OllamaProvider(OpenAICompatibleProvider):
             available_models = cls._fetch_available_model_ids(base_url=base_url, api_key=api_key)
             missing = sorted(set(required_models) - set(available_models))
             if missing:
-                raise RuntimeError(
-                    "Ollama preflight failed: required model(s) not available on "
-                    f"{base_url}: {missing}. Available model names: {available_models}. "
-                    "Run 'ollama list' and update config model names."
-                )
+                cls._pull_missing_models(base_url=base_url, api_key=api_key, missing_models=missing)
+
+                available_after_pull = cls._fetch_available_model_ids(base_url=base_url, api_key=api_key)
+                still_missing = sorted(set(required_models) - set(available_after_pull))
+                if still_missing:
+                    pull_instructions = "; ".join(
+                        f"ollama pull {model}" for model in still_missing
+                    )
+                    raise RuntimeError(
+                        "Ollama preflight failed: required model(s) not available on "
+                        f"{base_url}: {still_missing}. Available model names: {available_after_pull}. "
+                        f"Pull missing models with: {pull_instructions}. "
+                        "Then re-run the benchmark."
+                    )
 
     @classmethod
     def _fetch_available_model_ids(cls, base_url: str, api_key: str, timeout: int = 5) -> List[str]:
@@ -130,3 +139,26 @@ class OllamaProvider(OpenAICompatibleProvider):
         models = payload.get("models", [])
         model_names = [item["name"] for item in models if isinstance(item, dict) and "name" in item]
         return sorted(model_names)
+
+    @classmethod
+    def _pull_missing_models(cls, base_url: str, api_key: str, missing_models: List[str]) -> None:
+        """Attempt pulling missing models from the Ollama server."""
+        native_base = cls._to_native_base_url(base_url)
+        pull_url = f"{native_base}/api/pull"
+
+        headers = {"Content-Type": "application/json"}
+        if api_key:
+            headers["Authorization"] = f"Bearer {api_key}"
+
+        for model in missing_models:
+            payload = json.dumps({"model": model, "stream": False}).encode("utf-8")
+            request = Request(pull_url, data=payload, headers=headers, method="POST")
+
+            try:
+                with urlopen(request, timeout=600):
+                    pass
+            except URLError as exc:
+                raise RuntimeError(
+                    "Ollama preflight failed while pulling missing model "
+                    f"'{model}' from {pull_url}. Try running `ollama pull {model}` manually."
+                ) from exc

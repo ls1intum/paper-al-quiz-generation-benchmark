@@ -53,10 +53,19 @@ def test_preflight_fails_when_server_unreachable(monkeypatch: pytest.MonkeyPatch
 def test_preflight_fails_when_required_model_missing(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("OLLAMA_ENDPOINT", "http://localhost:11434")
 
+    pulled = []
+
     monkeypatch.setattr(
         OllamaProvider,
         "_fetch_available_model_ids",
         classmethod(lambda cls, base_url, api_key, timeout=5: ["llama3.1:8b-instruct"]),
+    )
+    monkeypatch.setattr(
+        OllamaProvider,
+        "_pull_missing_models",
+        classmethod(
+            lambda cls, base_url, api_key, missing_models: pulled.extend(missing_models)
+        ),
     )
 
     evaluators = {
@@ -80,6 +89,7 @@ def test_preflight_fails_when_required_model_missing(monkeypatch: pytest.MonkeyP
 
     with pytest.raises(RuntimeError, match="required model\\(s\\) not available"):
         OllamaProvider.preflight(evaluators)
+    assert pulled == ["qwen2.5:7b-instruct"]
 
 
 def test_preflight_passes_when_all_models_available(monkeypatch: pytest.MonkeyPatch):
@@ -93,6 +103,46 @@ def test_preflight_passes_when_all_models_available(monkeypatch: pytest.MonkeyPa
                 "llama3.1:8b-instruct",
                 "qwen2.5:7b-instruct",
             ]
+        ),
+    )
+
+    evaluators = {
+        "local_a": EvaluatorConfig(
+            name="local_a",
+            provider="ollama",
+            model="llama3.1:8b-instruct",
+            temperature=0.0,
+            max_tokens=100,
+            additional_params={},
+        ),
+        "local_b": EvaluatorConfig(
+            name="local_b",
+            provider="ollama",
+            model="qwen2.5:7b-instruct",
+            temperature=0.0,
+            max_tokens=100,
+            additional_params={},
+        ),
+    }
+
+    OllamaProvider.preflight(evaluators)
+
+
+def test_preflight_auto_pulls_and_passes(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("OLLAMA_ENDPOINT", "http://localhost:11434")
+
+    available = {"llama3.1:8b-instruct"}
+
+    monkeypatch.setattr(
+        OllamaProvider,
+        "_fetch_available_model_ids",
+        classmethod(lambda cls, base_url, api_key, timeout=5: sorted(available)),
+    )
+    monkeypatch.setattr(
+        OllamaProvider,
+        "_pull_missing_models",
+        classmethod(
+            lambda cls, base_url, api_key, missing_models: available.update(missing_models)
         ),
     )
 
