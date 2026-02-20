@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import hashlib
-from typing import Any, Dict, Iterable, List, Optional
+import json
+from typing import Any, Dict, Iterable, List, Optional, Type
 
 import pytest
+from pydantic import BaseModel
 
 from src.evaluators.base import LLMProvider
 from src.evaluators.factory import LLMProviderFactory
@@ -25,7 +27,7 @@ class MockLLMProvider(LLMProvider):
         model: str,
         temperature: float = 0.0,
         max_tokens: int = 500,
-        responses: Optional[Iterable[str]] = None,
+        responses: Optional[Iterable[Any]] = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(model, temperature, max_tokens, **kwargs)
@@ -42,7 +44,10 @@ class MockLLMProvider(LLMProvider):
         if self._responses is not None:
             if not self._responses:
                 return "0"
-            return self._responses.pop(0)
+            next_response = self._responses.pop(0)
+            if isinstance(next_response, str):
+                return next_response
+            return json.dumps(next_response)
 
         # Coverage Stage 1: Question topic extraction
         if "Question #" in prompt and "cognitive_level" in prompt:
@@ -73,6 +78,49 @@ class MockLLMProvider(LLMProvider):
         digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
         score = int(digest, 16) % 101
         return str(score)
+
+    def generate_structured(
+        self,
+        prompt: str,
+        schema: Type[BaseModel],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        # If custom responses provided, use those
+        if self._responses is not None:
+            if not self._responses:
+                return {"score": 0}
+            return self._responses.pop(0)
+
+        # Coverage Stage 1: Question topic extraction
+        if "Question #" in prompt and "cognitive_level" in prompt:
+            return {
+                "topics": ["test_topic"],
+                "cognitive_level": "understanding",
+                "reasoning": "Mock question analysis",
+            }
+
+        # Coverage Stage 2: Overall coverage analysis
+        if "Scoring Framework" in prompt or ("sub_scores" in prompt and "final_score" in prompt):
+            return {
+                "final_score": 67.5,
+                "sub_scores": {
+                    "breadth": 20.0,
+                    "depth": 22.5,
+                    "balance": 15.0,
+                    "critical": 10.0,
+                },
+                "topics_in_source": ["topic1", "topic2"],
+                "topics_covered": ["topic1"],
+                "critical_concepts": ["concept1"],
+                "critical_covered": ["concept1"],
+                "reasoning": "Mock coverage analysis",
+            }
+
+        digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+        score = int(digest, 16) % 101
+        return {"score": float(score)}
 
 
 @pytest.fixture
