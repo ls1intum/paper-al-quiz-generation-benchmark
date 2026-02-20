@@ -121,7 +121,7 @@ Consider:
 4. Potential for confusion
 
         Respond with ONLY a JSON object in this format:
-        {"score": <number between 0 and 100>}
+        {{"score": <number between 0 and 100>}}
 """
 
         return prompt

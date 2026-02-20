@@ -85,7 +85,7 @@ Consider:
    - Is there a single, clearly correct answer?
 
 Respond with ONLY a JSON object in this format:
-{"score": <number between 0 and 100>}
+{{"score": <number between 0 and 100>}}
 """
 
         return prompt

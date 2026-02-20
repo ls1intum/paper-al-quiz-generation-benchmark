@@ -180,7 +180,7 @@ class GrammaticalCorrectnessMetric(BaseMetric):
         - Deduct points proportionally to severity and frequency
     
         Respond with ONLY a JSON object in this format:
-        {"score": <number between 0 and 100>}
+        {{"score": <number between 0 and 100>}}
         """
 
         return prompt
