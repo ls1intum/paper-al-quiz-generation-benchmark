@@ -1,14 +1,14 @@
 """Tests for LLM provider factory creation."""
 
 from src.evaluators.factory import LLMProviderFactory
-from src.evaluators.lm_studio import LMStudioProvider
+from src.evaluators.ollama import OllamaProvider
 from src.evaluators.openai_compatible import OpenAICompatibleProvider
 from src.models.config import EvaluatorConfig
 
 
 def test_factory_creates_openai_compatible_from_config():
     config = EvaluatorConfig(
-        name="lmstudio_fast",
+        name="openai_compat_local",
         provider="openai_compatible",
         model="qwen2.5-7b-instruct",
         temperature=0.0,
@@ -23,18 +23,18 @@ def test_factory_creates_openai_compatible_from_config():
     assert provider.base_url == "http://localhost:1234/v1"
 
 
-def test_factory_creates_lm_studio_provider_from_config():
+def test_factory_creates_ollama_provider_from_config():
     config = EvaluatorConfig(
-        name="lmstudio_reasoning",
-        provider="lm_studio",
-        model="qwen2.5-14b-instruct",
+        name="ollama_reasoning",
+        provider="ollama",
+        model="qwen2.5:14b-instruct",
         temperature=0.0,
         max_tokens=700,
-        additional_params={"base_url": "http://localhost:1234"},
+        additional_params={"base_url": "http://localhost:11434"},
     )
 
     provider = LLMProviderFactory.create(config)
 
-    assert isinstance(provider, LMStudioProvider)
-    assert provider.model_name == "qwen2.5-14b-instruct"
-    assert provider.base_url == "http://localhost:1234/v1"
+    assert isinstance(provider, OllamaProvider)
+    assert provider.model_name == "qwen2.5:14b-instruct"
+    assert provider.base_url == "http://localhost:11434/v1"

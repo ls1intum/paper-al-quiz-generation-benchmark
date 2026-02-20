@@ -1,20 +1,20 @@
-"""Tests for LM Studio preflight validation."""
+"""Tests for Ollama preflight validation."""
 
 import pytest
 
-from src.evaluators.lm_studio import LMStudioProvider
+from src.evaluators.ollama import OllamaProvider
 from src.models.config import EvaluatorConfig
 
 
 def test_preflight_fails_when_endpoint_not_configured(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.delenv("LM_STUDIO_ENDPOINT", raising=False)
+    monkeypatch.delenv("OLLAMA_ENDPOINT", raising=False)
     monkeypatch.delenv("CUSTOM_LLM_ENDPOINT", raising=False)
 
     evaluators = {
         "local_a": EvaluatorConfig(
             name="local_a",
-            provider="lm_studio",
-            model="model-a",
+            provider="ollama",
+            model="llama3.1:8b-instruct",
             temperature=0.0,
             max_tokens=100,
             additional_params={},
@@ -22,24 +22,24 @@ def test_preflight_fails_when_endpoint_not_configured(monkeypatch: pytest.Monkey
     }
 
     with pytest.raises(RuntimeError, match="endpoint not configured"):
-        LMStudioProvider.preflight(evaluators)
+        OllamaProvider.preflight(evaluators)
 
 
 def test_preflight_fails_when_server_unreachable(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("LM_STUDIO_ENDPOINT", "http://localhost:1234/v1")
+    monkeypatch.setenv("OLLAMA_ENDPOINT", "http://localhost:11434")
 
     def _raise_unreachable(base_url: str, api_key: str, timeout: int = 5):
-        raise RuntimeError("LM Studio preflight failed: cannot reach server")
+        raise RuntimeError("Ollama preflight failed: cannot reach server")
 
-    monkeypatch.setattr(
-        LMStudioProvider, "_fetch_available_model_ids", staticmethod(_raise_unreachable)
-    )
+    monkeypatch.setattr(OllamaProvider, "_fetch_available_model_ids", classmethod(
+        lambda cls, base_url, api_key, timeout=5: _raise_unreachable(base_url, api_key, timeout)
+    ))
 
     evaluators = {
         "local_a": EvaluatorConfig(
             name="local_a",
-            provider="lm_studio",
-            model="model-a",
+            provider="ollama",
+            model="llama3.1:8b-instruct",
             temperature=0.0,
             max_tokens=100,
             additional_params={},
@@ -47,32 +47,31 @@ def test_preflight_fails_when_server_unreachable(monkeypatch: pytest.MonkeyPatch
     }
 
     with pytest.raises(RuntimeError, match="cannot reach server"):
-        LMStudioProvider.preflight(evaluators)
+        OllamaProvider.preflight(evaluators)
 
 
 def test_preflight_fails_when_required_model_missing(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("LM_STUDIO_ENDPOINT", "http://localhost:1234/v1")
-
-    def _available_models(base_url: str, api_key: str, timeout: int = 5):
-        return ["model-a"]
+    monkeypatch.setenv("OLLAMA_ENDPOINT", "http://localhost:11434")
 
     monkeypatch.setattr(
-        LMStudioProvider, "_fetch_available_model_ids", staticmethod(_available_models)
+        OllamaProvider,
+        "_fetch_available_model_ids",
+        classmethod(lambda cls, base_url, api_key, timeout=5: ["llama3.1:8b-instruct"]),
     )
 
     evaluators = {
         "local_a": EvaluatorConfig(
             name="local_a",
-            provider="lm_studio",
-            model="model-a",
+            provider="ollama",
+            model="llama3.1:8b-instruct",
             temperature=0.0,
             max_tokens=100,
             additional_params={},
         ),
         "local_b": EvaluatorConfig(
             name="local_b",
-            provider="lm_studio",
-            model="model-b",
+            provider="ollama",
+            model="qwen2.5:7b-instruct",
             temperature=0.0,
             max_tokens=100,
             additional_params={},
@@ -80,36 +79,40 @@ def test_preflight_fails_when_required_model_missing(monkeypatch: pytest.MonkeyP
     }
 
     with pytest.raises(RuntimeError, match="required model\\(s\\) not available"):
-        LMStudioProvider.preflight(evaluators)
+        OllamaProvider.preflight(evaluators)
 
 
 def test_preflight_passes_when_all_models_available(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("LM_STUDIO_ENDPOINT", "http://localhost:1234/v1")
-
-    def _available_models(base_url: str, api_key: str, timeout: int = 5):
-        return ["model-a", "model-b"]
+    monkeypatch.setenv("OLLAMA_ENDPOINT", "http://localhost:11434")
 
     monkeypatch.setattr(
-        LMStudioProvider, "_fetch_available_model_ids", staticmethod(_available_models)
+        OllamaProvider,
+        "_fetch_available_model_ids",
+        classmethod(
+            lambda cls, base_url, api_key, timeout=5: [
+                "llama3.1:8b-instruct",
+                "qwen2.5:7b-instruct",
+            ]
+        ),
     )
 
     evaluators = {
         "local_a": EvaluatorConfig(
             name="local_a",
-            provider="lm_studio",
-            model="model-a",
+            provider="ollama",
+            model="llama3.1:8b-instruct",
             temperature=0.0,
             max_tokens=100,
             additional_params={},
         ),
         "local_b": EvaluatorConfig(
             name="local_b",
-            provider="lm_studio",
-            model="model-b",
+            provider="ollama",
+            model="qwen2.5:7b-instruct",
             temperature=0.0,
             max_tokens=100,
             additional_params={},
         ),
     }
 
-    LMStudioProvider.preflight(evaluators)
+    OllamaProvider.preflight(evaluators)

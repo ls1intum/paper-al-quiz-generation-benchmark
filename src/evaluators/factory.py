@@ -6,7 +6,7 @@ from ..models.config import EvaluatorConfig
 from .anthropic import AnthropicProvider
 from .azure_openai import AzureOpenAIProvider
 from .base import LLMProvider
-from .lm_studio import LMStudioProvider
+from .ollama import OllamaProvider
 from .openai import OpenAIProvider
 from .openai_compatible import OpenAICompatibleProvider
 
@@ -19,7 +19,7 @@ class LLMProviderFactory:
         "openai": OpenAIProvider,
         "anthropic": AnthropicProvider,
         "openai_compatible": OpenAICompatibleProvider,
-        "lm_studio": LMStudioProvider,
+        "ollama": OllamaProvider,
     }
 
     @classmethod

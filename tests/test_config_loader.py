@@ -95,3 +95,35 @@ def test_parse_config_preserves_openai_compatible_additional_params():
     assert evaluator.model == "qwen2.5-7b-instruct"
     assert evaluator.additional_params["base_url"] == "http://localhost:1234/v1"
     assert evaluator.additional_params["api_key"] == "not-required"
+
+
+def test_parse_config_preserves_ollama_additional_params():
+    config_dict = {
+        "benchmark": {"name": "test", "version": "1.0", "runs": 1},
+        "evaluators": {
+            "ollama_eval": {
+                "provider": "ollama",
+                "model": "llama3.1:8b-instruct",
+                "base_url": "http://localhost:11434",
+                "temperature": 0.0,
+                "max_tokens": 300,
+            }
+        },
+        "metrics": [
+            {
+                "name": "difficulty",
+                "version": "1.0",
+                "evaluators": ["ollama_eval"],
+                "enabled": True,
+            }
+        ],
+        "inputs": {"quiz_directory": "data/quizzes", "source_directory": "data/inputs"},
+        "outputs": {"results_directory": "data/results"},
+    }
+
+    config = ConfigLoader.parse_config(config_dict)
+    evaluator = config.evaluators["ollama_eval"]
+
+    assert evaluator.provider == "ollama"
+    assert evaluator.model == "llama3.1:8b-instruct"
+    assert evaluator.additional_params["base_url"] == "http://localhost:11434"

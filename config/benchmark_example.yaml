@@ -10,24 +10,24 @@ evaluators:
     temperature: 0.0
     max_tokens: 500
 
-  lmstudio_fast:
-    provider: "lm_studio"
-    model: "qwen2.5-7b-instruct"  # Example local model
-    base_url: "http://localhost:1234/v1"  # LM Studio OpenAI endpoint
+  ollama_fast:
+    provider: "ollama"
+    model: "qwen2.5:7b-instruct"  # Example local model name in Ollama
+    base_url: "http://localhost:11434"
     temperature: 0.0
     max_tokens: 300
 
-  lmstudio_reasoning:
-    provider: "lm_studio"
-    model: "qwen2.5-14b-instruct"  # Example local model
-    base_url: "http://localhost:1234/v1"  # LM Studio OpenAI endpoint
+  ollama_reasoning:
+    provider: "ollama"
+    model: "llama3.1:8b-instruct"  # Example local model name in Ollama
+    base_url: "http://localhost:11434"
     temperature: 0.0
     max_tokens: 500
 
 metrics:
   - name: "difficulty"
     version: "1.0"
-    evaluators: ["lmstudio_fast"]
+    evaluators: ["ollama_fast"]
     parameters:
       rubric: "bloom_taxonomy"
       target_audience: "undergraduate"
@@ -42,12 +42,12 @@ metrics:
 
   - name: "grammatical_correctness"
     version: "1.0"
-    evaluators: ["lmstudio_fast"]
+    evaluators: ["ollama_fast"]
     enabled: true
 
   - name: "clarity"
     version: "1.0"
-    evaluators: ["lmstudio_reasoning", "azure_gpt4"]  # Compare local vs Azure
+    evaluators: ["ollama_reasoning", "azure_gpt4"]  # Compare local vs Azure
     enabled: true
 
 inputs:

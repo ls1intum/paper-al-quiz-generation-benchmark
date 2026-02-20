@@ -21,51 +21,48 @@ OPENAI_API_KEY=sk-your-key-here
 # Anthropic Claude
 ANTHROPIC_API_KEY=sk-ant-your-key-here
 
-# LM Studio models (optional, recommended with provider: "lm_studio")
-LM_STUDIO_ENDPOINT=http://localhost:1234/v1
-LM_STUDIO_API_KEY=not-required
+# Ollama models (optional, recommended with provider: "ollama")
+OLLAMA_ENDPOINT=http://localhost:11434
+OLLAMA_API_KEY=not-required
 
 # Generic OpenAI-compatible fallback
-CUSTOM_LLM_ENDPOINT=http://localhost:1234/v1
+CUSTOM_LLM_ENDPOINT=http://localhost:11434/v1
 CUSTOM_LLM_API_KEY=optional-key
 ```
 
-### LM Studio JIT Setup (Local OpenAI-Compatible Endpoint)
+### Ollama Setup (Local Endpoint)
 
-To use LM Studio as a local evaluator backend:
+To use Ollama as a local evaluator backend:
 
-1. Start LM Studio and launch the local server.
-2. Enable JIT model loading.
-3. Enable Auto-Evict so the server can switch models when different `model` IDs are requested.
-4. Use `http://localhost:1234/v1` as your endpoint (or your configured port).
+1. Start the local server with `ollama serve`.
+2. Pull required models with `ollama pull <model>`.
+3. Use `http://localhost:11434` as your endpoint (or your configured port).
 
 Recommended `.env` values:
 
 ```bash
-LM_STUDIO_ENDPOINT=http://localhost:1234/v1
-LM_STUDIO_API_KEY=not-required
+OLLAMA_ENDPOINT=http://localhost:11434
+OLLAMA_API_KEY=not-required
 
 # Optional fallback aliases
-CUSTOM_LLM_ENDPOINT=http://localhost:1234/v1
+CUSTOM_LLM_ENDPOINT=http://localhost:11434/v1
 CUSTOM_LLM_API_KEY=not-required
 ```
 
 Sanity checks:
 
 ```bash
-# OpenAI-compatible model list
-curl http://localhost:1234/v1/models
+# Ollama model list
+ollama list
 
-# Optional LM Studio health check
-curl http://localhost:1234/api/v1/models
+# Ollama tags API
+curl http://localhost:11434/api/tags
 ```
 
 Notes:
-- Your benchmark does not manually load/unload models today; it relies on LM Studio JIT behavior.
-- If multiple local evaluators use different `model` IDs, LM Studio handles switching between them.
-- First request after a switch can be slower due to model load time.
-- `lm_studio` resolves env vars in this order: `LM_STUDIO_ENDPOINT`/`LM_STUDIO_API_KEY`, then `CUSTOM_LLM_ENDPOINT`/`CUSTOM_LLM_API_KEY`.
-- The runner performs fail-early validation for `lm_studio`: endpoint configured, server reachable, and configured model IDs present in `/v1/models`.
+- If multiple local evaluators use different `model` IDs, Ollama loads them as needed.
+- `ollama` resolves env vars in this order: `OLLAMA_ENDPOINT`/`OLLAMA_API_KEY`, then `CUSTOM_LLM_ENDPOINT`/`CUSTOM_LLM_API_KEY`.
+- The runner performs fail-early validation for `ollama`: endpoint configured, server reachable, and configured model names present in `/api/tags`.
 
 ### Benchmark Configuration
 
@@ -177,13 +174,13 @@ outputs:
   results_directory: "data/results"
 ```
 
-#### Hybrid Azure + LM Studio Configuration
+#### Hybrid Azure + Ollama Configuration
 
 Use larger hosted models for expensive metrics and local models for lower-cost checks:
 
 ```yaml
 benchmark:
-  name: "hybrid-azure-lmstudio"
+  name: "hybrid-azure-ollama"
   version: "1.0.0"
   runs: 3
 
@@ -194,24 +191,24 @@ evaluators:
     temperature: 0.0
     max_tokens: 700
 
-  lmstudio_fast:
-    provider: "lm_studio"
-    model: "qwen2.5-7b-instruct"
-    base_url: "http://localhost:1234/v1"
+  ollama_fast:
+    provider: "ollama"
+    model: "qwen2.5:7b-instruct"
+    base_url: "http://localhost:11434"
     temperature: 0.0
     max_tokens: 300
 
-  lmstudio_reasoning:
-    provider: "lm_studio"
-    model: "qwen2.5-14b-instruct"
-    base_url: "http://localhost:1234/v1"
+  ollama_reasoning:
+    provider: "ollama"
+    model: "llama3.1:8b-instruct"
+    base_url: "http://localhost:11434"
     temperature: 0.0
     max_tokens: 500
 
 metrics:
   - name: "difficulty"
     version: "1.0"
-    evaluators: ["lmstudio_fast"]
+    evaluators: ["ollama_fast"]
     parameters:
       rubric: "bloom_taxonomy"
       target_audience: "undergraduate"
@@ -219,12 +216,12 @@ metrics:
 
   - name: "grammatical_correctness"
     version: "1.0"
-    evaluators: ["lmstudio_fast"]
+    evaluators: ["ollama_fast"]
     enabled: true
 
   - name: "clarity"
     version: "1.0"
-    evaluators: ["lmstudio_reasoning", "azure_gpt4"]
+    evaluators: ["ollama_reasoning", "azure_gpt4"]
     enabled: true
 
   - name: "coverage"
@@ -236,10 +233,10 @@ metrics:
 ```
 
 Notes:
-- `lm_studio` is the recommended provider for LM Studio endpoints.
+- `ollama` is the recommended provider for Ollama endpoints.
 - `openai_compatible` remains available for generic OpenAI-compatible backends (vLLM, local proxies, etc.).
 - You can define multiple local evaluators with different `model` values and route metrics accordingly.
-- If all local evaluators use the same LM Studio instance, keep `base_url` identical.
+- If all local evaluators use the same Ollama instance, keep `base_url` identical.
 
 ### Data Preparation
 
