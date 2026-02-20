@@ -31,7 +31,10 @@ class OllamaProvider(OpenAICompatibleProvider):
             or "http://localhost:11434/v1"
         )
         resolved_api_key = (
-            api_key or os.getenv("OLLAMA_API_KEY") or os.getenv("CUSTOM_LLM_API_KEY") or "not-required"
+            api_key
+            or os.getenv("OLLAMA_API_KEY")
+            or os.getenv("CUSTOM_LLM_API_KEY")
+            or "not-required"
         )
 
         super().__init__(
@@ -98,12 +101,12 @@ class OllamaProvider(OpenAICompatibleProvider):
             if missing:
                 cls._pull_missing_models(base_url=base_url, api_key=api_key, missing_models=missing)
 
-                available_after_pull = cls._fetch_available_model_ids(base_url=base_url, api_key=api_key)
+                available_after_pull = cls._fetch_available_model_ids(
+                    base_url=base_url, api_key=api_key
+                )
                 still_missing = sorted(set(required_models) - set(available_after_pull))
                 if still_missing:
-                    pull_instructions = "; ".join(
-                        f"ollama pull {model}" for model in still_missing
-                    )
+                    pull_instructions = "; ".join(f"ollama pull {model}" for model in still_missing)
                     raise RuntimeError(
                         "Ollama preflight failed: required model(s) not available on "
                         f"{base_url}: {still_missing}. Available model names: {available_after_pull}. "
@@ -132,8 +135,7 @@ class OllamaProvider(OpenAICompatibleProvider):
             ) from exc
         except json.JSONDecodeError as exc:
             raise RuntimeError(
-                "Ollama preflight failed: invalid /api/tags response from "
-                f"{tags_url}."
+                "Ollama preflight failed: invalid /api/tags response from " f"{tags_url}."
             ) from exc
 
         models = payload.get("models", [])
