@@ -22,9 +22,40 @@ OPENAI_API_KEY=sk-your-key-here
 ANTHROPIC_API_KEY=sk-ant-your-key-here
 
 # Custom/Local models (optional)
-CUSTOM_LLM_ENDPOINT=http://localhost:8000/v1
+CUSTOM_LLM_ENDPOINT=http://localhost:1234/v1
 CUSTOM_LLM_API_KEY=optional-key
 ```
+
+### LM Studio JIT Setup (Local OpenAI-Compatible Endpoint)
+
+To use LM Studio as a local evaluator backend:
+
+1. Start LM Studio and launch the local server.
+2. Enable JIT model loading.
+3. Enable Auto-Evict so the server can switch models when different `model` IDs are requested.
+4. Use `http://localhost:1234/v1` as your endpoint (or your configured port).
+
+Recommended `.env` values:
+
+```bash
+CUSTOM_LLM_ENDPOINT=http://localhost:1234/v1
+CUSTOM_LLM_API_KEY=not-required
+```
+
+Sanity checks:
+
+```bash
+# OpenAI-compatible model list
+curl http://localhost:1234/v1/models
+
+# Optional LM Studio health check
+curl http://localhost:1234/api/v1/models
+```
+
+Notes:
+- Your benchmark does not manually load/unload models today; it relies on LM Studio JIT behavior.
+- If multiple local evaluators use different `model` IDs, LM Studio handles switching between them.
+- First request after a switch can be slower due to model load time.
 
 ### Benchmark Configuration
 
@@ -135,6 +166,69 @@ inputs:
 outputs:
   results_directory: "data/results"
 ```
+
+#### Hybrid Azure + LM Studio Configuration
+
+Use larger hosted models for expensive metrics and local models for lower-cost checks:
+
+```yaml
+benchmark:
+  name: "hybrid-azure-lmstudio"
+  version: "1.0.0"
+  runs: 3
+
+evaluators:
+  azure_gpt4:
+    provider: "azure_openai"
+    model: "gpt-4"
+    temperature: 0.0
+    max_tokens: 700
+
+  lmstudio_fast:
+    provider: "openai_compatible"
+    model: "qwen2.5-7b-instruct"
+    base_url: "http://localhost:1234/v1"
+    temperature: 0.0
+    max_tokens: 300
+
+  lmstudio_reasoning:
+    provider: "openai_compatible"
+    model: "qwen2.5-14b-instruct"
+    base_url: "http://localhost:1234/v1"
+    temperature: 0.0
+    max_tokens: 500
+
+metrics:
+  - name: "difficulty"
+    version: "1.0"
+    evaluators: ["lmstudio_fast"]
+    parameters:
+      rubric: "bloom_taxonomy"
+      target_audience: "undergraduate"
+    enabled: true
+
+  - name: "grammatical_correctness"
+    version: "1.0"
+    evaluators: ["lmstudio_fast"]
+    enabled: true
+
+  - name: "clarity"
+    version: "1.0"
+    evaluators: ["lmstudio_reasoning", "azure_gpt4"]
+    enabled: true
+
+  - name: "coverage"
+    version: "1.1"
+    evaluators: ["azure_gpt4"]
+    parameters:
+      granularity: "balanced"
+    enabled: true
+```
+
+Notes:
+- `openai_compatible` is the provider for LM Studio and other OpenAI-compatible endpoints.
+- You can define multiple local evaluators with different `model` values and route metrics accordingly.
+- If all local evaluators use the same LM Studio instance, keep `base_url` identical.
 
 ### Data Preparation
 
@@ -413,4 +507,3 @@ DISTRACTOR QUALITY
 ```
 
 ---
-

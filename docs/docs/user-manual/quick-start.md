@@ -55,44 +55,72 @@ AZURE_OPENAI_API_VERSION=2024-02-15-preview
 
 # Or Anthropic Claude
 ANTHROPIC_API_KEY=sk-ant-your-key-here
+
+# Or LM Studio / OpenAI-compatible local endpoint
+CUSTOM_LLM_ENDPOINT=http://localhost:1234/v1
+CUSTOM_LLM_API_KEY=not-required
 ```
 
 **Security Note:** Never commit `.env` to version control. It's already listed in `.gitignore`.
 
-#### Step 2: Configure Benchmark Settings
+#### Step 2: Set Up LM Studio with JIT (Optional, for local models)
 
-The repository includes an example configuration. If you only have OpenAI configured, edit `config/benchmark_example.yaml`:
+If you want to run local evaluators with `provider: "openai_compatible"`, configure LM Studio:
+
+1. Start the LM Studio local server.
+2. Enable JIT model loading in LM Studio settings.
+3. Keep Auto-Evict enabled so LM Studio can unload one JIT model when another is requested.
+4. Confirm the OpenAI-compatible base URL is `http://localhost:1234/v1`.
+
+Quick check:
+
+```bash
+curl http://localhost:1234/v1/models
+```
+
+If this returns a model list, your benchmark can call LM Studio using `base_url: "http://localhost:1234/v1"`.
+
+#### Step 3: Configure Benchmark Settings
+
+The repository includes an example configuration. To run a hybrid setup (Azure + LM Studio), use:
 
 ```yaml
 benchmark:
-  name: "example-benchmark"
+  name: "hybrid-benchmark"
   version: "1.0.0"
-  runs: 3
+  runs: 1
 
 evaluators:
-  gpt4:
-    provider: "openai"  # or "azure_openai" or "anthropic"
-    model: "gpt-4"
+  azure_gpt4:
+    provider: "azure_openai"
+    model: "gpt-4"  # Azure deployment name
     temperature: 0.0
     max_tokens: 500
 
+  lmstudio_fast:
+    provider: "openai_compatible"
+    model: "qwen2.5-7b-instruct"
+    base_url: "http://localhost:1234/v1"
+    temperature: 0.0
+    max_tokens: 300
+
 metrics:
-  - name: "alignment"
+  - name: "difficulty"
     version: "1.0"
-    evaluators: ["gpt4"]
+    evaluators: ["lmstudio_fast"]
     parameters:
-      learning_objectives: "auto_extract"
-      
-  - name: "cognitive_level"
-    version: "1.0"
-    evaluators: ["gpt4"]
-    parameters:
-      taxonomy: "bloom"
-      target_level: "apply"
-      
+      rubric: "bloom_taxonomy"
+      target_audience: "undergraduate"
+
   - name: "clarity"
     version: "1.0"
-    evaluators: ["gpt4"]
+    evaluators: ["lmstudio_fast", "azure_gpt4"]
+
+  - name: "coverage"
+    version: "1.1"
+    evaluators: ["azure_gpt4"]
+    parameters:
+      granularity: "balanced"
 
 inputs:
   quiz_directory: "data/quizzes"
@@ -101,6 +129,8 @@ inputs:
 outputs:
   results_directory: "data/results"
 ```
+
+To switch local models per metric, define multiple `openai_compatible` evaluators (different `model` values) and assign them in each metric's `evaluators` list.
 
 ### Running Your First Benchmark
 
@@ -134,4 +164,3 @@ cat data/results/aggregated_*.json
 5. **Reporting**: Results are saved as JSON and human-readable text
 
 ---
-

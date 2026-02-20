@@ -4,55 +4,51 @@ benchmark:
   runs: 3  # Number of times to repeat the evaluation
 
 evaluators:
-  gpt4:
+  azure_gpt4:
     provider: "azure_openai"
     model: "gpt-4"  # Your Azure deployment name
     temperature: 0.0
     max_tokens: 500
 
-  gpt35:
-    provider: "azure_openai"
-    model: "gpt-35-turbo"  # Your Azure deployment name
+  lmstudio_fast:
+    provider: "openai_compatible"
+    model: "qwen2.5-7b-instruct"  # Example local model
+    base_url: "http://localhost:1234/v1"  # LM Studio OpenAI endpoint
     temperature: 0.0
-    max_tokens: 500
+    max_tokens: 300
 
-  claude_opus:
-    provider: "anthropic"
-    model: "claude-3-opus-20240229"
-    temperature: 0.0
-    max_tokens: 500
-
-  claude_sonnet:
-    provider: "anthropic"
-    model: "claude-3-5-sonnet-20241022"
+  lmstudio_reasoning:
+    provider: "openai_compatible"
+    model: "qwen2.5-14b-instruct"  # Example local model
+    base_url: "http://localhost:1234/v1"  # LM Studio OpenAI endpoint
     temperature: 0.0
     max_tokens: 500
 
 metrics:
   - name: "difficulty"
     version: "1.0"
-    evaluators: ["gpt4", "gpt35"]  # Compare GPT-4 vs GPT-3.5
+    evaluators: ["lmstudio_fast"]
     parameters:
       rubric: "bloom_taxonomy"
       target_audience: "undergraduate"
-    enabled: false
+    enabled: true
 
   - name: "coverage"
-    version: "1.0"
-    evaluators: ["claude_opus"]
+    version: "1.1"
+    evaluators: ["azure_gpt4"]
     parameters:
       granularity: "balanced"
-    enabled: false
+    enabled: true
 
   - name: "grammatical_correctness"
     version: "1.0"
-    evaluators: ["gpt4"]
+    evaluators: ["lmstudio_fast"]
     enabled: true
 
   - name: "clarity"
     version: "1.0"
-    evaluators: ["gpt4", "claude_sonnet"]  # Compare different models
-    enabled: false
+    evaluators: ["lmstudio_reasoning", "azure_gpt4"]  # Compare local vs Azure
+    enabled: true
 
 inputs:
   quiz_directory: "data/quizzes"
