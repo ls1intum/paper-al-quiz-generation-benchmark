@@ -95,7 +95,7 @@ class BaseMetric(ABC):
         """
         Evaluate and return a score.
 
-        Default implementation uses get_prompt() + parse_response().
+        Default implementation uses get_prompt() + structured parsing.
         Metrics can override this for custom evaluation logic (e.g., multi-stage).
 
         Args:
@@ -167,21 +167,6 @@ class BaseMetric(ABC):
 
         Raises:
             ValueError: If required inputs are missing
-        """
-        pass
-
-    @abstractmethod
-    def parse_response(self, llm_response: str) -> float:
-        """Parse the LLM response to extract a numeric score.
-
-        Args:
-            llm_response: Raw text response from LLM
-
-        Returns:
-            Numeric score between 0 and 100
-
-        Raises:
-            ValueError: If response cannot be parsed
         """
         pass
 

@@ -1,6 +1,5 @@
 """Clarity metric implementation."""
 
-import re
 from typing import Any, Optional
 
 from ..models.quiz import Quiz, QuizQuestion
@@ -90,26 +89,3 @@ Respond with ONLY a JSON object in this format:
 """
 
         return prompt
-
-    def parse_response(self, llm_response: str) -> float:
-        """Parse clarity score from LLM response.
-
-        Args:
-            llm_response: Raw LLM response
-
-        Returns:
-            Score between 0 and 100
-
-        Raises:
-            ValueError: If score cannot be extracted
-        """
-        response = llm_response.strip()
-
-        # Try to find a number
-        match = re.search(r"\b(\d+(?:\.\d+)?)\b", response)
-        if match:
-            score = float(match.group(1))
-            if 0 <= score <= 100:
-                return score
-
-        raise ValueError(f"Could not parse clarity score from response: {llm_response}")

@@ -1,6 +1,5 @@
 """Grammatical Correctness metric implementation."""
 
-import re
 from typing import Any, List, Optional, Dict
 
 from . import MetricParameter
@@ -185,32 +184,3 @@ class GrammaticalCorrectnessMetric(BaseMetric):
         """
 
         return prompt
-
-    def parse_response(self, llm_response: str) -> float:
-        """Parse grammatical correctness score from LLM response.
-
-        Args:
-            llm_response: Raw LLM response
-
-        Returns:
-            Score between 0 and 100
-
-        Raises:
-            ValueError: If score cannot be extracted
-        """
-        print(f"DEBUG - Raw LLM Response: '{llm_response}'")
-        print(f"DEBUG - Response length: {len(llm_response)}")
-        print(f"DEBUG - Response type: {type(llm_response)}")
-
-        response = llm_response.strip()
-
-        # Try to find a number
-        match = re.search(r"\b(\d+(?:\.\d+)?)\b", response)
-        if match:
-            score = float(match.group(1))
-            if 0 <= score <= 100:
-                return score
-
-        raise ValueError(
-            f"Could not parse grammatical correctness score from response: {llm_response}"
-        )

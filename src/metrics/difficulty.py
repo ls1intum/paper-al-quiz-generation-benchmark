@@ -1,6 +1,5 @@
 """Difficulty metric implementation."""
 
-import re
 from typing import Any, List, Optional
 
 from ..models.quiz import Quiz, QuizQuestion
@@ -121,33 +120,8 @@ Consider:
 3. Number of steps needed to solve
 4. Potential for confusion
 
-Respond with ONLY a JSON object in this format:
-{"score": <number between 0 and 100>}
+        Respond with ONLY a JSON object in this format:
+        {"score": <number between 0 and 100>}
 """
 
         return prompt
-
-    def parse_response(self, llm_response: str) -> float:
-        """Parse difficulty score from LLM response.
-
-        Args:
-            llm_response: Raw LLM response
-
-        Returns:
-            Score between 0 and 100
-
-        Raises:
-            ValueError: If score cannot be extracted
-        """
-        # Try to extract a number from the response
-        # Look for standalone numbers or numbers at the start of the response
-        response = llm_response.strip()
-
-        # Try to find a number (integer or float)
-        match = re.search(r"\b(\d+(?:\.\d+)?)\b", response)
-        if match:
-            score = float(match.group(1))
-            if 0 <= score <= 100:
-                return score
-
-        raise ValueError(f"Could not parse difficulty score from response: {llm_response}")

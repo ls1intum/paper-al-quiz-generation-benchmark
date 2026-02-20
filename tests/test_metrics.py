@@ -27,40 +27,21 @@ def make_quiz() -> Quiz:
     )
 
 
-@pytest.mark.parametrize(
-    "response,expected",
-    [
-        ("42", 42.0),
-        ("Score: 88", 88.0),
-        ("85.5", 85.5),
-    ],
-)
-@pytest.mark.parametrize(
-    "metric_cls",
-    [DifficultyMetric, ClarityMetric],  # Only simple metrics
-)
-def test_simple_metric_parse_response_success(metric_cls, response, expected):
-    """Simple metrics should parse numeric responses."""
+@pytest.mark.parametrize("score", [42.0, 88.0, 85.5])
+@pytest.mark.parametrize("metric_cls", [DifficultyMetric, ClarityMetric])
+def test_simple_metric_parse_structured_response_success(metric_cls, score):
+    """Simple metrics should parse structured score responses."""
     metric = metric_cls()
-    assert metric.parse_response(response) == expected
+    assert metric.parse_structured_response({"score": score}) == score
 
 
-@pytest.mark.parametrize(
-    "response",
-    [
-        "no number",
-        "101",
-    ],
-)
-@pytest.mark.parametrize(
-    "metric_cls",
-    [DifficultyMetric, ClarityMetric],  # Only simple metrics
-)
-def test_simple_metric_parse_response_failure(metric_cls, response):
-    """Simple metrics should reject invalid responses."""
+@pytest.mark.parametrize("score", [-1, 101])
+@pytest.mark.parametrize("metric_cls", [DifficultyMetric, ClarityMetric])
+def test_simple_metric_parse_structured_response_failure(metric_cls, score):
+    """Simple metrics should reject out-of-range structured scores."""
     metric = metric_cls()
     with pytest.raises(ValueError):
-        metric.parse_response(response)
+        metric.parse_structured_response({"score": score})
 
 
 def test_difficulty_prompt_requires_question():
@@ -84,42 +65,29 @@ def test_difficulty_param_validation():
         metric.get_prompt(question=question, unknown_param="x")
 
 
-def test_coverage_parse_json_response():
-    """Coverage should parse JSON responses with final_score."""
+def test_coverage_parse_structured_response():
+    """Coverage should parse structured responses with final_score."""
     metric = CoverageMetric()
 
-    json_response = """{
+    response = {
         "final_score": 67.5,
         "sub_scores": {
             "breadth": 20.0,
             "depth": 22.5,
             "balance": 15.0,
             "critical": 10.0
-        }
-    }"""
+        },
+    }
 
-    assert metric.parse_response(json_response) == 67.5
-
-
-def test_coverage_parse_simple_fallback():
-    """Coverage should fall back to parsing simple numbers."""
-    metric = CoverageMetric()
-
-    # Fallback patterns for compatibility
-    assert metric.parse_response("42") == 42.0
-    assert metric.parse_response("Score: 88") == 88.0
-    assert metric.parse_response("85.5") == 85.5
+    assert metric.parse_structured_response(response) == 67.5
 
 
-def test_coverage_parse_invalid_response():
-    """Coverage should reject responses without valid scores."""
+def test_coverage_parse_structured_invalid_response():
+    """Coverage should reject invalid structured scores."""
     metric = CoverageMetric()
 
     with pytest.raises(ValueError):
-        metric.parse_response("no number")
-
-    with pytest.raises(ValueError):
-        metric.parse_response("101")
+        metric.parse_structured_response({"final_score": 101})
 
 
 def test_coverage_get_prompt_not_implemented():

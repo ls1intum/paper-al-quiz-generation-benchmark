@@ -1,7 +1,6 @@
 """Coverage metric implementation."""
 
 import json
-import re
 from typing import Any, Dict, List, Optional, Type
 
 from pydantic import BaseModel, Field
@@ -242,63 +241,6 @@ class CoverageMetric(BaseMetric):
         raise NotImplementedError(
             f"{self.name} uses a two-stage evaluation approach and does not "
             "support get_prompt(). Use evaluate() directly."
-        )
-
-    def parse_response(self, llm_response: str) -> float:
-        """
-        Parse the final coverage score from the LLM's JSON response.
-        Falls back to regex-based extraction if JSON is malformed.
-        """
-        response = llm_response.strip()
-
-        # Remove Markdown code fences if present
-        response = re.sub(r"^```json?\s*\n", "", response, flags=re.MULTILINE)
-        response = re.sub(r"\n```\s*$", "", response, flags=re.MULTILINE)
-
-        # ----- PRIMARY: JSON extraction -----
-        try:
-            start = response.find("{")
-            end = response.rfind("}") + 1
-
-            if start != -1 and end > start:
-                json_str = response[start:end]
-                data = json.loads(json_str)
-
-                # Extract final_score
-                if "final_score" in data:
-                    score = float(data["final_score"])
-                    if 0 <= score <= 100:
-                        return round(score, 1)
-
-                # If final_score missing but sub_scores present, sum them
-                if "sub_scores" in data:
-                    subs = data["sub_scores"]
-                    total = sum(
-                        float(subs.get(k, 0)) for k in ("breadth", "depth", "balance", "critical")
-                    )
-                    if 0 <= total <= 100:
-                        return round(total, 1)
-        except (ValueError, KeyError, json.JSONDecodeError):
-            pass
-
-        # explicit score patterns
-        patterns = [
-            r'"final_score"\s*:\s*(\d+(?:\.\d+)?)',
-            r"TOTAL\s+COVERAGE\s+SCORE\s*:?\s*(\d+(?:\.\d+)?)",
-            r"FINAL\s+SCORE\s*:?\s*(\d+(?:\.\d+)?)",
-            r"Score:\s*(\d+(?:\.\d+)?)",
-            r"^\s*(\d+(?:\.\d+)?)\s*$",
-        ]
-        for pat in patterns:
-            match = re.search(pat, response, re.IGNORECASE)
-            if match:
-                score = float(match.group(1))
-                if 0 <= score <= 100:
-                    return round(score, 1)
-
-        raise ValueError(
-            f"Could not parse coverage score from response.\n"
-            f"Response preview: {response[:500]}..."
         )
     class QuestionSummaryResponse(BaseModel):
         topics: List[str] = Field(default_factory=list)
