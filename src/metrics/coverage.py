@@ -192,7 +192,9 @@ class CoverageMetric(BaseMetric):
         overall_prompt = self._get_overall_coverage_prompt(
             source_text, quiz, question_summaries, granularity
         )
-        overall_response = llm_client.generate_structured(overall_prompt, self.OverallCoverageResponse)
+        overall_response = llm_client.generate_structured(
+            overall_prompt, self.OverallCoverageResponse
+        )
         score = self.parse_structured_response(overall_response)
 
         return EvaluationResult(
@@ -242,6 +244,7 @@ class CoverageMetric(BaseMetric):
             f"{self.name} uses a two-stage evaluation approach and does not "
             "support get_prompt(). Use evaluate() directly."
         )
+
     class QuestionSummaryResponse(BaseModel):
         topics: List[str] = Field(default_factory=list)
         cognitive_level: str
