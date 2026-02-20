@@ -28,7 +28,7 @@ Systematically evaluate the quality of quizzes using research-backed metrics:
 
 ### Key Features
 
-✅ **Multiple LLM Support** — Azure OpenAI, OpenAI API, Anthropic Claude, and OpenAI-compatible local models  
+✅ **Multiple LLM Support** — Azure OpenAI, OpenAI API, Anthropic Claude, Ollama, and OpenAI-compatible local models  
 ✅ **Research-Based Metrics** — Implements quality criteria from assessment literature  
 ✅ **Flexible Configuration** — YAML-based configs for easy experimentation  
 ✅ **Statistical Rigor** — Multiple runs with aggregation (mean, median, standard deviation)  
@@ -52,10 +52,9 @@ Systematically evaluate the quality of quizzes using research-backed metrics:
 ## System Goals
 
 1. **Evaluate quiz quality** using configurable, research-based metrics
-2. **Support multiple LLM providers** (Azure OpenAI, OpenAI, Anthropic, open-source)
+2. **Support multiple LLM providers** (Azure OpenAI, OpenAI, Anthropic, Ollama, open-source)
 3. **Enable flexible configuration** for different benchmark runs and research questions
 4. **Provide reproducible results** with versioning, statistical aggregation, and deterministic evaluation
 5. **Maintain clean architecture** with clear interfaces, type safety, and extensibility
 
 ---
-

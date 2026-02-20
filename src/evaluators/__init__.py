@@ -6,6 +6,7 @@ from .azure_openai import AzureOpenAIProvider
 from .openai import OpenAIProvider
 from .anthropic import AnthropicProvider
 from .openai_compatible import OpenAICompatibleProvider
+from .ollama import OllamaProvider
 
 __all__ = [
     "LLMProvider",
@@ -14,4 +15,5 @@ __all__ = [
     "OpenAIProvider",
     "AnthropicProvider",
     "OpenAICompatibleProvider",
+    "OllamaProvider",
 ]

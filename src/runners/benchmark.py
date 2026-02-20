@@ -7,6 +7,7 @@ from typing import Dict, List, Optional
 
 from ..evaluators.base import LLMProvider
 from ..evaluators.factory import LLMProviderFactory
+from ..evaluators.ollama import OllamaProvider
 from ..metrics.base import BaseMetric, MetricScope
 from ..metrics.registry import MetricRegistry
 from ..models.config import BenchmarkConfig
@@ -46,12 +47,19 @@ class BenchmarkRunner:
 
     def _init_evaluators(self) -> None:
         """Initialize all configured LLM evaluators."""
+        # Fail early for Ollama prerequisites (env/server/model availability).
+        OllamaProvider.preflight(self.config.evaluators)
+
         for eval_name, eval_config in self.config.evaluators.items():
             try:
                 evaluator = LLMProviderFactory.create(eval_config)
                 self.evaluators[eval_name] = evaluator
                 print(f"Initialized evaluator: {eval_name} ({eval_config.model})")
             except Exception as e:
+                if eval_config.provider == "ollama":
+                    raise RuntimeError(
+                        f"Failed to initialize Ollama evaluator '{eval_name}': {e}"
+                    ) from e
                 print(f"Warning: Failed to initialize evaluator {eval_name}: {e}")
 
     def _init_metrics(self) -> None:

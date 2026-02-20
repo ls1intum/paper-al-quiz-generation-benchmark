@@ -21,10 +21,48 @@ OPENAI_API_KEY=sk-your-key-here
 # Anthropic Claude
 ANTHROPIC_API_KEY=sk-ant-your-key-here
 
-# Custom/Local models (optional)
-CUSTOM_LLM_ENDPOINT=http://localhost:8000/v1
+# Ollama models (optional, recommended with provider: "ollama")
+OLLAMA_ENDPOINT=http://localhost:11434
+OLLAMA_API_KEY=not-required
+
+# Generic OpenAI-compatible fallback
+CUSTOM_LLM_ENDPOINT=http://localhost:11434/v1
 CUSTOM_LLM_API_KEY=optional-key
 ```
+
+### Ollama Setup (Local Endpoint)
+
+To use Ollama as a local evaluator backend:
+
+1. Start the local server with `ollama serve`.
+2. Use `http://localhost:11434` as your endpoint (or your configured port).
+
+Recommended `.env` values:
+
+```bash
+OLLAMA_ENDPOINT=http://localhost:11434
+OLLAMA_API_KEY=not-required
+
+# Optional fallback aliases
+CUSTOM_LLM_ENDPOINT=http://localhost:11434/v1
+CUSTOM_LLM_API_KEY=not-required
+```
+
+Sanity checks:
+
+```bash
+# Ollama model list
+ollama list
+
+# Ollama tags API
+curl http://localhost:11434/api/tags
+```
+
+Notes:
+- If multiple local evaluators use different `model` IDs, Ollama loads them as needed.
+- `ollama` resolves env vars in this order: `OLLAMA_ENDPOINT`/`OLLAMA_API_KEY`, then `CUSTOM_LLM_ENDPOINT`/`CUSTOM_LLM_API_KEY`.
+- The runner performs fail-early validation for `ollama`: endpoint configured, server reachable, and configured model names present in `/api/tags`.
+- If required models are missing, preflight attempts automatic pulls via `/api/pull` before aborting.
 
 ### Benchmark Configuration
 
@@ -135,6 +173,70 @@ inputs:
 outputs:
   results_directory: "data/results"
 ```
+
+#### Hybrid Azure + Ollama Configuration
+
+Use larger hosted models for expensive metrics and local models for lower-cost checks:
+
+```yaml
+benchmark:
+  name: "hybrid-azure-ollama"
+  version: "1.0.0"
+  runs: 3
+
+evaluators:
+  azure_gpt4:
+    provider: "azure_openai"
+    model: "gpt-4"
+    temperature: 0.0
+    max_tokens: 700
+
+  ollama_fast:
+    provider: "ollama"
+    model: "qwen2.5:7b-instruct"
+    base_url: "http://localhost:11434"
+    temperature: 0.0
+    max_tokens: 300
+
+  ollama_reasoning:
+    provider: "ollama"
+    model: "llama3.1:8b-instruct"
+    base_url: "http://localhost:11434"
+    temperature: 0.0
+    max_tokens: 500
+
+metrics:
+  - name: "difficulty"
+    version: "1.0"
+    evaluators: ["ollama_fast"]
+    parameters:
+      rubric: "bloom_taxonomy"
+      target_audience: "undergraduate"
+    enabled: true
+
+  - name: "grammatical_correctness"
+    version: "1.0"
+    evaluators: ["ollama_fast"]
+    enabled: true
+
+  - name: "clarity"
+    version: "1.0"
+    evaluators: ["ollama_reasoning", "azure_gpt4"]
+    enabled: true
+
+  - name: "coverage"
+    version: "1.1"
+    evaluators: ["azure_gpt4"]
+    parameters:
+      granularity: "balanced"
+    enabled: true
+```
+
+Notes:
+- `ollama` is the recommended provider for Ollama endpoints.
+- `openai_compatible` remains available for generic OpenAI-compatible backends (vLLM, local proxies, etc.).
+- You can define multiple local evaluators with different `model` values and route metrics accordingly.
+- If all local evaluators use the same Ollama instance, keep `base_url` identical.
 
 ### Data Preparation
 
@@ -413,4 +515,3 @@ DISTRACTOR QUALITY
 ```
 
 ---
-

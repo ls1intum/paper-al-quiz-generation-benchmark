@@ -342,6 +342,7 @@ paper-al-quiz-generation-benchmark/
 │   │   ├── azure_openai.py      # Azure OpenAI implementation
 │   │   ├── openai.py            # OpenAI direct API
 │   │   ├── anthropic.py         # Anthropic Claude
+│   │   ├── ollama.py            # Ollama local runtime
 │   │   ├── openai_compatible.py # Generic OpenAI-compatible
 │   │   └── factory.py           # LLMProviderFactory
 │   │
@@ -503,4 +504,3 @@ paper-al-quiz-generation-benchmark/
 8. **Research-Based**: Metrics grounded in educational assessment literature
 
 ---
-
