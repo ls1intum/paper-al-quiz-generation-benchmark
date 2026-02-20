@@ -1,9 +1,13 @@
 """Base metric interface."""
 
+import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional, Type
+
+from pydantic import BaseModel, Field
+
 from ..models.quiz import Quiz, QuizQuestion
 from ..models.result import EvaluationResult
 
@@ -107,13 +111,40 @@ class BaseMetric(ABC):
         if llm_client is None:
             raise ValueError(f"{self.name} requires an llm_client")
 
-        # Default behavior: single prompt evaluation
+        # Default behavior: single structured output evaluation
         prompt = self.get_prompt(question=question, quiz=quiz, source_text=source_text, **params)
+        structured = llm_client.generate_structured(
+            prompt=prompt,
+            schema=self.get_response_schema(question=question, quiz=quiz, source_text=source_text),
+        )
+        score = self.parse_structured_response(structured)
 
-        response = llm_client.generate(prompt)
-        score = self.parse_response(response)
+        return EvaluationResult(
+            score=score,
+            raw_response=json.dumps(structured, ensure_ascii=True),
+            metadata={"structured_response": structured},
+        )
 
-        return EvaluationResult(score=score, raw_response=response, metadata={})
+    class ScoreResponse(BaseModel):
+        """Default structured response schema for score-only metrics."""
+
+        score: float = Field(ge=0, le=100)
+
+    def get_response_schema(
+        self,
+        question: Optional[QuizQuestion] = None,
+        quiz: Optional[Quiz] = None,
+        source_text: Optional[str] = None,
+    ) -> Type[BaseModel]:
+        """Schema used for structured LLM responses."""
+        return self.ScoreResponse
+
+    def parse_structured_response(self, response: Dict[str, Any]) -> float:
+        """Extract score from a structured response payload."""
+        score = float(response["score"])
+        if not 0 <= score <= 100:
+            raise ValueError(f"Score must be between 0 and 100, got {score}")
+        return score
 
     @abstractmethod
     def get_prompt(

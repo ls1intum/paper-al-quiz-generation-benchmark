@@ -85,7 +85,8 @@ Consider:
    - Would a student clearly understand what's being asked?
    - Is there a single, clearly correct answer?
 
-Respond with ONLY a number between 0 and 100.
+Respond with ONLY a JSON object in this format:
+{"score": <number between 0 and 100>}
 """
 
         return prompt

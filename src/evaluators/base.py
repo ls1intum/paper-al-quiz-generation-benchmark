@@ -1,7 +1,9 @@
 """Base LLM provider interface."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any, Dict, Optional, Type
+
+from pydantic import BaseModel
 
 
 class LLMProvider(ABC):
@@ -52,6 +54,32 @@ class LLMProvider(ABC):
 
         Raises:
             Exception: If generation fails
+        """
+        pass
+
+    @abstractmethod
+    def generate_structured(
+        self,
+        prompt: str,
+        schema: Type[BaseModel],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Generate a schema-validated structured response from the LLM.
+
+        Args:
+            prompt: The prompt to send to the LLM
+            schema: Pydantic schema describing required response structure
+            temperature: Override default temperature
+            max_tokens: Override default max_tokens
+            **kwargs: Additional generation parameters
+
+        Returns:
+            Structured response as dictionary
+
+        Raises:
+            Exception: If generation or schema validation fails
         """
         pass
 

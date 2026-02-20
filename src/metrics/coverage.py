@@ -2,7 +2,10 @@
 
 import json
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Type
+
+from pydantic import BaseModel, Field
+
 from ..models.quiz import Quiz, QuizQuestion
 from .base import BaseMetric, MetricParameter, MetricScope
 from ..models.result import EvaluationResult
@@ -177,53 +180,48 @@ class CoverageMetric(BaseMetric):
         granularity = self.get_param_value("granularity", **params)
 
         # STAGE 1: Extract topics from each question
-        question_summaries = []
-        stage1_responses = []
+        question_summaries: List[Dict[str, Any]] = []
+        stage1_responses: List[Dict[str, Any]] = []
 
         for q in quiz.questions:
             prompt = self._get_question_topic_prompt(q, source_text)
-            response = llm_client.generate(prompt)
-            stage1_responses.append({"question_id": q.question_id, "response": response})
-
-            try:
-                summary = self._parse_question_summary(response)
-                question_summaries.append(summary)
-            except Exception:
-                question_summaries.append(
-                    {"topics": [], "cognitive_level": "unknown", "reasoning": "Failed to parse"}
-                )
+            summary = llm_client.generate_structured(prompt, self.QuestionSummaryResponse)
+            stage1_responses.append({"question_id": q.question_id, "response": summary})
+            question_summaries.append(summary)
 
         # STAGE 2: Analyze overall coverage
         overall_prompt = self._get_overall_coverage_prompt(
             source_text, quiz, question_summaries, granularity
         )
-        overall_response = llm_client.generate(overall_prompt)
-
-        score = self.parse_response(overall_response)
+        overall_response = llm_client.generate_structured(overall_prompt, self.OverallCoverageResponse)
+        score = self.parse_structured_response(overall_response)
 
         return EvaluationResult(
             score=score,
-            raw_response=overall_response,
+            raw_response=json.dumps(overall_response, ensure_ascii=True),
             metadata={
+                "structured_response": overall_response,
                 "stage1_responses": stage1_responses,
                 "question_summaries": question_summaries,
                 "granularity": granularity,
             },
         )
 
-    def _parse_question_summary(self, response: str) -> Dict[str, Any]:
-        """Parse JSON response from question topic extraction."""
-        response = response.strip()
-        response = re.sub(r"^```json?\s*\n", "", response, flags=re.MULTILINE)
-        response = re.sub(r"\n```\s*$", "", response, flags=re.MULTILINE)
+    def get_response_schema(
+        self,
+        question: Optional[QuizQuestion] = None,
+        quiz: Optional[Quiz] = None,
+        source_text: Optional[str] = None,
+    ) -> Type[BaseModel]:
+        """Coverage uses stage-specific schemas in custom evaluate()."""
+        return self.OverallCoverageResponse
 
-        start = response.find("{")
-        end = response.rfind("}") + 1
-        if start != -1 and end > start:
-            parsed: Dict[str, Any] = json.loads(response[start:end])
-            return parsed
-
-        raise ValueError("Could not parse question summary JSON")
+    def parse_structured_response(self, response: Dict[str, Any]) -> float:
+        """Parse final score from validated structured response."""
+        score = float(response["final_score"])
+        if 0 <= score <= 100:
+            return round(score, 1)
+        raise ValueError(f"Coverage score must be between 0 and 100, got {score}")
 
     def get_prompt(
         self,
@@ -302,3 +300,16 @@ class CoverageMetric(BaseMetric):
             f"Could not parse coverage score from response.\n"
             f"Response preview: {response[:500]}..."
         )
+    class QuestionSummaryResponse(BaseModel):
+        topics: List[str] = Field(default_factory=list)
+        cognitive_level: str
+        reasoning: str
+
+    class OverallCoverageResponse(BaseModel):
+        topics_in_source: List[str] = Field(default_factory=list)
+        topics_covered: List[str] = Field(default_factory=list)
+        critical_concepts: List[str] = Field(default_factory=list)
+        critical_covered: List[str] = Field(default_factory=list)
+        reasoning: str
+        sub_scores: Dict[str, float] = Field(default_factory=dict)
+        final_score: float = Field(ge=0, le=100)

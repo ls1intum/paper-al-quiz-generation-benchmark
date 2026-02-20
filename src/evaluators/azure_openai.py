@@ -1,9 +1,10 @@
 """Azure OpenAI provider implementation using the v1 API."""
 
 import os
-from typing import Any, Optional
+from typing import Any, Dict, Optional, Type
 
 from langchain_openai import ChatOpenAI
+from pydantic import BaseModel
 
 from .base import LLMProvider
 
@@ -100,3 +101,36 @@ class AzureOpenAIProvider(LLMProvider):
         if isinstance(content, str):
             return content
         return str(content)
+
+    def generate_structured(
+        self,
+        prompt: str,
+        schema: Type[BaseModel],
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        """Generate a schema-validated structured response using Azure OpenAI."""
+        if temperature is not None or max_tokens is not None:
+            temp = temperature if temperature is not None else self.temperature
+            tokens = max_tokens if max_tokens is not None else self.max_tokens
+
+            endpoint = os.getenv("AZURE_OPENAI_ENDPOINT", "")
+            base_url = endpoint.rstrip("/") + "/openai/v1"
+            llm = ChatOpenAI(
+                model=self.model,
+                base_url=base_url,
+                api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+                temperature=temp,
+                max_completion_tokens=tokens,
+                **{**self.additional_params, **kwargs},
+            )
+            response = llm.with_structured_output(schema).invoke(prompt)
+        else:
+            response = self.llm.with_structured_output(schema).invoke(prompt)
+
+        if isinstance(response, BaseModel):
+            return response.model_dump()
+        if isinstance(response, dict):
+            return response
+        raise ValueError(f"Structured output did not match expected schema: {response}")

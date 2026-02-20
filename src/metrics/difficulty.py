@@ -121,7 +121,8 @@ Consider:
 3. Number of steps needed to solve
 4. Potential for confusion
 
-Respond with ONLY a number between 0 and 100.
+Respond with ONLY a JSON object in this format:
+{"score": <number between 0 and 100>}
 """
 
         return prompt
