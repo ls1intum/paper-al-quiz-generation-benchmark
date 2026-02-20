@@ -72,8 +72,7 @@ CUSTOM_LLM_API_KEY=not-required
 If you want to run local evaluators with `provider: "ollama"` (recommended), configure Ollama:
 
 1. Start the Ollama server (`ollama serve`).
-2. Pull required models (for example: `ollama pull qwen2.5:7b-instruct`).
-3. Confirm endpoint is reachable at `http://localhost:11434`.
+2. Confirm endpoint is reachable at `http://localhost:11434`.
 
 Quick check:
 
@@ -83,6 +82,7 @@ curl http://localhost:11434/api/tags
 ```
 
 If this returns model entries, your benchmark can call Ollama using `base_url: "http://localhost:11434"`.
+Missing configured models are pulled automatically during benchmark preflight.
 
 #### Step 3: Configure Benchmark Settings
 

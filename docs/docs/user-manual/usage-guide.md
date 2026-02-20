@@ -35,8 +35,7 @@ CUSTOM_LLM_API_KEY=optional-key
 To use Ollama as a local evaluator backend:
 
 1. Start the local server with `ollama serve`.
-2. Pull required models with `ollama pull <model>`.
-3. Use `http://localhost:11434` as your endpoint (or your configured port).
+2. Use `http://localhost:11434` as your endpoint (or your configured port).
 
 Recommended `.env` values:
 
