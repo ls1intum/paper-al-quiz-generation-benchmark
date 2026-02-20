@@ -21,7 +21,11 @@ OPENAI_API_KEY=sk-your-key-here
 # Anthropic Claude
 ANTHROPIC_API_KEY=sk-ant-your-key-here
 
-# Custom/Local models (optional)
+# LM Studio models (optional, recommended with provider: "lm_studio")
+LM_STUDIO_ENDPOINT=http://localhost:1234/v1
+LM_STUDIO_API_KEY=not-required
+
+# Generic OpenAI-compatible fallback
 CUSTOM_LLM_ENDPOINT=http://localhost:1234/v1
 CUSTOM_LLM_API_KEY=optional-key
 ```
@@ -38,6 +42,10 @@ To use LM Studio as a local evaluator backend:
 Recommended `.env` values:
 
 ```bash
+LM_STUDIO_ENDPOINT=http://localhost:1234/v1
+LM_STUDIO_API_KEY=not-required
+
+# Optional fallback aliases
 CUSTOM_LLM_ENDPOINT=http://localhost:1234/v1
 CUSTOM_LLM_API_KEY=not-required
 ```
@@ -56,6 +64,8 @@ Notes:
 - Your benchmark does not manually load/unload models today; it relies on LM Studio JIT behavior.
 - If multiple local evaluators use different `model` IDs, LM Studio handles switching between them.
 - First request after a switch can be slower due to model load time.
+- `lm_studio` resolves env vars in this order: `LM_STUDIO_ENDPOINT`/`LM_STUDIO_API_KEY`, then `CUSTOM_LLM_ENDPOINT`/`CUSTOM_LLM_API_KEY`.
+- The runner performs fail-early validation for `lm_studio`: endpoint configured, server reachable, and configured model IDs present in `/v1/models`.
 
 ### Benchmark Configuration
 
@@ -185,14 +195,14 @@ evaluators:
     max_tokens: 700
 
   lmstudio_fast:
-    provider: "openai_compatible"
+    provider: "lm_studio"
     model: "qwen2.5-7b-instruct"
     base_url: "http://localhost:1234/v1"
     temperature: 0.0
     max_tokens: 300
 
   lmstudio_reasoning:
-    provider: "openai_compatible"
+    provider: "lm_studio"
     model: "qwen2.5-14b-instruct"
     base_url: "http://localhost:1234/v1"
     temperature: 0.0
@@ -226,7 +236,8 @@ metrics:
 ```
 
 Notes:
-- `openai_compatible` is the provider for LM Studio and other OpenAI-compatible endpoints.
+- `lm_studio` is the recommended provider for LM Studio endpoints.
+- `openai_compatible` remains available for generic OpenAI-compatible backends (vLLM, local proxies, etc.).
 - You can define multiple local evaluators with different `model` values and route metrics accordingly.
 - If all local evaluators use the same LM Studio instance, keep `base_url` identical.
 

@@ -11,14 +11,14 @@ evaluators:
     max_tokens: 500
 
   lmstudio_fast:
-    provider: "openai_compatible"
+    provider: "lm_studio"
     model: "qwen2.5-7b-instruct"  # Example local model
     base_url: "http://localhost:1234/v1"  # LM Studio OpenAI endpoint
     temperature: 0.0
     max_tokens: 300
 
   lmstudio_reasoning:
-    provider: "openai_compatible"
+    provider: "lm_studio"
     model: "qwen2.5-14b-instruct"  # Example local model
     base_url: "http://localhost:1234/v1"  # LM Studio OpenAI endpoint
     temperature: 0.0

@@ -56,7 +56,11 @@ AZURE_OPENAI_API_VERSION=2024-02-15-preview
 # Or Anthropic Claude
 ANTHROPIC_API_KEY=sk-ant-your-key-here
 
-# Or LM Studio / OpenAI-compatible local endpoint
+# Or LM Studio (recommended with provider: "lm_studio")
+LM_STUDIO_ENDPOINT=http://localhost:1234/v1
+LM_STUDIO_API_KEY=not-required
+
+# Fallback alias used by openai_compatible
 CUSTOM_LLM_ENDPOINT=http://localhost:1234/v1
 CUSTOM_LLM_API_KEY=not-required
 ```
@@ -65,7 +69,7 @@ CUSTOM_LLM_API_KEY=not-required
 
 #### Step 2: Set Up LM Studio with JIT (Optional, for local models)
 
-If you want to run local evaluators with `provider: "openai_compatible"`, configure LM Studio:
+If you want to run local evaluators with `provider: "lm_studio"` (recommended), configure LM Studio:
 
 1. Start the LM Studio local server.
 2. Enable JIT model loading in LM Studio settings.
@@ -98,7 +102,7 @@ evaluators:
     max_tokens: 500
 
   lmstudio_fast:
-    provider: "openai_compatible"
+    provider: "lm_studio"
     model: "qwen2.5-7b-instruct"
     base_url: "http://localhost:1234/v1"
     temperature: 0.0
@@ -130,7 +134,7 @@ outputs:
   results_directory: "data/results"
 ```
 
-To switch local models per metric, define multiple `openai_compatible` evaluators (different `model` values) and assign them in each metric's `evaluators` list.
+To switch local models per metric, define multiple `lm_studio` evaluators (different `model` values) and assign them in each metric's `evaluators` list.
 
 ### Running Your First Benchmark
 
