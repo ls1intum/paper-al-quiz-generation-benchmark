@@ -1,5 +1,6 @@
 """Main benchmark runner implementation."""
 
+import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -38,6 +39,7 @@ class BenchmarkRunner:
         self.config_hash = ConfigLoader.hash_config(config)
         self.metrics: Dict[str, BaseMetric] = {}
         self.evaluators: Dict[str, LLMProvider] = {}
+        self.logger = logging.getLogger(__name__)
 
         # Initialize evaluators
         self._init_evaluators()
@@ -54,13 +56,13 @@ class BenchmarkRunner:
             try:
                 evaluator = LLMProviderFactory.create(eval_config)
                 self.evaluators[eval_name] = evaluator
-                print(f"Initialized evaluator: {eval_name} ({eval_config.model})")
+                self.logger.info("Initialized evaluator: %s (%s)", eval_name, eval_config.model)
             except Exception as e:
                 if eval_config.provider == "ollama":
                     raise RuntimeError(
                         f"Failed to initialize Ollama evaluator '{eval_name}': {e}"
                     ) from e
-                print(f"Warning: Failed to initialize evaluator {eval_name}: {e}")
+                self.logger.warning("Failed to initialize evaluator %s: %s", eval_name, e)
 
     def _init_metrics(self) -> None:
         """Initialize all configured metrics."""
@@ -68,9 +70,9 @@ class BenchmarkRunner:
             try:
                 metric = MetricRegistry.create(metric_config.name)
                 self.metrics[metric_config.name] = metric
-                print(f"Initialized metric: {metric_config.name} v{metric.version}")
+                self.logger.info("Initialized metric: %s v%s", metric_config.name, metric.version)
             except Exception as e:
-                print(f"Warning: Failed to initialize metric {metric_config.name}: {e}")
+                self.logger.warning("Failed to initialize metric %s: %s", metric_config.name, e)
 
     def run(
         self, quizzes: Optional[List[Quiz]] = None, source_texts: Optional[Dict[str, str]] = None
@@ -86,9 +88,9 @@ class BenchmarkRunner:
         """
         # Load quizzes if not provided
         if quizzes is None:
-            print(f"Loading quizzes from {self.config.input_output.quiz_directory}...")
+            self.logger.info("Loading quizzes from %s...", self.config.input_output.quiz_directory)
             quizzes = IOUtils.load_all_quizzes(self.config.input_output.quiz_directory)
-            print(f"Loaded {len(quizzes)} quizzes")
+            self.logger.info("Loaded %s quizzes", len(quizzes))
 
         if not quizzes:
             raise ValueError("No quizzes to evaluate")
@@ -100,12 +102,12 @@ class BenchmarkRunner:
         # Run benchmark for specified number of runs
         all_results = []
         for run_number in range(1, self.config.runs + 1):
-            print(f"\n{'='*60}")
-            print(f"Starting Run {run_number}/{self.config.runs}")
-            print(f"{'='*60}")
+            self.logger.info("%s", "=" * 60)
+            self.logger.info("Starting Run %s/%s", run_number, self.config.runs)
+            self.logger.info("%s", "=" * 60)
 
             for quiz in quizzes:
-                print(f"\nEvaluating quiz: {quiz.title} ({quiz.quiz_id})")
+                self.logger.info("Evaluating quiz: %s (%s)", quiz.title, quiz.quiz_id)
                 result = self._evaluate_quiz(quiz, source_texts.get(quiz.quiz_id), run_number)
                 all_results.append(result)
 
@@ -129,9 +131,9 @@ class BenchmarkRunner:
                 try:
                     source_texts[quiz.quiz_id] = IOUtils.load_source_text(str(source_file))
                 except Exception as e:
-                    print(f"Warning: Failed to load source for {quiz.quiz_id}: {e}")
+                    self.logger.warning("Failed to load source for %s: %s", quiz.quiz_id, e)
             else:
-                print(f"Warning: Source file not found: {source_file}")
+                self.logger.warning("Source file not found: %s", source_file)
 
         return source_texts
 
@@ -162,7 +164,7 @@ class BenchmarkRunner:
             )
 
         except Exception as e:
-            print(f"    Error evaluating quiz: {e}")
+            self.logger.error("Error evaluating quiz %s: %s", quiz.quiz_id, e)
             return None
 
     def _evaluate_question(
@@ -197,7 +199,7 @@ class BenchmarkRunner:
             )
 
         except Exception as e:
-            print(f"    Error evaluating question {question.question_id}: {e}")
+            self.logger.error("Error evaluating question %s: %s", question.question_id, e)
             return None
 
     def _evaluate_quiz(
@@ -220,17 +222,17 @@ class BenchmarkRunner:
         for metric_config in self.config.get_enabled_metrics():
             metric = self.metrics.get(metric_config.name)
             if metric is None:
-                print(f"  Skipping {metric_config.name}: not initialized")
+                self.logger.warning("Skipping %s: metric not initialized", metric_config.name)
                 continue
 
             # Run with each configured evaluator
             for evaluator_name in metric_config.evaluators:
                 evaluator = self.evaluators.get(evaluator_name)
                 if evaluator is None:
-                    print(f"  Skipping evaluator {evaluator_name}: not initialized")
+                    self.logger.warning("Skipping evaluator %s: not initialized", evaluator_name)
                     continue
 
-                print(f"  Running {metric_config.name} with {evaluator_name}...")
+                self.logger.info("Running %s with %s...", metric_config.name, evaluator_name)
 
                 # Evaluate based on metric scope
                 if metric.scope == MetricScope.QUESTION_LEVEL:
