@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Type, Optional
 from pydantic import BaseModel, Field
 
 from ..models.quiz import QuizQuestion, Quiz
-from .base import BaseMetric, MetricParameter, MetricScope, ScoreResponse
+from .base import BaseMetric, MetricParameter, MetricScope
 
 
 class CoverageMetric(BaseMetric):
@@ -199,20 +199,8 @@ class CoverageMetric(BaseMetric):
       "final_score": <sum of sub_scores>
     }}"""
 
-    class OverallCoverageResponse(BaseModel):
-        topics_in_source: List[str] = Field(default_factory=list)
-        topics_covered: List[str] = Field(default_factory=list)
-        critical_concepts: List[str] = Field(default_factory=list)
-        critical_covered: List[str] = Field(default_factory=list)
-        breadth_reasoning: str
-        depth_reasoning: str
-        balance_reasoning: str
-        critical_reasoning: str
-        sub_scores: SubScores
-        final_score: float = Field(ge=0, le=100)
-
     def get_response_schema(self, **kwargs: Any) -> Type[BaseModel]:
-        return self.OverallCoverageResponse
+        return OverallCoverageResponse
 
     def parse_structured_response(self, response: Dict[str, Any]) -> float:
         """Extract the final score specifically from the coverage payload."""
@@ -241,3 +229,16 @@ class SubScores(BaseModel):
     depth: float = Field(ge=0, le=100)
     balance: float = Field(ge=0, le=100)
     critical: float = Field(ge=0, le=100)
+
+
+class OverallCoverageResponse(BaseModel):
+    topics_in_source: List[str] = Field(default_factory=list)
+    topics_covered: List[str] = Field(default_factory=list)
+    critical_concepts: List[str] = Field(default_factory=list)
+    critical_covered: List[str] = Field(default_factory=list)
+    breadth_reasoning: str
+    depth_reasoning: str
+    balance_reasoning: str
+    critical_reasoning: str
+    sub_scores: SubScores
+    final_score: float = Field(ge=0, le=100)
