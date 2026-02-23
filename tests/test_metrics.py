@@ -6,6 +6,7 @@ from src.metrics.difficulty import DifficultyMetric
 from src.metrics.coverage import CoverageMetric
 from src.metrics.clarity import ClarityMetric
 from src.models.quiz import QuizQuestion, QuestionType, Quiz
+from tests.conftest import MockLLMProvider
 
 
 def make_question() -> QuizQuestion:
@@ -91,39 +92,29 @@ def test_coverage_parse_structured_invalid_response():
 
 
 def test_coverage_get_prompt_not_implemented():
-    """Coverage should raise NotImplementedError for get_prompt()."""
+    """Coverage get_prompt() should raise ValueError when per_question_results is missing."""
     metric = CoverageMetric()
-
-    with pytest.raises(NotImplementedError, match="two-stage evaluation"):
-        metric.get_prompt(quiz=make_quiz())
+    with pytest.raises(ValueError, match="requires per_question_results"):
+        metric.get_prompt(quiz=make_quiz(), source_text="some text")
 
 
 def test_coverage_evaluate_requires_quiz():
     """Coverage evaluate() should require quiz parameter."""
     metric = CoverageMetric()
-
+    mock_llm = MockLLMProvider(model="mock-model")
     with pytest.raises(ValueError, match="requires a quiz"):
-        metric.evaluate(source_text="text", llm_client=None)
+        metric.evaluate(source_text="text", llm_client=mock_llm)
 
 
 def test_coverage_evaluate_requires_source_text():
-    """Coverage evaluate() should require source_text parameter."""
     metric = CoverageMetric()
-
+    mock_llm = MockLLMProvider(model="mock-model")
     with pytest.raises(ValueError, match="requires source_text"):
-        metric.evaluate(quiz=make_quiz(), llm_client=None)
+        metric.evaluate(quiz=make_quiz(), llm_client=mock_llm)
 
 
 def test_coverage_param_validation():
     """Coverage should validate granularity parameter type."""
-    from tests.conftest import MockLLMProvider
-
     metric = CoverageMetric()
-    quiz = make_quiz()
-    mock_llm = MockLLMProvider(model="mock-model")
-
-    # Invalid type (int instead of str)
     with pytest.raises(ValueError, match="should be of type str"):
-        metric.evaluate(
-            quiz=quiz, source_text="text", llm_client=mock_llm, granularity=10  # Wrong type
-        )
+        metric.validate_params(granularity=10)

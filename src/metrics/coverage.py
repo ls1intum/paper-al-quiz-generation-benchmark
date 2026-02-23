@@ -126,11 +126,14 @@ class CoverageMetric(BaseMetric):
         granularity = self.get_param_value("granularity", **params)
         weights = self._get_weights(granularity)
 
-        if not per_question_results:
-            raise ValueError("CoverageMetric requires per_question_results")
-
         if quiz is None:
             raise ValueError("CoverageMetric requires a quiz")
+
+        if not source_text:
+            raise ValueError("CoverageMetric requires source_text")
+
+        if not per_question_results:
+            raise ValueError("CoverageMetric requires per_question_results")
 
         summaries_text = "\n".join(
             f"Q{i} [{r.get('cognitive_level', 'unknown')}]: {', '.join(r.get('topics', []))}"
