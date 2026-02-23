@@ -1,9 +1,8 @@
 """Grammatical Correctness metric implementation."""
 
 from typing import Any, Dict, List, Optional
-
 from . import MetricParameter
-from ..models.quiz import Quiz, QuizQuestion
+from ..models.quiz import Quiz
 from .base import BaseMetric, MetricScope, ScoreResponse
 from .phase import Phase, PhaseInput
 

@@ -1,8 +1,6 @@
 """Clarity metric implementation."""
 
-from typing import Any, Optional, List
-
-from ..models.quiz import Quiz, QuizQuestion
+from typing import List
 from .base import BaseMetric, MetricScope, ScoreResponse
 from .phase import Phase, PhaseInput
 

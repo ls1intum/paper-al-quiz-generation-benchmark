@@ -1,10 +1,6 @@
 """Difficulty metric implementation."""
 
-from typing import Any, List, Optional, Dict
-
-from pydantic import BaseModel, Field
-
-from ..models.quiz import Quiz, QuizQuestion
+from typing import Any, List
 from .base import BaseMetric, MetricParameter, MetricScope, ScoreResponse
 from .phase import Phase, PhaseInput
 
