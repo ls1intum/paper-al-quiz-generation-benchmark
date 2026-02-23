@@ -127,10 +127,7 @@ def main() -> int:
             summary = ResultsReporter.generate_summary(aggregated)
 
             # Extract and Append Qualitative Reasoning
-            detailed_notes = []
-            detailed_notes.append("\n" + "=" * 70)
-            detailed_notes.append("DETAILED INSIGHTS (Qualitative Data)")
-            detailed_notes.append("=" * 70)
+            detailed_notes = ["\n" + "=" * 70, "DETAILED INSIGHTS (Qualitative Data)", "=" * 70]
 
             found_insights = False
 
@@ -151,29 +148,30 @@ def main() -> int:
                     # Check for Coverage metric specifically
                     if metric_name == 'coverage':
                         try:
-                            # Clean the markdown JSON string
                             if isinstance(raw_response, str):
                                 clean_json = raw_response.replace("```json", "").replace("```", "").strip()
-                                # Parse JSON
                                 data = json.loads(clean_json)
 
-                                # Extract fields
-                                reasoning = data.get('reasoning')
+                                breadth_reasoning = data.get('breadth_reasoning')
+                                depth_reasoning = data.get('depth_reasoning')
+                                balance_reasoning = data.get('balance_reasoning')
+                                critical_reasoning = data.get('critical_reasoning')
                                 sub_scores = data.get('sub_scores')
                                 score = data.get('final_score')
 
-                                if reasoning:
+                                if breadth_reasoning:
                                     found_insights = True
                                     detailed_notes.append(f"\n[Quiz: {quiz_id}] Coverage Analysis:")
                                     detailed_notes.append("-" * 40)
                                     detailed_notes.append(f"Score: {score}")
-                                    detailed_notes.append(f"Reasoning:\n{reasoning}")
-
+                                    detailed_notes.append(f"Breadth:  {breadth_reasoning}")
+                                    detailed_notes.append(f"Depth:    {depth_reasoning}")
+                                    detailed_notes.append(f"Balance:  {balance_reasoning}")
+                                    detailed_notes.append(f"Critical: {critical_reasoning}")
                                     if sub_scores:
                                         detailed_notes.append(f"Sub-scores: {sub_scores}")
                                     detailed_notes.append("-" * 40)
                         except Exception:
-                            # If parsing fails, skip silently
                             continue
 
             if found_insights:

@@ -1,6 +1,6 @@
 """Difficulty metric implementation."""
 
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Dict
 
 from ..models.quiz import Quiz, QuizQuestion
 from .base import BaseMetric, MetricParameter, MetricScope
@@ -47,6 +47,8 @@ class DifficultyMetric(BaseMetric):
         question: Optional[QuizQuestion] = None,
         quiz: Optional[Quiz] = None,
         source_text: Optional[str] = None,
+        per_question_results: Optional[List[Dict[str, Any]]] = None,
+        context: Optional[Dict[str, Any]] = None,
         **params: Any,
     ) -> str:
         """Generate difficulty evaluation prompt.
@@ -55,6 +57,8 @@ class DifficultyMetric(BaseMetric):
             question: Question to evaluate
             quiz: Not used (question-level metric)
             source_text: Optional source material for context
+            per_question_results: Not used (single-stage metric).
+            context: Not used (no pre-processing stage).
             **params: rubric and target_audience parameters
 
         Returns:

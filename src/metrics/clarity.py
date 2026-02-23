@@ -1,6 +1,6 @@
 """Clarity metric implementation."""
 
-from typing import Any, Optional
+from typing import Any, Optional, List, Dict
 
 from ..models.quiz import Quiz, QuizQuestion
 from .base import BaseMetric, MetricScope
@@ -30,6 +30,8 @@ class ClarityMetric(BaseMetric):
         question: Optional[QuizQuestion] = None,
         quiz: Optional[Quiz] = None,
         source_text: Optional[str] = None,
+        per_question_results: Optional[List[Dict[str, Any]]] = None,
+        context: Optional[Dict[str, Any]] = None,
         **params: Any,
     ) -> str:
         """Generate clarity evaluation prompt.
@@ -38,6 +40,8 @@ class ClarityMetric(BaseMetric):
             question: Question to evaluate
             quiz: Not used (question-level metric)
             source_text: Not used
+            per_question_results: Not used (single-stage metric).
+            context: Not used (no pre-processing stage).
             **params: No parameters for this metric
 
         Returns:

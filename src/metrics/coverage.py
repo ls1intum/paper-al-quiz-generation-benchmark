@@ -1,13 +1,11 @@
 """Coverage metric implementation."""
 
-import json
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Type, Optional
 
 from pydantic import BaseModel, Field
 
-from ..models.quiz import Quiz, QuizQuestion
-from .base import BaseMetric, MetricParameter, MetricScope
-from ..models.result import EvaluationResult
+from ..models.quiz import QuizQuestion, Quiz
+from .base import BaseMetric, MetricParameter, MetricScope, ScoreResponse
 
 
 class CoverageMetric(BaseMetric):
@@ -24,7 +22,7 @@ class CoverageMetric(BaseMetric):
 
     @property
     def version(self) -> str:
-        return "1.1"  # Fixed determinism issue
+        return "1.2"
 
     @property
     def scope(self) -> MetricScope:
@@ -41,7 +39,8 @@ class CoverageMetric(BaseMetric):
             ),
         ]
 
-    def _get_weights(self, granularity: str) -> Dict[str, int]:
+    @staticmethod
+    def _get_weights(granularity: str) -> Dict[str, int]:
         """Return weight distribution for the four sub-scores."""
         if granularity == "broad":
             return {"breadth": 40, "depth": 20, "balance": 20, "critical": 20}
@@ -50,12 +49,42 @@ class CoverageMetric(BaseMetric):
         else:  # balanced
             return {"breadth": 30, "depth": 30, "balance": 20, "critical": 20}
 
-    def _get_question_topic_prompt(self, question: QuizQuestion, source_text: str) -> str:
-        """Generate prompt for stage 1: extract topics from a single question."""
-        return f"""Analyze what topics this quiz question tests from the source material.
+    class SourceTopicsResponse(BaseModel):
+        topics: List[str] = Field(default_factory=list)
+
+    def generate_context(self, source_text: Optional[str], llm_client: Any) -> Dict[str, Any]:
+        """Stage 1: Extract topics before per-question fan-out."""
+        if not source_text:
+            return {}
+
+        prompt = f"""Analyze the source material and identify its main topics.
 
     **Source Material**:
     {source_text}
+
+    List 5-15 HIGH-LEVEL topics. Group related concepts together.
+
+    Respond with ONLY a JSON object."""
+
+        [source_topics] = self.run_stage([prompt], self.SourceTopicsResponse, llm_client)
+        return {"source_topics": source_topics}
+
+    def get_per_question_prompt(
+        self,
+        question: QuizQuestion,
+        source_text: str,
+        context: Dict[str, Any],
+    ) -> str:
+        """Generate prompt for stage 2: extract topics from a single question."""
+        source_topics = context.get("source_topics", {})
+        topics_hint = ""
+
+        if source_topics and "topics" in source_topics:
+            topics_hint = f"\n**Known topics in source**: {', '.join(source_topics['topics'])}\nMap this question to topics from this list where possible."
+        return f"""Analyze what topics this quiz question tests.
+    
+    **Topics**:
+    {topics_hint}
     
     **Question #{question.question_id}**:
     Type: {question.question_type.value}
@@ -76,28 +105,39 @@ class CoverageMetric(BaseMetric):
     
     Respond with ONLY the JSON object."""
 
-    def _get_overall_coverage_prompt(
+    class QuestionSummaryResponse(BaseModel):
+        topics: List[str] = Field(default_factory=list)
+        cognitive_level: str
+        reasoning: str
+
+    def get_per_question_schema(self) -> Type[BaseModel]:
+        return self.QuestionSummaryResponse
+
+    def get_prompt(
         self,
-        source_text: str,
-        quiz: Quiz,
-        question_summaries: List[Dict[str, Any]],
-        granularity: str,
+        question: Optional[QuizQuestion] = None,
+        quiz: Optional[Quiz] = None,
+        source_text: Optional[str] = None,
+        per_question_results: Optional[List[Dict[str, Any]]] = None,
+        context: Optional[Dict[str, Any]] = None,
+        **params: Any,
     ) -> str:
-        """Generate prompt for stage 2: analyze overall coverage."""
+        """Generate prompt for stage 3: final coverage scoring."""
+        granularity = self.get_param_value("granularity", **params)
         weights = self._get_weights(granularity)
 
-        # Build summary of all questions and their topics
-        summaries_text = []
-        for i, summary in enumerate(question_summaries, 1):
-            topics = ", ".join(summary.get("topics", []))
-            level = summary.get("cognitive_level", "unknown")
-            summaries_text.append(f"Q{i} [{level}]: {topics}")
+        if not per_question_results:
+            raise ValueError("CoverageMetric requires per_question_results")
 
-        summaries_block = "\n".join(summaries_text)
+        if quiz is None:
+            raise ValueError("CoverageMetric requires a quiz")
+
+        summaries_text = "\n".join(
+            f"Q{i} [{r.get('cognitive_level', 'unknown')}]: {', '.join(r.get('topics', []))}"
+            for i, r in enumerate(per_question_results, 1)
+        )
 
         return f"""You are an expert quiz evaluator. Assess how well this quiz covers the source material.
-
-    **CRITICAL: Your response must be ONLY a JSON object. No other text.**
 
     **Calibration Guidelines**:
     - Most good quizzes score 55-75 (this is NORMAL and EXPECTED)
@@ -114,7 +154,7 @@ class CoverageMetric(BaseMetric):
     Total Questions: {quiz.num_questions}
 
     **Topics Tested by Each Question**:
-    {summaries_block}
+    {summaries_text}
 
     **Scoring Framework (Granularity: {granularity})**:
 
@@ -137,15 +177,19 @@ class CoverageMetric(BaseMetric):
        - Identify 3-5 essential "must-know" concepts from the source
        - Count how many are tested
        - Score = (critical_covered / critical_total) × {weights['critical']}
+       
+    **CRITICAL CONSTRAINT:** Keep all "reasoning" fields extremely concise (1-2 sentences maximum).
 
-    **Required JSON Format**:
-    ```json
+    Respond with ONLY this JSON object:
     {{
       "topics_in_source": ["topic1", "topic2", ...],
       "topics_covered": ["topic1", ...],
       "critical_concepts": ["concept1", ...],
       "critical_covered": ["concept1", ...],
-      "reasoning": "Step-by-step explanation of scores",
+      "breadth_reasoning": "step by step breadth calculation",
+      "depth_reasoning": "step by step depth calculation",
+      "balance_reasoning": "explanation of balance score",
+      "critical_reasoning": "step by step critical coverage calculation",
       "sub_scores": {{
         "breadth": <0-{weights['breadth']}>,
         "depth": <0-{weights['depth']}>,
@@ -153,108 +197,47 @@ class CoverageMetric(BaseMetric):
         "critical": <0-{weights['critical']}>
       }},
       "final_score": <sum of sub_scores>
-    }}
-    ```
-
-    Respond with ONLY the JSON object, no other text.
-    """
-
-    def evaluate(
-        self,
-        question: Optional[QuizQuestion] = None,
-        quiz: Optional[Quiz] = None,
-        source_text: Optional[str] = None,
-        llm_client: Optional[Any] = None,
-        **params: Any,
-    ) -> EvaluationResult:
-        """Two-stage evaluation with response tracking."""
-        if quiz is None:
-            raise ValueError("CoverageMetric requires a quiz")
-        if source_text is None:
-            raise ValueError("CoverageMetric requires source_text")
-        if llm_client is None:
-            raise ValueError("CoverageMetric requires an llm_client")
-
-        self.validate_params(**params)
-        granularity = self.get_param_value("granularity", **params)
-
-        # STAGE 1: Extract topics from each question
-        question_summaries: List[Dict[str, Any]] = []
-        stage1_responses: List[Dict[str, Any]] = []
-
-        for q in quiz.questions:
-            prompt = self._get_question_topic_prompt(q, source_text)
-            summary = llm_client.generate_structured(prompt, self.QuestionSummaryResponse)
-            stage1_responses.append({"question_id": q.question_id, "response": summary})
-            question_summaries.append(summary)
-
-        # STAGE 2: Analyze overall coverage
-        overall_prompt = self._get_overall_coverage_prompt(
-            source_text, quiz, question_summaries, granularity
-        )
-        overall_response = llm_client.generate_structured(
-            overall_prompt, self.OverallCoverageResponse
-        )
-        score = self.parse_structured_response(overall_response)
-
-        return EvaluationResult(
-            score=score,
-            raw_response=json.dumps(overall_response, ensure_ascii=True),
-            metadata={
-                "structured_response": overall_response,
-                "stage1_responses": stage1_responses,
-                "question_summaries": question_summaries,
-                "granularity": granularity,
-            },
-        )
-
-    def get_response_schema(
-        self,
-        question: Optional[QuizQuestion] = None,
-        quiz: Optional[Quiz] = None,
-        source_text: Optional[str] = None,
-    ) -> Type[BaseModel]:
-        """Coverage uses stage-specific schemas in custom evaluate()."""
-        return self.OverallCoverageResponse
-
-    def parse_structured_response(self, response: Dict[str, Any]) -> float:
-        """Parse final score from validated structured response."""
-        score = float(response["final_score"])
-        if 0 <= score <= 100:
-            return round(score, 1)
-        raise ValueError(f"Coverage score must be between 0 and 100, got {score}")
-
-    def get_prompt(
-        self,
-        question: Optional[QuizQuestion] = None,
-        quiz: Optional[Quiz] = None,
-        source_text: Optional[str] = None,
-        **params: Any,
-    ) -> str:
-        """
-        Not applicable for two-stage coverage evaluation.
-
-        Coverage metric uses a custom evaluate() method that orchestrates
-        multiple LLM calls. Use evaluate() directly instead.
-
-        Raises:
-            NotImplementedError: This metric uses custom evaluation logic
-        """
-        raise NotImplementedError(
-            f"{self.name} uses a two-stage evaluation approach and does not "
-            "support get_prompt(). Use evaluate() directly."
-        )
-
-    class QuestionSummaryResponse(BaseModel):
-        topics: List[str] = Field(default_factory=list)
-        cognitive_level: str
-        reasoning: str
+    }}"""
 
     class OverallCoverageResponse(BaseModel):
         topics_in_source: List[str] = Field(default_factory=list)
         topics_covered: List[str] = Field(default_factory=list)
         critical_concepts: List[str] = Field(default_factory=list)
         critical_covered: List[str] = Field(default_factory=list)
-        reasoning: str
-        sub_scores: Dict[str, float] = Field(default_factory=dict)
+        breadth_reasoning: str
+        depth_reasoning: str
+        balance_reasoning: str
+        critical_reasoning: str
+        sub_scores: SubScores
         final_score: float = Field(ge=0, le=100)
+
+    def get_response_schema(self, **kwargs: Any) -> Type[BaseModel]:
+        return self.OverallCoverageResponse
+
+    def parse_structured_response(self, response: Dict[str, Any]) -> float:
+        """Extract the final score specifically from the coverage payload."""
+        try:
+            # We explicitly ask for final_score, ignoring the sub_scores
+            raw_score = response["final_score"]
+            score = float(raw_score)
+        except KeyError:
+            raise ValueError(
+                f"Coverage parsing failed. Expected 'final_score', "
+                f"but got keys: {list(response.keys())}"
+            )
+        except (ValueError, TypeError):
+            raise ValueError(
+                f"Could not convert final_score to float. Got: {response.get('final_score')}"
+            )
+
+        if not 0 <= score <= 100:
+            raise ValueError(f"Coverage score must be between 0 and 100, got {score}")
+
+        return round(score, 1)
+
+
+class SubScores(BaseModel):
+    breadth: float = Field(ge=0, le=100)
+    depth: float = Field(ge=0, le=100)
+    balance: float = Field(ge=0, le=100)
+    critical: float = Field(ge=0, le=100)

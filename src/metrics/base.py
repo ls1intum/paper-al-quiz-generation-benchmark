@@ -13,8 +13,6 @@ from ..models.result import EvaluationResult
 
 
 class MetricScope(str, Enum):
-    """Defines the scope at which a metric operates."""
-
     QUESTION_LEVEL = "question"
     QUIZ_LEVEL = "quiz"
 
@@ -36,53 +34,104 @@ class MetricParameter:
     description: str
 
 
+class ScoreResponse(BaseModel):
+    """Default structured response schema for score-only metrics."""
+
+    score: float = Field(ge=0, le=100)
+
+
 class BaseMetric(ABC):
     """Abstract base class for all metrics.
 
-    Subclasses must implement the abstract methods to define
-    metric behavior and prompt generation.
+    Orchestrates the evaluation pipeline. Subclasses should override specific hook methods depending on their complexity:
+    - For single-stage metrics: implement `get_prompt()`.
+    - For two-stage metrics (fan-out): implement `get_per_question_prompt()` and `get_per_question_schema()`.
+    - For metrics requiring pre-processing (e.g., extracting topics): override `generate_context()`.
     """
 
     @property
     @abstractmethod
     def name(self) -> str:
-        """Unique identifier for this metric.
-
-        Returns:
-            Metric name
-        """
         pass
 
     @property
     @abstractmethod
     def version(self) -> str:
-        """Version of this metric implementation.
-
-        Returns:
-            Version string (e.g., "1.0")
-        """
         pass
 
     @property
     @abstractmethod
     def scope(self) -> MetricScope:
-        """Scope at which this metric operates.
-
-        Returns:
-            MetricScope.QUESTION_LEVEL or MetricScope.QUIZ_LEVEL
-        """
         pass
 
     @property
     def parameters(self) -> List[MetricParameter]:
-        """Configurable parameters for this metric.
+        return []
 
-        Override in subclass to define custom parameters.
+    def run_stage(
+        self,
+        prompts: List[str],
+        schema: Type[BaseModel],
+        llm_client: Any,
+    ) -> List[Dict[str, Any]]:
+        """Execute N structured LLM calls and return all responses.
+
+        Args:
+            prompts: List of prompts, one per LLM call
+            schema: Pydantic model class for structured responses
+            llm_client: LLM provider for generating responses
 
         Returns:
-            List of MetricParameter objects
+            List of structured response dicts, one per prompt
         """
-        return []
+        return [llm_client.generate_structured(prompt=p, schema=schema) for p in prompts]
+
+    def generate_context(self, source_text: Optional[str], llm_client: Any) -> Dict[str, Any]:
+        """Hook to generate shared context before per-question fan-out.
+
+        Override in subclasses that require a pre-processing stage, e.g.
+        extracting source topics before evaluating individual questions.
+        Returns an empty dict by default (no-op for single-stage metrics).
+
+        Args:
+            source_text: Raw source material text to extract context from.
+            llm_client: LLM provider for generating responses.
+
+        Returns:
+            Dict of context data passed downstream to get_per_question_prompt()
+            and get_prompt(). Empty dict if no context is needed.
+        """
+        return {}
+
+    def get_per_question_prompt(
+        self,
+        question: QuizQuestion,
+        source_text: str,
+        context: Dict[str, Any],
+    ) -> Optional[str]:
+        """Generate prompt for per-question fan-out stage.
+
+        Override to enable per-question analysis before final scoring.
+
+        Args:
+            question: Question to analyze
+            source_text: Raw source material text
+            context: Additional info needed for a certain metric (e.g. topics for coverage)
+
+        Returns:
+            Prompt string, or None to skip this question
+        """
+        return None
+
+    def get_per_question_schema(self) -> Type[BaseModel]:
+        """Schema for per-question fan-out responses.
+
+        Must override if get_per_question_prompt() is overridden.
+
+        Returns:
+            Pydantic model class for structured LLM response
+        """
+        raise NotImplementedError
 
     def evaluate(
         self,
@@ -92,11 +141,12 @@ class BaseMetric(ABC):
         llm_client: Optional[Any] = None,
         **params: Any,
     ) -> EvaluationResult:
-        """
-        Evaluate and return a score.
+        """Evaluate and return a score.
 
-        Default implementation uses get_prompt() + structured parsing.
-        Metrics can override this for custom evaluation logic (e.g., multi-stage).
+        Orchestrates single- and multi-stage evaluation via hook methods:
+        - Single-stage: implement get_prompt() only
+        - Two-stage: implement get_per_question_prompt() + get_per_question_schema() + get_prompt()
+        - Custom: override evaluate() and use run_stage() directly
 
         Args:
             question: Question to evaluate (for question-level metrics)
@@ -106,38 +156,54 @@ class BaseMetric(ABC):
             **params: Metric-specific parameters
 
         Returns:
-            Numeric score (0-100)
+            EvaluationResult with score and metadata
         """
         if llm_client is None:
             raise ValueError(f"{self.name} requires an llm_client")
 
-        # Default behavior: single structured output evaluation
-        prompt = self.get_prompt(question=question, quiz=quiz, source_text=source_text, **params)
-        structured = llm_client.generate_structured(
-            prompt=prompt,
-            schema=self.get_response_schema(question=question, quiz=quiz, source_text=source_text),
+        # 1. Generate any pre-evaluation context (e.g., source topics for coverage)
+        context = self.generate_context(source_text, llm_client) if source_text else {}
+
+        per_question_results = None
+        if quiz is not None:
+            prompts = [
+                # 2. Pass the context down to per-question analysis
+                self.get_per_question_prompt(q, source_text or "", context)
+                for q in quiz.questions
+            ]
+            if any(p is not None for p in prompts):
+                valid_prompts: List[str] = [p for p in prompts if p is not None]
+                per_question_results = self.run_stage(
+                    valid_prompts, self.get_per_question_schema(), llm_client
+                )
+
+        # 3. Pass the context down to the final scoring prompt
+        prompt = self.get_prompt(
+            question=question,
+            quiz=quiz,
+            source_text=source_text,
+            per_question_results=per_question_results,
+            context=context,
+            **params,
         )
+        [structured] = self.run_stage([prompt], self.get_response_schema(), llm_client)
         score = self.parse_structured_response(structured)
 
         return EvaluationResult(
             score=score,
             raw_response=json.dumps(structured, ensure_ascii=True),
-            metadata={"structured_response": structured},
+            metadata={
+                "evaluation_context": context,
+                "structured_response": structured,
+                "per_question_results": per_question_results,
+            },
         )
-
-    class ScoreResponse(BaseModel):
-        """Default structured response schema for score-only metrics."""
-
-        score: float = Field(ge=0, le=100)
 
     def get_response_schema(
         self,
-        question: Optional[QuizQuestion] = None,
-        quiz: Optional[Quiz] = None,
-        source_text: Optional[str] = None,
     ) -> Type[BaseModel]:
         """Schema used for structured LLM responses."""
-        return self.ScoreResponse
+        return ScoreResponse
 
     def parse_structured_response(self, response: Dict[str, Any]) -> float:
         """Extract score from a structured response payload."""
@@ -152,6 +218,8 @@ class BaseMetric(ABC):
         question: Optional[QuizQuestion] = None,
         quiz: Optional[Quiz] = None,
         source_text: Optional[str] = None,
+        per_question_results: Optional[List[Dict[str, Any]]] = None,
+        context: Optional[Dict[str, Any]] = None,
         **params: Any,
     ) -> str:
         """Generate the LLM prompt for evaluating this metric.
@@ -160,6 +228,8 @@ class BaseMetric(ABC):
             question: Question to evaluate (for question-level metrics)
             quiz: Quiz to evaluate (for quiz-level metrics)
             source_text: Original source material text
+            per_question_results: Responses from stage 1 fan-out, if applicable
+            context: Shared context produced by generate_context()
             **params: Metric-specific parameters
 
         Returns:

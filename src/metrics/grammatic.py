@@ -99,6 +99,8 @@ class GrammaticalCorrectnessMetric(BaseMetric):
         question: Optional[QuizQuestion] = None,
         quiz: Optional[Quiz] = None,
         source_text: Optional[str] = None,
+        per_question_results: Optional[List[Dict[str, Any]]] = None,
+        context: Optional[Dict[str, Any]] = None,
         **params: Any,
     ) -> str:
         """Generate grammatical correctness evaluation prompt.
@@ -107,6 +109,8 @@ class GrammaticalCorrectnessMetric(BaseMetric):
             question: Question to evaluate
             quiz: Not used (question-level metric)
             source_text: Not used
+            per_question_results: Not used (single-stage metric).
+            context: Not used (no pre-processing stage).
             **params: No parameters for this metric
 
         Returns:
