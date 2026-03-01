@@ -1,7 +1,7 @@
 """Evaluation phase DTOs for the metric pipeline."""
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Type
+from typing import Any, Dict, Optional, Type, Callable
 from pydantic import BaseModel
 from ..models.quiz import Quiz, QuizQuestion
 
@@ -10,14 +10,16 @@ from ..models.quiz import Quiz, QuizQuestion
 class PhaseInput:
     """Container for data fed into a phase.
 
-    Attributes:
-        source_text: Raw source material text.
-        quiz: Full quiz being evaluated.
-        question: Current question, populated only during fan-out phases.
-        accumulated: Outputs from all previously completed phases,
-            keyed by phase name.
+        Attributes:
+            prompt_builder: Callable that builds the prompt from this input.
+    15            Required — phases will raise if absent.
+            source_text: Raw source material text.
+            quiz: Full quiz being evaluated.
+            question: Current question, populated only during fan-out phases.
+            accumulated: Outputs from all previously completed phases, keyed by phase name.
     """
 
+    prompt_builder: Callable[["PhaseInput"], str]
     source_text: Optional[str] = None
     quiz: Optional[Quiz] = None
     question: Optional[QuizQuestion] = None
@@ -61,18 +63,10 @@ class Phase:
     output_schema: Type[BaseModel]
     fan_out: bool = False
 
-    def build_prompt(self, phase_input: PhaseInput) -> str:
-        """Generate the LLM prompt for this phase.
-
-        Args:
-            phase_input: Input container with source text, quiz, question
-                (for fan-out phases), and accumulated outputs from prior phases.
-
-        Returns:
-            Formatted prompt string to send to the LLM.
-
-        Raises:
-            NotImplementedError: Subclasses must implement this method.
-            ValueError: If required fields in phase_input are missing.
-        """
-        raise NotImplementedError(f"{self.__class__.__name__} must implement build_prompt()")
+    def process(self, phase_input: PhaseInput, llm_client: Any) -> Dict[str, Any]:
+        """Builds the prompt from phase_input and calls the LLM."""
+        prompt = phase_input.prompt_builder(phase_input)
+        result: Dict[str, Any] = llm_client.generate_structured(
+            prompt=prompt, schema=self.output_schema
+        )
+        return result

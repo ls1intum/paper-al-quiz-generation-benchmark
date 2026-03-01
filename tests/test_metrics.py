@@ -29,6 +29,13 @@ def make_quiz() -> Quiz:
     )
 
 
+def make_phase_input(metric, phase_name, **kwargs) -> PhaseInput:
+    """Helper: build a PhaseInput with the correct prompt_builder for the given phase."""
+    return PhaseInput(
+        prompt_builder=metric.get_prompt_builder(phase_name),
+        **kwargs,
+    )
+
 @pytest.mark.parametrize("score", [42.0, 88.0, 85.5])
 @pytest.mark.parametrize("metric_cls", [DifficultyMetric, ClarityMetric])
 def test_simple_metric_parse_score_success(metric_cls, score):
@@ -47,37 +54,19 @@ def test_simple_metric_parse_score_failure(metric_cls, score):
     with pytest.raises(ValueError):
         metric.parse_score(output)
 
-
 def test_difficulty_phase_requires_question():
-    """DifficultyScorePhase should raise ValueError when question is missing."""
+    """Difficulty prompt builder should raise ValueError when question is missing."""
     metric = DifficultyMetric()
-    phase = metric.phases[0]
+    inp = make_phase_input(metric, "score")
     with pytest.raises(ValueError, match="requires a question"):
-        phase.build_prompt(PhaseInput())
-
-
-def test_clarity_phase_requires_question():
-    """ClarityScorePhase should raise ValueError when question is missing."""
-    metric = ClarityMetric()
-    phase = metric.phases[0]
-    with pytest.raises(ValueError, match="requires a question"):
-        phase.build_prompt(PhaseInput())
+        inp.prompt_builder(inp)
 
 
 def test_difficulty_phase_builds_prompt():
-    """DifficultyScorePhase should return a non-empty prompt string."""
+    """Difficulty prompt builder should return a non-empty string."""
     metric = DifficultyMetric()
-    phase = metric.phases[0]
-    prompt = phase.build_prompt(PhaseInput(question=make_question()))
-    assert isinstance(prompt, str)
-    assert len(prompt) > 0
-
-
-def test_clarity_phase_builds_prompt():
-    """ClarityScorePhase should return a non-empty prompt string."""
-    metric = ClarityMetric()
-    phase = metric.phases[0]
-    prompt = phase.build_prompt(PhaseInput(question=make_question()))
+    inp = make_phase_input(metric, "score", question=make_question())
+    prompt = inp.prompt_builder(inp)
     assert isinstance(prompt, str)
     assert len(prompt) > 0
 
@@ -90,6 +79,21 @@ def test_difficulty_param_validation():
     with pytest.raises(ValueError, match="Unknown parameter"):
         metric.validate_params(unknown_param="x")
 
+def test_clarity_phase_requires_question():
+    """Clarity prompt builder should raise ValueError when question is missing."""
+    metric = ClarityMetric()
+    inp = make_phase_input(metric, "score")
+    with pytest.raises(ValueError, match="requires a question"):
+        inp.prompt_builder(inp)
+
+
+def test_clarity_phase_builds_prompt():
+    """Clarity prompt builder should return a non-empty string."""
+    metric = ClarityMetric()
+    inp = make_phase_input(metric, "score", question=make_question())
+    prompt = inp.prompt_builder(inp)
+    assert isinstance(prompt, str)
+    assert len(prompt) > 0
 
 def test_coverage_parse_score_success():
     """CoverageMetric should extract final_score from PhaseOutput."""
@@ -119,36 +123,92 @@ def test_coverage_parse_score_invalid():
     with pytest.raises(ValueError):
         metric.parse_score(output)
 
-
-def test_coverage_scoring_phase_requires_quiz():
-    """CoverageScoringPhase should raise ValueError when quiz is missing."""
+def test_coverage_extract_phase_requires_source_text():
+    """Coverage extract prompt builder should raise when source_text is missing."""
     metric = CoverageMetric()
-    scoring_phase = metric.phases[-1]
-    with pytest.raises(ValueError, match="requires a quiz"):
-        scoring_phase.build_prompt(PhaseInput(source_text="text"))
-
-
-def test_coverage_scoring_phase_requires_source_text():
-    """CoverageScoringPhase should raise ValueError when source_text is missing."""
-    metric = CoverageMetric()
-    scoring_phase = metric.phases[-1]
-    accumulated = {
-        "per_question_mapping": PhaseOutput(
-            phase_name="per_question_mapping",
-            data={"results": [{"topics": ["t1"], "cognitive_level": "recall"}]},
-        )
-    }
+    inp = make_phase_input(metric, "extract")
     with pytest.raises(ValueError, match="requires source_text"):
-        scoring_phase.build_prompt(PhaseInput(quiz=make_quiz(), accumulated=accumulated))
+        inp.prompt_builder(inp)
 
 
-def test_coverage_scoring_phase_requires_per_question_results():
-    """CoverageScoringPhase should raise ValueError when per_question_mapping is missing."""
+def test_coverage_extract_phase_builds_prompt():
+    """Coverage extract prompt builder should return a non-empty string."""
     metric = CoverageMetric()
-    scoring_phase = metric.phases[-1]
-    with pytest.raises(ValueError, match="requires per_question_mapping results"):
-        scoring_phase.build_prompt(PhaseInput(quiz=make_quiz(), source_text="text"))
+    inp = make_phase_input(metric, "extract", source_text="Python is a language.")
+    prompt = inp.prompt_builder(inp)
+    assert isinstance(prompt, str)
+    assert len(prompt) > 0
 
+
+def test_coverage_map_phase_requires_question():
+    """Coverage map prompt builder should raise when question is missing."""
+    metric = CoverageMetric()
+    inp = make_phase_input(metric, "map")
+    with pytest.raises(ValueError, match="requires a question"):
+        inp.prompt_builder(inp)
+
+
+def test_coverage_map_phase_builds_prompt():
+    """Coverage map prompt builder should return a non-empty string."""
+    metric = CoverageMetric()
+    extract_output = PhaseOutput(
+        phase_name="extract",
+        data={"topics": ["functions", "data types"], "critical_concepts": ["functions"]},
+    )
+    inp = make_phase_input(
+        metric, "map",
+        question=make_question(),
+        accumulated={"extract": extract_output},
+    )
+    prompt = inp.prompt_builder(inp)
+    assert isinstance(prompt, str)
+    assert len(prompt) > 0
+
+
+def test_coverage_score_phase_requires_extract_and_map():
+    """Coverage score prompt builder should raise when extract or map output is missing."""
+    metric = CoverageMetric()
+
+    # Missing both
+    inp = make_phase_input(metric, "score", quiz=make_quiz(), source_text="text")
+    with pytest.raises(ValueError, match="requires outputs from extract and map phases"):
+        inp.prompt_builder(inp)
+
+    # extract present, map missing
+    inp = make_phase_input(
+        metric, "score",
+        quiz=make_quiz(),
+        source_text="text",
+        accumulated={
+            "extract": PhaseOutput(
+                phase_name="extract",
+                data={"topics": ["t1"], "critical_concepts": ["t1"]},
+            )
+        },
+    )
+    with pytest.raises(ValueError, match="requires outputs from extract and map phases"):
+        inp.prompt_builder(inp)
+
+
+def test_coverage_score_phase_builds_prompt():
+    """Coverage score prompt builder should return a non-empty string."""
+    metric = CoverageMetric()
+    accumulated = {
+        "extract": PhaseOutput(
+            phase_name="extract",
+            data={"topics": ["functions", "data types"], "critical_concepts": ["functions"]},
+        ),
+        "map": PhaseOutput(
+            phase_name="map",
+            data={"results": [
+                {"topics": ["functions"], "cognitive_level_label": "recall", "cognitive_level_score": 1}
+            ]},
+        ),
+    }
+    inp = make_phase_input(metric, "score", quiz=make_quiz(), accumulated=accumulated)
+    prompt = inp.prompt_builder(inp)
+    assert isinstance(prompt, str)
+    assert len(prompt) > 0
 
 def test_coverage_evaluate_requires_quiz():
     """Coverage evaluate() should raise when quiz is missing."""

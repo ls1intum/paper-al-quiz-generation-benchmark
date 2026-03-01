@@ -17,7 +17,7 @@ evaluators:
     max_tokens: 1500
 
 metrics:
-  - name: "grammatical_correctness"
+  - name: "coverage"
     version: "1.2"
     evaluators: [ "gpt4" ]
     enabled: true

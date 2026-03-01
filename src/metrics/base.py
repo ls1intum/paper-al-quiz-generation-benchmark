@@ -4,7 +4,7 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type, Callable
 from pydantic import BaseModel, Field
 from ..models.quiz import Quiz, QuizQuestion
 from ..models.result import EvaluationResult
@@ -44,14 +44,14 @@ class BaseMetric(ABC):
 
     Orchestrates the evaluation pipeline by iterating over a metric's
     declared phases in order. Each phase receives a PhaseInput containing
-    the source text, quiz, and accumulated outputs from all prior phases,
-    and produces a PhaseOutput that is passed forward.
+    the source text, quiz, accumulated outputs from all prior phases, and
+    the phase's prompt builder. The phase is the sole point of LLM contact.
 
     Subclasses define their pipeline by implementing the `phases` property
-    and declaring Phase subclasses with metric-specific prompt logic:
-    - Single-stage metrics: declare one ScoringPhase.
-    - Multi-stage metrics: declare multiple phases in order
-      (e.g. TopicExtractionPhase → PerQuestionMappingPhase → ScoringPhase).
+    and `get_prompt_builder()`:
+     - Single-stage metrics: declare one Phase.
+     - Multi-stage metrics: declare multiple phases in order
+       (e.g. extract → map → score).
     """
 
     @property
@@ -85,23 +85,10 @@ class BaseMetric(ABC):
         """
         pass
 
-    def run_stage(
-        self,
-        prompts: List[str],
-        schema: Type[BaseModel],
-        llm_client: Any,
-    ) -> List[Dict[str, Any]]:
-        """Execute N structured LLM calls and return all responses.
-
-        Args:
-            prompts: List of prompts, one per LLM call.
-            schema: Pydantic model class for structured responses.
-            llm_client: LLM provider for generating responses.
-
-        Returns:
-            List of structured response dicts, one per prompt.
-        """
-        return [llm_client.generate_structured(prompt=p, schema=schema) for p in prompts]
+    @abstractmethod
+    def get_prompt_builder(self, phase_name: str) -> Callable[[PhaseInput], str]:
+        """Return the prompt builder callable for the given phase name."""
+        pass
 
     def evaluate(
         self,
@@ -140,47 +127,44 @@ class BaseMetric(ABC):
         accumulated: Dict[str, PhaseOutput] = {}
 
         for phase in self.phases:
-            phase_input = PhaseInput(
-                source_text=source_text,
-                quiz=quiz,
-                question=question,
-                accumulated=accumulated,
-            )
+            builder = self.get_prompt_builder(phase.name)
 
             if phase.fan_out:
                 if quiz is None:
-                    raise ValueError(f"Phase '{phase.name}' is a fan-out phase and requires a quiz")
+                    raise ValueError(f"Fan-out phase '{phase.name}' requires a quiz")
+
                 results = []
                 for q in quiz.questions:
-                    phase_input.question = q
-                    [result] = self.run_stage(
-                        [phase.build_prompt(phase_input)],
-                        phase.output_schema,
-                        llm_client,
+                    inp = PhaseInput(
+                        prompt_builder=builder,
+                        source_text=source_text,
+                        quiz=quiz,
+                        question=q,
+                        accumulated=accumulated,
                     )
-                    results.append(result)
+                    results.append(phase.process(inp, llm_client))
+
                 accumulated[phase.name] = PhaseOutput(
-                    phase_name=phase.name,
-                    data={"results": results},
+                    phase_name=phase.name, data={"results": results}
                 )
             else:
-                [result] = self.run_stage(
-                    [phase.build_prompt(phase_input)],
-                    phase.output_schema,
-                    llm_client,
+                inp = PhaseInput(
+                    prompt_builder=builder,
+                    source_text=source_text,
+                    quiz=quiz,
+                    question=question,
+                    accumulated=accumulated,
                 )
-                accumulated[phase.name] = PhaseOutput(
-                    phase_name=phase.name,
-                    data=result,
-                )
+                result_data = phase.process(inp, llm_client)
+                accumulated[phase.name] = PhaseOutput(phase_name=phase.name, data=result_data)
 
-        # Final phase output is always the score
-        final_output = accumulated[self.phases[-1].name]
-        score = self.parse_score(final_output)
+            # Final phase determines the score
+        final_phase_output = accumulated[self.phases[-1].name]
+        score = self.parse_score(final_phase_output)
 
         return EvaluationResult(
             score=score,
-            raw_response=json.dumps(final_output.data, ensure_ascii=True),
+            raw_response=json.dumps(final_phase_output.data, ensure_ascii=True),
             metadata={"phases": {name: output.data for name, output in accumulated.items()}},
         )
 
