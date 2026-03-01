@@ -4,7 +4,7 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type, Callable
+from typing import Any, Dict, List, Optional, Callable
 from pydantic import BaseModel, Field
 from ..models.quiz import Quiz, QuizQuestion
 from ..models.result import EvaluationResult
