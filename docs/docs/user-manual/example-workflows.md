@@ -41,7 +41,8 @@ EOF
 python main.py --config config/quick_test.yaml
 
 # 3. View results
-cat data/results/summary_*.txt | tail -20
+ls -lt data/results
+cat data/results/<run-bundle>/summary.txt | tail -20
 ```
 
 ---
@@ -63,7 +64,7 @@ import pandas as pd
 from pathlib import Path
 
 # Load results
-results = json.load(open('data/results/aggregated_experiment_comparison_v1.json'))
+results = json.load(open('data/results/experiment_comparison_v1/aggregated.json'))
 
 # Extract evaluator comparisons
 for metric_name, metric_data in results['aggregations'].items():
@@ -74,7 +75,7 @@ EOF
 
 # 3. Generate comparison report
 python scripts/generate_comparison_report.py \
-  --input data/results/aggregated_experiment_comparison_v1.json \
+  --input data/results/experiment_comparison_v1/aggregated.json \
   --output reports/model_comparison.pdf
 ```
 
@@ -118,7 +119,7 @@ EOF
 python main.py --config config/test_new_metric.yaml --output-prefix dev_v1
 
 # 3. Review results and identify issues
-cat data/results/summary_dev_v1.txt
+cat data/results/dev_v1/summary.txt
 
 # 4. Refine metric implementation
 # Edit src/metrics/my_new_metric.py
@@ -131,8 +132,8 @@ python main.py --config config/test_new_metric.yaml --output-prefix dev_v2
 python << 'EOF'
 import json
 
-v1 = json.load(open('data/results/aggregated_dev_v1.json'))
-v2 = json.load(open('data/results/aggregated_dev_v2.json'))
+v1 = json.load(open('data/results/dev_v1/aggregated.json'))
+v2 = json.load(open('data/results/dev_v2/aggregated.json'))
 
 print("Version comparison:")
 print(f"v0.1 mean: {v1['aggregations']['my_new_metric']['gpt4']['mean']:.2f}")
@@ -161,7 +162,7 @@ python main.py \
 
 # 3. Generate comprehensive reports
 python scripts/generate_report.py \
-  --results data/results/aggregated_prod_eval_*.json \
+  --results data/results/prod_eval_$(date +%Y%m%d)/aggregated.json \
   --format pdf \
   --include-visualizations \
   --output reports/production_evaluation_$(date +%Y%m%d).pdf
@@ -180,4 +181,3 @@ python scripts/send_notification.py \
 ```
 
 ---
-

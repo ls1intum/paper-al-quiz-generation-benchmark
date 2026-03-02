@@ -146,17 +146,23 @@ python main.py --config config/benchmark_example.yaml
 
 ### Viewing Results
 
-Results are saved to `data/results/`:
+Each run creates a readable bundle directory in `data/results/`:
 
 ```bash
-# View the human-readable summary
-cat data/results/summary_*.txt
+# List recent bundles
+ls -lt data/results
 
-# View raw JSON results
-cat data/results/results_*.json
+# Inspect one bundle
+cat data/results/<run-bundle>/summary.txt
+cat data/results/<run-bundle>/results.json
+cat data/results/<run-bundle>/aggregated.json
+cat data/results/<run-bundle>/run.log
+```
 
-# View aggregated statistics
-cat data/results/aggregated_*.json
+Use `--debug` to stream verbose logs live in terminal:
+
+```bash
+python main.py --config config/benchmark_example.yaml --debug
 ```
 
 ### What's Happening?

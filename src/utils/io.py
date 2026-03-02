@@ -1,6 +1,7 @@
 """I/O utilities for loading and saving data."""
 
 import json
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import List
@@ -81,12 +82,13 @@ class IOUtils:
             raise FileNotFoundError(f"Quiz directory not found: {quiz_directory}")
 
         quizzes = []
+        logger = logging.getLogger(__name__)
         for quiz_file in quiz_dir.glob("*.json"):
             try:
                 quiz = IOUtils.load_quiz(str(quiz_file))
                 quizzes.append(quiz)
             except Exception as e:
-                print(f"Warning: Failed to load {quiz_file}: {e}")
+                logger.warning("Failed to load %s: %s", quiz_file, e)
 
         return quizzes
 

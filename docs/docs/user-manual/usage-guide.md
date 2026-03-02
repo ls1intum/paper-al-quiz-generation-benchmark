@@ -344,8 +344,11 @@ python main.py --config config/my_benchmark.yaml --env .env.production
 # Skip aggregation (save only raw results)
 python main.py --config config/my_benchmark.yaml --no-aggregate
 
-# Custom output filename prefix
+# Custom run bundle name
 python main.py --config config/my_benchmark.yaml --output-prefix experiment_001
+
+# Stream verbose debug logs in terminal
+python main.py --config config/my_benchmark.yaml --debug
 ```
 
 #### What Happens During Execution
@@ -377,56 +380,27 @@ python main.py --config config/my_benchmark.yaml --output-prefix experiment_001
    - Generates summary report
 
 5. **Output**
-   - Saves raw results JSON
-   - Saves aggregated results JSON
-   - Saves human-readable summary
+   - Creates a run bundle directory in `outputs.results_directory`
+   - Saves `results.json`, `aggregated.json` (unless `--no-aggregate`), `summary.txt`, `metadata.json`
+   - Saves a full execution log in `run.log`
 
 #### Progress Monitoring
 
-The framework prints progress information:
-
-```
-Registering metrics...
-Available metrics: ['alignment', 'cognitive_level', 'clarity', 'distractor_quality']
-
-Loading configuration from config/benchmark_example.yaml...
-Configuration loaded: example-benchmark v1.0.0
-  Runs: 3
-  Evaluators: ['gpt4', 'gpt35']
-  Metrics: ['alignment', 'clarity', 'distractor_quality']
-
-Initializing benchmark runner...
-  Initialized evaluator: gpt4 (gpt-4)
-  Initialized evaluator: gpt35 (gpt-3.5-turbo)
-  Initialized metric: alignment v1.0
-  Initialized metric: clarity v1.0
-  Initialized metric: distractor_quality v1.0
-
-Starting benchmark execution...
-Loading quizzes from data/quizzes...
-  Loaded 1 quizzes
-
-============================================================
-Starting Run 1/3
-============================================================
-Evaluating quiz: Python Fundamentals Quiz (quiz_example_001)
-  Running alignment with gpt4...
-  Running alignment with gpt35...
-  Running clarity with gpt4...
-  Running clarity with gpt35...
-  Running distractor_quality with gpt4...
-...
-```
+- Default terminal output shows concise run progress (`INFO` level).
+- Full detailed logs are always written to each run bundle (`run.log`).
+- Use `--debug` if you want full verbose logs live in terminal.
 
 ### Understanding Results
 
 #### Output Files
 
-After execution, you'll find three files in `data/results/`:
+After execution, you'll find one run bundle directory in `data/results/` per benchmark run:
 
-1. **`results_<timestamp>.json`** — Raw results from all evaluations
-2. **`aggregated_<timestamp>.json`** — Statistical aggregations
-3. **`summary_<timestamp>.txt`** — Human-readable report
+1. **`results.json`** — Raw results from all evaluations
+2. **`aggregated.json`** — Statistical aggregations (if aggregation enabled)
+3. **`summary.txt`** — Human-readable report
+4. **`metadata.json`** — Run metadata (config, timestamps, run id)
+5. **`run.log`** — Full detailed execution log
 
 #### Reading the Summary
 

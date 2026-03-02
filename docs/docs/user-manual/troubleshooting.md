@@ -57,7 +57,7 @@ pip install -r requirements.txt --upgrade
 **Symptoms**: Scores don't match manual assessment
 
 **Diagnostic steps**:
-1. Review raw LLM responses in `results_*.json`
+1. Review raw LLM responses in `<run-bundle>/results.json`
 2. Test metric prompt manually in LLM playground
 3. Verify source material quality and completeness
 4. Check if questions align with learning objectives
@@ -84,4 +84,3 @@ pip install -r requirements.txt --upgrade
 - Clear results between runs
 
 ---
-
