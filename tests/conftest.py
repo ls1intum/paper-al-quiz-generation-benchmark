@@ -20,7 +20,14 @@ from src.models.quiz import Quiz, QuizQuestion, QuestionType
 
 
 class MockLLMProvider(LLMProvider):
-    """Deterministic mock LLM provider for tests."""
+    """Deterministic mock LLM provider for tests.
+
+    Prompt-sniffing detects which coverage phase is running:
+      - extract: prompt contains '"critical_concepts"' and 'must-know'
+      - map:     prompt contains '"cognitive_level_score"'
+      - score:   prompt contains '"final_score"'
+    All other calls fall back to a deterministic hash-based score.
+    """
 
     def __init__(
         self,
@@ -33,6 +40,54 @@ class MockLLMProvider(LLMProvider):
         super().__init__(model, temperature, max_tokens, **kwargs)
         self._responses = list(responses) if responses is not None else None
 
+    @staticmethod
+    def _coverage_extract_response() -> Dict[str, Any]:
+        return {
+            "topics": ["functions", "data types", "control flow"],
+            "critical_concepts": ["functions", "data types"],
+        }
+
+    @staticmethod
+    def _coverage_map_response() -> Dict[str, Any]:
+        return {
+            "topics": ["functions"],
+            "cognitive_level_label": "understanding",
+            "cognitive_level_score": 2,
+            "reasoning": "Mock question analysis",
+        }
+
+    @staticmethod
+    def _coverage_score_response() -> Dict[str, Any]:
+        return {
+            "final_score": 73.0,
+            "sub_scores": {
+                "breadth": 20.0,
+                "depth": 20.0,
+                "balance": 13.0,
+                "critical": 20.0,
+            },
+            "topics_in_source": ["functions", "data types", "control flow"],
+            "topics_covered": ["functions", "data types"],
+            "critical_concepts": ["functions", "data types"],
+            "critical_covered": ["functions", "data types"],
+            "breadth_reasoning": "2 of 3 topics covered = 20.0",
+            "depth_reasoning": "avg level 2/3 x 30 = 20.0",
+            "balance_reasoning": "deduction_a=5, deduction_b=2, balance=13",
+            "critical_reasoning": "2 of 2 critical concepts covered = 20.0",
+        }
+
+    @staticmethod
+    def _detect_coverage_phase(prompt: str) -> Optional[str]:
+        """Identify which coverage phase produced this prompt by inspecting
+        the JSON key names the prompt asks the LLM to return."""
+        if '"critical_concepts"' in prompt and "must-know" in prompt:
+            return "extract"
+        if '"cognitive_level_score"' in prompt:
+            return "map"
+        if '"final_score"' in prompt:
+            return "score"
+        return None
+
     def generate(
         self,
         prompt: str,
@@ -40,44 +95,22 @@ class MockLLMProvider(LLMProvider):
         max_tokens: Optional[int] = None,
         **kwargs: Any,
     ) -> str:
-        # If custom responses provided, use those
         if self._responses is not None:
             if not self._responses:
                 return "0"
             next_response = self._responses.pop(0)
-            if isinstance(next_response, str):
-                return next_response
-            return json.dumps(next_response)
+            return next_response if isinstance(next_response, str) else json.dumps(next_response)
 
-        # Coverage Stage 1: Question topic extraction
-        if "Question #" in prompt and "cognitive_level" in prompt:
-            return """{
-                "topics": ["test_topic"],
-                "cognitive_level": "understanding",
-                "reasoning": "Mock question analysis"
-            }"""
+        phase = self._detect_coverage_phase(prompt)
+        if phase == "extract":
+            return json.dumps(self._coverage_extract_response())
+        if phase == "map":
+            return json.dumps(self._coverage_map_response())
+        if phase == "score":
+            return json.dumps(self._coverage_score_response())
 
-        # Coverage Stage 2: Overall coverage analysis
-        if "Scoring Framework" in prompt or ("sub_scores" in prompt and "final_score" in prompt):
-            return """{
-                "final_score": 67.5,
-                "sub_scores": {
-                    "breadth": 20.0,
-                    "depth": 22.5,
-                    "balance": 15.0,
-                    "critical": 10.0
-                },
-                "topics_in_source": ["topic1", "topic2"],
-                "topics_covered": ["topic1"],
-                "critical_concepts": ["concept1"],
-                "critical_covered": ["concept1"],
-                "reasoning": "Mock coverage analysis"
-            }"""
-
-        # Default: deterministic score based on prompt hash (for simple metrics)
         digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
-        score = int(digest, 16) % 101
-        return str(score)
+        return str(int(digest, 16) % 101)
 
     def generate_structured(
         self,
@@ -87,40 +120,21 @@ class MockLLMProvider(LLMProvider):
         max_tokens: Optional[int] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
-        # If custom responses provided, use those
         if self._responses is not None:
             if not self._responses:
                 return {"score": 0}
             return self._responses.pop(0)
 
-        # Coverage Stage 1: Question topic extraction
-        if "Question #" in prompt and "cognitive_level" in prompt:
-            return {
-                "topics": ["test_topic"],
-                "cognitive_level": "understanding",
-                "reasoning": "Mock question analysis",
-            }
-
-        # Coverage Stage 2: Overall coverage analysis
-        if "Scoring Framework" in prompt or ("sub_scores" in prompt and "final_score" in prompt):
-            return {
-                "final_score": 67.5,
-                "sub_scores": {
-                    "breadth": 20.0,
-                    "depth": 22.5,
-                    "balance": 15.0,
-                    "critical": 10.0,
-                },
-                "topics_in_source": ["topic1", "topic2"],
-                "topics_covered": ["topic1"],
-                "critical_concepts": ["concept1"],
-                "critical_covered": ["concept1"],
-                "reasoning": "Mock coverage analysis",
-            }
+        phase = self._detect_coverage_phase(prompt)
+        if phase == "extract":
+            return self._coverage_extract_response()
+        if phase == "map":
+            return self._coverage_map_response()
+        if phase == "score":
+            return self._coverage_score_response()
 
         digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
-        score = int(digest, 16) % 101
-        return {"score": float(score)}
+        return {"score": float(int(digest, 16) % 101)}
 
 
 @pytest.fixture
@@ -161,7 +175,6 @@ def sample_quiz() -> Quiz:
             correct_answer="True",
         ),
     ]
-
     return Quiz(
         quiz_id="quiz_1",
         title="Sample Quiz",
@@ -209,7 +222,6 @@ def sample_config(tmp_path) -> BenchmarkConfig:
         source_directory=str(tmp_path / "sources"),
         results_directory=str(tmp_path / "results"),
     )
-
     return BenchmarkConfig(
         name="test_benchmark",
         version="1.0",
