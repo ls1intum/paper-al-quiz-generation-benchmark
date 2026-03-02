@@ -1,16 +1,16 @@
 """Clarity metric implementation."""
 
-from typing import Any, Optional
-
-from ..models.quiz import Quiz, QuizQuestion
-from .base import BaseMetric, MetricScope
+from typing import Callable, List
+from .base import BaseMetric, MetricScope, ScoreResponse
+from .phase import Phase, PhaseInput
 
 
 class ClarityMetric(BaseMetric):
     """Evaluates the clarity of quiz questions and answer options.
 
-    This metric assesses how clear, unambiguous, and well-written
-    the questions are.
+    Uses a single-stage pipeline:
+    1. score: scores how clear, unambiguous, and well-written the question
+       and its options are.
     """
 
     @property
@@ -19,47 +19,39 @@ class ClarityMetric(BaseMetric):
 
     @property
     def version(self) -> str:
-        return "1.0"
+        return "1.1"
 
     @property
     def scope(self) -> MetricScope:
         return MetricScope.QUESTION_LEVEL
 
-    def get_prompt(
-        self,
-        question: Optional[QuizQuestion] = None,
-        quiz: Optional[Quiz] = None,
-        source_text: Optional[str] = None,
-        **params: Any,
-    ) -> str:
-        """Generate clarity evaluation prompt.
+    @property
+    def phases(self) -> List[Phase]:
+        return [Phase("score", ScoreResponse)]
 
-        Args:
-            question: Question to evaluate
-            quiz: Not used (question-level metric)
-            source_text: Not used
-            **params: No parameters for this metric
+    def get_prompt_builder(self, phase_name: str) -> Callable[[PhaseInput], str]:
+        builders = {
+            "score": self._build_score_prompt,
+        }
+        if phase_name not in builders:
+            raise ValueError(f"Unknown phase '{phase_name}' for metric '{self.name}'")
+        return builders[phase_name]
 
-        Returns:
-            Formatted prompt
+    def _build_score_prompt(self, inp: PhaseInput) -> str:
+        if inp.question is None:
+            raise ValueError("clarity score phase requires a question")
 
-        Raises:
-            ValueError: If question is None
-        """
-        if question is None:
-            raise ValueError("ClarityMetric requires a question")
+        question = inp.question
+        options_text = "\n".join(f"{i}. {option}" for i, option in enumerate(question.options, 1))
 
-        prompt = f"""Evaluate the clarity of the following quiz question.
+        return f"""Evaluate the clarity of the following quiz question.
 
 Question Type: {question.question_type.value}
 Question: {question.question_text}
 
 Options:
-"""
-        for i, option in enumerate(question.options, 1):
-            prompt += f"{i}. {option}\n"
+{options_text}
 
-        prompt += """
 Provide a clarity score from 0 to 100, where:
 - 0-20: Very Unclear (ambiguous, confusing, poorly written)
 - 21-40: Unclear (some confusion, vague wording)
@@ -85,7 +77,4 @@ Consider:
    - Is there a single, clearly correct answer?
 
 Respond with ONLY a JSON object in this format:
-{{"score": <number between 0 and 100>}}
-"""
-
-        return prompt
+{{"score": <number between 0 and 100>}}"""
