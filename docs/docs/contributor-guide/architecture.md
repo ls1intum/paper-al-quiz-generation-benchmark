@@ -370,9 +370,12 @@ paper-al-quiz-generation-benchmark/
 │   │   └── example_quiz.json
 │   │
 │   └── results/                 # Benchmark results
-│       ├── results_<timestamp>.json
-│       ├── aggregated_<timestamp>.json
-│       └── summary_<timestamp>.txt
+│       └── <run-bundle>/
+│           ├── results.json
+│           ├── aggregated.json
+│           ├── summary.txt
+│           ├── metadata.json
+│           └── run.log
 │
 ├── config/
 │   ├── benchmark_example.yaml

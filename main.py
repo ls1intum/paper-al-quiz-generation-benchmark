@@ -2,8 +2,10 @@
 """Main entry point for the quiz benchmark framework."""
 
 import argparse
-import sys
 import json
+import logging
+import re
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -17,6 +19,7 @@ from src.metrics.clarity import ClarityMetric
 from src.runners.benchmark import BenchmarkRunner
 from src.utils.config_loader import ConfigLoader
 from src.utils.io import IOUtils
+from src.utils.logging_utils import setup_logging
 
 
 def register_metrics() -> None:
@@ -69,61 +72,97 @@ def main() -> int:
         "--output-prefix",
         type=str,
         default=None,
-        help="Prefix for output files (default: timestamp)",
+        help="Run bundle name override (default: benchmark-name + timestamp + config hash)",
+    )
+
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable verbose debug logging in terminal",
     )
 
     args = parser.parse_args()
 
     try:
+        setup_logging(debug=args.debug)
+        logger = logging.getLogger(__name__)
+
         # Register metrics
-        print("Registering metrics...")
+        logger.info("Registering metrics...")
         register_metrics()
-        print(f"Available metrics: {MetricRegistry.list_metrics()}")
-        print()
+        logger.debug("Available metrics: %s", MetricRegistry.list_metrics())
 
         # Load configuration
-        print(f"Loading configuration from {args.config}...")
+        logger.info("Loading configuration from %s...", args.config)
         config = ConfigLoader.load_config(args.config, args.env)
-        print(f"Configuration loaded: {config.name} v{config.version}")
-        print(f"Runs: {config.runs}")
-        print(f"Evaluators: {list(config.evaluators.keys())}")
-        print(f"Metrics: {[m.name for m in config.get_enabled_metrics()]}")
-        print()
+        logger.info("Configuration loaded: %s v%s", config.name, config.version)
+        logger.info("Runs: %s", config.runs)
+        logger.info("Evaluators: %s", list(config.evaluators.keys()))
+        logger.info("Metrics: %s", [m.name for m in config.get_enabled_metrics()])
+
+        # Build run bundle directory
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        slug_name = re.sub(r"[^a-zA-Z0-9_-]+", "-", config.name.strip().lower()).strip("-")
+        slug_name = slug_name or "benchmark"
+        run_id = f"{slug_name}-{timestamp}-{ConfigLoader.hash_config(config)[:8]}"
+        run_bundle_name = args.output_prefix or run_id
+
+        results_root = Path(config.input_output.results_directory)
+        run_dir = results_root / run_bundle_name
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+        log_file = run_dir / "run.log"
+        setup_logging(debug=args.debug, log_file=log_file)
+        logger = logging.getLogger(__name__)
+
+        logger.info("Run bundle: %s", run_dir)
+        logger.debug("Log file: %s", log_file)
+        logger.debug("Environment file: %s", args.env)
+
+        metadata_file = run_dir / "metadata.json"
+        with open(metadata_file, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "run_bundle": run_bundle_name,
+                    "started_at": datetime.now().isoformat(),
+                    "config_name": config.name,
+                    "config_version": config.version,
+                    "config_hash": ConfigLoader.hash_config(config),
+                    "config_path": str(Path(args.config)),
+                    "env_file": str(Path(args.env)),
+                    "runs": config.runs,
+                    "evaluators": list(config.evaluators.keys()),
+                    "metrics": [m.name for m in config.get_enabled_metrics()],
+                    "debug_mode": args.debug,
+                },
+                f,
+                indent=2,
+            )
 
         # Initialize benchmark runner
-        print("Initializing benchmark runner...")
+        logger.info("Initializing benchmark runner...")
         runner = BenchmarkRunner(config)
-        print()
 
         # Run benchmark
-        print("Starting benchmark execution...")
+        logger.info("Starting benchmark execution...")
         results = runner.run()
-        print(f"\nBenchmark complete! Generated {len(results)} results.")
-        print()
-
-        # Generate output filename prefix
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_prefix = args.output_prefix or timestamp
+        logger.info("Benchmark complete. Generated %s result objects.", len(results))
 
         # Save individual results
-        results_dir = Path(config.input_output.results_directory)
-        results_dir.mkdir(parents=True, exist_ok=True)
-
-        results_file = results_dir / f"results_{output_prefix}.json"
-        print(f"Saving results to {results_file}...")
+        results_file = run_dir / "results.json"
+        logger.info("Saving results to %s...", results_file)
         IOUtils.save_results(results, str(results_file))
 
         # Aggregate and save if requested
         if not args.no_aggregate:
-            print("\nAggregating results...")
+            logger.info("Aggregating results...")
             aggregated = ResultsAggregator.aggregate(results, config.name)
 
-            aggregated_file = results_dir / f"aggregated_{output_prefix}.json"
-            print(f"Saving aggregated results to {aggregated_file}...")
+            aggregated_file = run_dir / "aggregated.json"
+            logger.info("Saving aggregated results to %s...", aggregated_file)
             IOUtils.save_aggregated_results(aggregated, str(aggregated_file))
 
             # Generate standard summary
-            print("\n" + "=" * 70)
             summary = ResultsReporter.generate_summary(aggregated)
 
             # Extract and Append Qualitative Reasoning
@@ -183,29 +222,24 @@ def main() -> int:
                 summary_str = summary
 
             # Print the FULL summary (Statistics + Reasoning)
-            print(summary_str)
+            logger.info("\n%s", summary_str)
 
             # Save summary to text file
-            summary_file = results_dir / f"summary_{output_prefix}.txt"
-            with open(summary_file, "w") as f:
+            summary_file = run_dir / "summary.txt"
+            with open(summary_file, "w", encoding="utf-8") as f:
                 f.write(summary_str)
-            print(f"\nSummary saved to {summary_file}")
+            logger.info("Summary saved to %s", summary_file)
 
-        print("\n" + "=" * 70)
-        print("BENCHMARK COMPLETE")
-        print("=" * 70)
+        logger.info("BENCHMARK COMPLETE")
 
         return 0
 
     except KeyboardInterrupt:
-        print("\n\nBenchmark interrupted by user.")
+        logging.getLogger(__name__).warning("Benchmark interrupted by user.")
         return 130
 
     except Exception as e:
-        print(f"\nError: {e}", file=sys.stderr)
-        import traceback
-
-        traceback.print_exc()
+        logging.getLogger(__name__).exception("Error: %s", e)
         return 1
 
 
