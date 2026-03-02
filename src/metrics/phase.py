@@ -10,19 +10,21 @@ from ..models.quiz import Quiz, QuizQuestion
 class PhaseInput:
     """Container for data fed into a phase.
 
-        Attributes:
-            prompt_builder: Callable that builds the prompt from this input.
-    15            Required — phases will raise if absent.
-            source_text: Raw source material text.
-            quiz: Full quiz being evaluated.
-            question: Current question, populated only during fan-out phases.
-            accumulated: Outputs from all previously completed phases, keyed by phase name.
+    Attributes:
+        prompt_builder: Callable that builds the prompt from this input.
+            Required — phases will raise if absent.
+        source_text: Raw source material text.
+        quiz: Full quiz being evaluated.
+        question: Current question, populated only during fan-out phases.
+        params: Metric-specific runtime parameters passed from evaluate(), used by prompt builders.
+        accumulated: Outputs from all previously completed phases, keyed by phase name.
     """
 
     prompt_builder: Callable[["PhaseInput"], str]
     source_text: Optional[str] = None
     quiz: Optional[Quiz] = None
     question: Optional[QuizQuestion] = None
+    params: Dict[str, Any] = field(default_factory=dict)
     accumulated: Dict[str, "PhaseOutput"] = field(default_factory=dict)
 
 

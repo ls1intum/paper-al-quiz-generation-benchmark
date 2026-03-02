@@ -1,6 +1,7 @@
 """Coverage metric implementation."""
 
-from typing import Any, Callable, Dict, List
+import json
+from typing import Any, Callable, Dict, List, Optional
 from pydantic import BaseModel, Field, field_validator
 from .base import BaseMetric, MetricParameter, MetricScope
 from .phase import Phase, PhaseInput, PhaseOutput
@@ -58,7 +59,7 @@ class CoverageMetric(BaseMetric):
             sub = info.data.get("sub_scores")
             if sub is not None:
                 expected = sub.breadth + sub.depth + sub.balance + sub.critical
-                if abs(v - expected) > 1.0:
+                if abs(v - expected) > 0.5:
                     raise ValueError(f"final_score {v} does not match sum of sub_scores {expected}")
             return v
 
@@ -189,7 +190,7 @@ Respond with ONLY a JSON object:
         if not source_topics or not results:
             raise ValueError("score phase requires outputs from extract and map phases")
 
-        granularity = self.get_param_value("granularity")
+        granularity = self.get_param_value("granularity", **inp.params)
         weights = self._get_weights(granularity)
         num_questions = inp.quiz.num_questions
         num_topics = len(source_topics)
@@ -285,3 +286,30 @@ Respond with ONLY this JSON object:
             raise ValueError(f"Coverage score must be between 0 and 100, got {score}")
 
         return round(score, 1)
+
+    def format_insights(self, raw_response: str, quiz_id: str) -> Optional[str]:
+        """Format coverage reasoning phases into a human-readable insight block."""
+        try:
+            clean_json = raw_response.replace("```json", "").replace("```", "").strip()
+            data = json.loads(clean_json)
+
+            breadth_reasoning = data.get("breadth_reasoning")
+            if not breadth_reasoning:
+                return None
+
+            lines = [
+                f"\n[Quiz: {quiz_id}] Coverage Analysis:",
+                "-" * 40,
+                f"Score: {data.get('final_score')}",
+                f"Breadth:  {breadth_reasoning}",
+                f"Depth:    {data.get('depth_reasoning')}",
+                f"Balance:  {data.get('balance_reasoning')}",
+                f"Critical: {data.get('critical_reasoning')}",
+            ]
+            if data.get("sub_scores"):
+                lines.append(f"Sub-scores: {data.get('sub_scores')}")
+            lines.append("-" * 40)
+            return "\n".join(lines)
+
+        except Exception:
+            return None

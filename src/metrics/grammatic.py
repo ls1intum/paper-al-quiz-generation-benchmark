@@ -59,8 +59,8 @@ class GrammaticalCorrectnessMetric(BaseMetric):
         if inp.quiz is None:
             raise ValueError("grammatical_correctness score phase requires a quiz")
 
-        error_weights: Dict = self.get_param_value("error_weights")
-        language: str = self.get_param_value("language")
+        error_weights: Dict = self.get_param_value("error_weights", **inp.params)
+        language: str = self.get_param_value("language", **inp.params)
         quiz_content = self._format_quiz_for_prompt(inp.quiz)
 
         return f"""You are evaluating the grammatical correctness of quiz content.

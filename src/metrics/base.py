@@ -12,6 +12,8 @@ from .phase import Phase, PhaseInput, PhaseOutput
 
 
 class MetricScope(str, Enum):
+    """Defines the scope at which a metric operates."""
+
     QUESTION_LEVEL = "question"
     QUIZ_LEVEL = "quiz"
 
@@ -57,20 +59,36 @@ class BaseMetric(ABC):
     @property
     @abstractmethod
     def name(self) -> str:
+        """Unique identifier for this metric.
+
+        Returns:
+            Metric name
+        """
         pass
 
     @property
     @abstractmethod
     def version(self) -> str:
+        """Version of this metric implementation.
+
+        Returns:
+            Version string (e.g., "1.0")
+        """
         pass
 
     @property
     @abstractmethod
     def scope(self) -> MetricScope:
+        """Scope at which this metric operates.
+
+        Returns:
+            MetricScope.QUESTION_LEVEL or MetricScope.QUIZ_LEVEL
+        """
         pass
 
     @property
     def parameters(self) -> List[MetricParameter]:
+        """Configurable parameters for this metric."""
         return []
 
     @property
@@ -124,6 +142,8 @@ class BaseMetric(ABC):
         if not self.phases:
             raise ValueError(f"{self.name} must declare at least one phase")
 
+        self.validate_params(**params)
+
         accumulated: Dict[str, PhaseOutput] = {}
 
         for phase in self.phases:
@@ -140,6 +160,7 @@ class BaseMetric(ABC):
                         source_text=source_text,
                         quiz=quiz,
                         question=q,
+                        params=params,
                         accumulated=accumulated,
                     )
                     results.append(phase.process(inp, llm_client))
@@ -153,6 +174,7 @@ class BaseMetric(ABC):
                     source_text=source_text,
                     quiz=quiz,
                     question=question,
+                    params=params,
                     accumulated=accumulated,
                 )
                 result_data = phase.process(inp, llm_client)
@@ -187,6 +209,21 @@ class BaseMetric(ABC):
         if not 0 <= score <= 100:
             raise ValueError(f"Score must be between 0 and 100, got {score}")
         return score
+
+    def format_insights(self, raw_response: str, quiz_id: str) -> Optional[str]:
+        """Extract qualitative insights from a metric's raw response for display.
+
+        Override in subclasses that produce reasoning or detailed output.
+        Returns None by default (no insights to display).
+
+        Args:
+            raw_response: Raw JSON string from the metric's final phase.
+            quiz_id: Quiz identifier for labelling output.
+
+        Returns:
+            Formatted string of insights, or None if not applicable.
+        """
+        return None
 
     def validate_params(self, **params: Any) -> None:
         """Validate provided parameters against metric's parameter definitions.

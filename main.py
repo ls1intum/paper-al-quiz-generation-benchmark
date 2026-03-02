@@ -3,7 +3,6 @@
 
 import argparse
 import sys
-import json
 from datetime import datetime
 from pathlib import Path
 
@@ -144,35 +143,15 @@ def main() -> int:
                 for metric in metrics_list:
                     metric_name = safe_get(metric, 'metric_name')
                     raw_response = safe_get(metric, 'raw_response')
-
-                    # Check for Coverage metric specifically
-                    if metric_name == 'coverage':
+                    if metric_name and isinstance(raw_response, str):
                         try:
-                            if isinstance(raw_response, str):
-                                clean_json = raw_response.replace("```json", "").replace("```", "").strip()
-                                data = json.loads(clean_json)
-
-                                breadth_reasoning = data.get('breadth_reasoning')
-                                depth_reasoning = data.get('depth_reasoning')
-                                balance_reasoning = data.get('balance_reasoning')
-                                critical_reasoning = data.get('critical_reasoning')
-                                sub_scores = data.get('sub_scores')
-                                score = data.get('final_score')
-
-                                if breadth_reasoning:
-                                    found_insights = True
-                                    detailed_notes.append(f"\n[Quiz: {quiz_id}] Coverage Analysis:")
-                                    detailed_notes.append("-" * 40)
-                                    detailed_notes.append(f"Score: {score}")
-                                    detailed_notes.append(f"Breadth:  {breadth_reasoning}")
-                                    detailed_notes.append(f"Depth:    {depth_reasoning}")
-                                    detailed_notes.append(f"Balance:  {balance_reasoning}")
-                                    detailed_notes.append(f"Critical: {critical_reasoning}")
-                                    if sub_scores:
-                                        detailed_notes.append(f"Sub-scores: {sub_scores}")
-                                    detailed_notes.append("-" * 40)
-                        except Exception:
+                            metric_instance = MetricRegistry.create(metric_name)
+                            insight = metric_instance.format_insights(raw_response, quiz_id)
+                        except ValueError:
                             continue
+                        if insight:
+                            found_insights = True
+                            detailed_notes.append(insight)
 
             if found_insights:
                 # Append the detailed notes to the main summary string

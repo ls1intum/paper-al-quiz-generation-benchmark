@@ -57,8 +57,8 @@ class DifficultyMetric(BaseMetric):
         if inp.question is None:
             raise ValueError("difficulty score phase requires a question")
 
-        rubric = self.get_param_value("rubric")
-        target_audience = self.get_param_value("target_audience")
+        rubric = self.get_param_value("rubric", **inp.params)
+        target_audience = self.get_param_value("target_audience", **inp.params)
         question = inp.question
 
         if rubric == "bloom_taxonomy":
