@@ -73,6 +73,7 @@ class Quiz:
     title: str
     source_material: str
     questions: List[QuizQuestion]
+    instructions: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.now)
 

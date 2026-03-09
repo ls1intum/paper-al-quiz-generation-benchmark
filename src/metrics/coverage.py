@@ -22,6 +22,13 @@ class CoverageMetric(BaseMetric):
     2. map: Map each question to source topics and assign a numeric cognitive level (fan-out).
     3. score: Score breadth, depth, balance, and critical coverage.
 
+    Instructions integration:
+    - num_questions: replaces the default ideal_questions calculation in the balance
+      sub-score. If the user requested 10 questions and the quiz has 4, the shortfall
+      is penalised proportionally.
+    - custom_prompt: handled entirely in BaseMetric.evaluate() as a post-processing
+      adjustment — coverage itself has no knowledge of it.
+
     Key design decisions:
     - Critical concepts are identified once from the source in stage 1, not re-invented
       per quiz in stage 3. This prevents the LLM from cherry-picking easy concepts.
@@ -50,6 +57,7 @@ class CoverageMetric(BaseMetric):
         depth_reasoning: str
         balance_reasoning: str
         critical_reasoning: str
+        instructions_reasoning: str = ""
         sub_scores: SubScores
         final_score: float = Field(ge=0, le=100)
 
@@ -69,7 +77,7 @@ class CoverageMetric(BaseMetric):
 
     @property
     def version(self) -> str:
-        return "1.5"
+        return "1.6"
 
     @property
     def scope(self) -> MetricScope:
@@ -105,15 +113,16 @@ class CoverageMetric(BaseMetric):
 
     def get_prompt_builder(self, phase_name: str) -> Callable[[PhaseInput], str]:
         builders = {
-            "extract": self._build_extract_prompt,
-            "map": self._build_map_prompt,
+            "extract": CoverageMetric._build_extract_prompt,
+            "map": CoverageMetric._build_map_prompt,
             "score": self._build_score_prompt,
         }
         if phase_name not in builders:
             raise ValueError(f"Unknown phase '{phase_name}' for metric '{self.name}'")
         return builders[phase_name]
 
-    def _build_extract_prompt(self, inp: PhaseInput) -> str:
+    @staticmethod
+    def _build_extract_prompt(inp: PhaseInput) -> str:
         if not inp.source_text:
             raise ValueError("extract phase requires source_text")
         return f"""Analyze the source material and identify its main topics and critical concepts.
@@ -135,7 +144,8 @@ Respond with ONLY a JSON object:
   "critical_concepts": ["concept1", "concept2", ...]
 }}"""
 
-    def _build_map_prompt(self, inp: PhaseInput) -> str:
+    @staticmethod
+    def _build_map_prompt(inp: PhaseInput) -> str:
         if inp.question is None:
             raise ValueError("map phase requires a question")
 
@@ -194,7 +204,29 @@ Respond with ONLY a JSON object:
         weights = self._get_weights(granularity)
         num_questions = inp.quiz.num_questions
         num_topics = len(source_topics)
-        ideal_questions = round(num_topics * 1.5)
+
+        # Use requested num_questions from instructions as the ideal if provided,
+        # otherwise fall back to the topic-based heuristic.
+        if inp.instructions and inp.instructions.num_questions:
+            ideal_questions = inp.instructions.num_questions
+            ideal_note = "(requested by instructions)"
+            instructions_note = (
+                f"\n**Instructions note**: The user requested {ideal_questions} questions "
+                f"but the quiz only has {num_questions}. "
+                f"You MUST populate 'instructions_reasoning' with a non-null string "
+                f"explaining exactly how this shortfall affected the balance sub-score "
+                f"and what deduction was applied."
+            )
+        else:
+            ideal_questions = round(num_topics * 1.5)
+            ideal_note = "(estimated from topic count)"
+            instructions_note = ""
+
+        # Pre-compute deduction_a in Python so the LLM cannot recalculate it
+        deduction_a = round(
+            max(0, (ideal_questions - num_questions) / ideal_questions) * (weights["balance"] // 2),
+            2,
+        )
 
         summaries_text = "\n".join(
             f"Q{i} [level={r.get('cognitive_level_score', '?')} "
@@ -211,14 +243,14 @@ Respond with ONLY a JSON object:
         )
 
         return f"""You are an expert quiz evaluator. Score quiz coverage against the source material.
-
+{instructions_note}
 **Source Topics** ({num_topics} total):
 {", ".join(source_topics)}
 
 {critical_hint}
 
 **Quiz**: {inp.quiz.title}
-Questions: {num_questions} | Source topics: {num_topics} | Ideal question count: ~{ideal_questions}
+Questions: {num_questions} | Source topics: {num_topics} | Ideal question count: ~{ideal_questions} {ideal_note}
 
 **Per-Question Analysis**:
 {summaries_text}
@@ -236,7 +268,7 @@ Questions: {num_questions} | Source topics: {num_topics} | Ideal question count:
 
 3. **Balance** (max {weights['balance']} pts):
    - Start at {weights['balance']} pts, then apply two deductions:
-   a. Question count shortfall: max(0, ({ideal_questions} - {num_questions}) / {ideal_questions}) × {weights['balance'] // 2}
+   a. Question count shortfall (pre-computed, use this exact value): deduction_a = {deduction_a}
    b. Topic imbalance: 0-{weights['balance'] // 2} pts deducted subjectively for over/under-represented topics
    - balance = {weights['balance']} - deduction_a - deduction_b  (floor at 0)
 
@@ -256,8 +288,9 @@ Respond with ONLY this JSON object:
   "critical_covered": ["concept1", ...],
   "breadth_reasoning": "X of {num_topics} topics covered → score",
   "depth_reasoning": "level sum / {num_questions} = avg → avg/3 × {weights['depth']} = score",
-  "balance_reasoning": "deduction_a=X, deduction_b=Y → {weights['balance']}-X-Y=score",
+  "balance_reasoning": "deduction_a={deduction_a} (pre-computed), deduction_b=Y → {weights['balance']}-{deduction_a}-Y=score",
   "critical_reasoning": "X of Y critical concepts covered → score",
+  "instructions_reasoning": "<if num_questions was specified in instructions, explain the shortfall and its impact on balance. Otherwise empty string.>",
   "sub_scores": {{
     "breadth": <0-{weights['breadth']}>,
     "depth": <0-{weights['depth']}>,
@@ -306,10 +339,17 @@ Respond with ONLY this JSON object:
                 f"Balance:  {data.get('balance_reasoning')}",
                 f"Critical: {data.get('critical_reasoning')}",
             ]
+
+            if "penalty_applied" in data:
+                lines.append(f"Penalty: {data.get('penalty_applied')} (Custom Prompt Violation)")
+
+            instr_r = data.get("instructions_reasoning", "").strip()
+            if instr_r and instr_r.lower() not in ("null", "none", ""):
+                lines.append(f"Instructions: {instr_r}")
             if data.get("sub_scores"):
                 lines.append(f"Sub-scores: {data.get('sub_scores')}")
             lines.append("-" * 40)
             return "\n".join(lines)
 
-        except Exception:
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
             return None

@@ -16,6 +16,7 @@ from ..models.quiz import Quiz, QuizQuestion
 from ..models.result import BenchmarkResult, MetricResult
 from ..utils.config_loader import ConfigLoader
 from ..utils.io import IOUtils
+from ..models.instruction import QuizInstructions
 
 
 class BenchmarkRunner:
@@ -144,12 +145,17 @@ class BenchmarkRunner:
         quiz: Quiz,
         source_text: Optional[str],
         parameters: Dict,
+        instructions: Optional[QuizInstructions] = None,
     ) -> Optional[MetricResult]:
         """Evaluate entire quiz with a metric."""
         try:
             # Metrics handle their own logic
             result = metric.evaluate(
-                quiz=quiz, source_text=source_text, llm_client=evaluator, **parameters
+                quiz=quiz,
+                source_text=source_text,
+                llm_client=evaluator,
+                instructions=instructions,
+                **parameters,
             )
 
             return MetricResult(
@@ -175,6 +181,7 @@ class BenchmarkRunner:
         question: QuizQuestion,
         source_text: Optional[str],
         parameters: Dict,
+        instructions: Optional[QuizInstructions] = None,
     ) -> Optional[MetricResult]:
         """Evaluate a single question with a metric."""
         try:
@@ -184,6 +191,7 @@ class BenchmarkRunner:
                 quiz=quiz,
                 source_text=source_text,
                 llm_client=evaluator,
+                instructions=instructions,
                 **parameters,
             )
 
@@ -218,6 +226,15 @@ class BenchmarkRunner:
         started_at = datetime.now()
         metric_results = []
 
+        # Load instructions for this quiz (None if no instructions file present)
+        instructions = IOUtils.load_instructions(
+            quiz=quiz,
+            instructions_dir=self.config.input_output.instructions_directory,
+        )
+
+        if instructions:
+            self.logger.info("Instructions loaded for quiz %s", quiz.quiz_id)
+
         # Process each configured metric
         for metric_config in self.config.get_enabled_metrics():
             metric = self.metrics.get(metric_config.name)
@@ -239,14 +256,20 @@ class BenchmarkRunner:
                     # Evaluate each question
                     for question in quiz.questions:
                         result = self._evaluate_question(
-                            metric, evaluator, quiz, question, source_text, metric_config.parameters
+                            metric,
+                            evaluator,
+                            quiz,
+                            question,
+                            source_text,
+                            metric_config.parameters,
+                            instructions,
                         )
                         if result:
                             metric_results.append(result)
                 else:  # QUIZ_LEVEL
                     # Evaluate entire quiz
                     result = self._evaluate_quiz_level(
-                        metric, evaluator, quiz, source_text, metric_config.parameters
+                        metric, evaluator, quiz, source_text, metric_config.parameters, instructions
                     )
                     if result:
                         metric_results.append(result)
@@ -262,5 +285,9 @@ class BenchmarkRunner:
             metrics=metric_results,
             started_at=started_at,
             completed_at=completed_at,
-            metadata={"quiz_title": quiz.title, "num_questions": quiz.num_questions},
+            metadata={
+                "quiz_title": quiz.title,
+                "num_questions": quiz.num_questions,
+                "instructions": instructions.model_dump() if instructions else None,
+            },
         )

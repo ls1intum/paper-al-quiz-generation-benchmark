@@ -18,13 +18,14 @@ evaluators:
 
 metrics:
   - name: "coverage"
-    version: "1.2"
+    version: "1.6"
     evaluators: [ "gpt4" ]
     enabled: true
 
 inputs:
   quiz_directory: "data/quizzes"
   source_directory: "data/inputs"
+  instructions_directory: "data/instructions"
 
 outputs:
   results_directory: "data/results"

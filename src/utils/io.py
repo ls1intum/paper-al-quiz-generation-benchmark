@@ -4,10 +4,11 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from ..models.quiz import Quiz, QuizQuestion, QuestionType
 from ..models.result import BenchmarkResult, AggregatedResults
+from ..models.instruction import QuizInstructions
 
 
 class IOUtils:
@@ -61,6 +62,7 @@ class IOUtils:
             title=quiz_dict["title"],
             source_material=quiz_dict["source_material"],
             questions=questions,
+            instructions=quiz_dict.get("instructions"),
             metadata=quiz_dict.get("metadata", {}),
             created_at=created_at,
         )
@@ -111,6 +113,18 @@ class IOUtils:
 
         with open(path, "r", encoding="utf-8") as f:
             return f.read()
+
+    @staticmethod
+    def load_instructions(quiz: Quiz, instructions_dir: str) -> Optional[QuizInstructions]:
+        if not quiz.instructions:
+            return None
+        instructions_file = Path(instructions_dir) / quiz.instructions
+        if not instructions_file.exists():
+            raise FileNotFoundError(
+                f"Instructions file '{quiz.instructions}' not found in {instructions_dir}"
+            )
+        with open(instructions_file, "r", encoding="utf-8") as f:
+            return QuizInstructions.model_validate_json(f.read())
 
     @staticmethod
     def save_results(results: List[BenchmarkResult], output_path: str, pretty: bool = True) -> None:

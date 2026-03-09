@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Type, Callable
 from pydantic import BaseModel
 from ..models.quiz import Quiz, QuizQuestion
+from ..models.instruction import QuizInstructions
 
 
 @dataclass
@@ -26,6 +27,7 @@ class PhaseInput:
     question: Optional[QuizQuestion] = None
     params: Dict[str, Any] = field(default_factory=dict)
     accumulated: Dict[str, "PhaseOutput"] = field(default_factory=dict)
+    instructions: Optional["QuizInstructions"] = None
 
 
 @dataclass
