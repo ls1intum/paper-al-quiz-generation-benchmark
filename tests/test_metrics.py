@@ -5,6 +5,7 @@ import pytest
 from src.metrics.difficulty import DifficultyMetric
 from src.metrics.coverage import CoverageMetric
 from src.metrics.clarity import ClarityMetric
+from src.metrics.homogeneous_options import HomogeneousOptionsMetric
 from src.metrics.phase import PhaseInput, PhaseOutput
 from src.models.quiz import QuizQuestion, QuestionType, Quiz
 from tests.conftest import MockLLMProvider
@@ -231,3 +232,199 @@ def test_coverage_param_validation():
     metric = CoverageMetric()
     with pytest.raises(ValueError, match="should be of type str"):
         metric.validate_params(granularity=10)
+
+
+def test_homogeneous_options_parse_score_success():
+    """HomogeneousOptionsMetric should extract score from aggregate output."""
+    metric = HomogeneousOptionsMetric()
+    output = PhaseOutput(
+        phase_name="aggregate",
+        data={
+            "num_questions_total": 2,
+            "num_questions_applicable": 1,
+            "num_excluded": 1,
+            "mean_question_score": 90.0,
+            "median_question_score": 90.0,
+            "major_violation_rate": 0.0,
+            "perfect_homogeneity_rate": 0.0,
+            "issue_distribution": [],
+            "question_scores": [],
+            "aggregation_reasoning": "reasoning",
+            "score": 90.0,
+        },
+    )
+    assert metric.parse_score(output) == 90.0
+
+
+def test_homogeneous_options_analyze_phase_requires_question():
+    """Analyze prompt builder should raise when question is missing."""
+    metric = HomogeneousOptionsMetric()
+    inp = make_phase_input(metric, "analyze_options")
+    with pytest.raises(ValueError, match="requires a question"):
+        inp.prompt_builder(inp)
+
+
+def test_homogeneous_options_analyze_phase_builds_prompt():
+    """Analyze prompt builder should return a non-empty string."""
+    metric = HomogeneousOptionsMetric()
+    inp = make_phase_input(metric, "analyze_options", question=make_question())
+    prompt = inp.prompt_builder(inp)
+    assert isinstance(prompt, str)
+    assert len(prompt) > 0
+
+
+def test_homogeneous_options_score_phase_requires_analysis():
+    """Score prompt builder should raise when analysis output is missing."""
+    metric = HomogeneousOptionsMetric()
+    inp = make_phase_input(metric, "score_question", question=make_question())
+    with pytest.raises(ValueError, match="requires output from analyze_options phase"):
+        inp.prompt_builder(inp)
+
+
+def test_homogeneous_options_score_phase_builds_prompt():
+    """Score prompt builder should return a non-empty string."""
+    metric = HomogeneousOptionsMetric()
+    accumulated = {
+        "analyze_options": PhaseOutput(
+            phase_name="analyze_options",
+            data={
+                "results": [
+                    {
+                        "question_id": "q1",
+                        "applicable": True,
+                        "exclusion_reason": None,
+                        "option_analyses": [
+                            {
+                                "option_text": "2",
+                                "grammatical_form": "numeric_expression",
+                                "content_type": "numeric_value",
+                                "is_complete_sentence": False,
+                                "contains_code": False,
+                                "contains_numeric_expression": True,
+                                "length_bucket": "very_short",
+                                "reasoning": "A number",
+                            }
+                        ],
+                        "dominant_grammatical_pattern": "numeric_expression",
+                        "dominant_content_type": "numeric_value",
+                        "structural_outliers": [],
+                    }
+                ]
+            },
+        )
+    }
+    inp = make_phase_input(
+        metric,
+        "score_question",
+        question=make_question(),
+        accumulated=accumulated,
+    )
+    prompt = inp.prompt_builder(inp)
+    assert isinstance(prompt, str)
+    assert len(prompt) > 0
+
+
+def test_homogeneous_options_aggregate_phase_requires_score_results():
+    """Aggregate prompt builder should raise when score results are missing."""
+    metric = HomogeneousOptionsMetric()
+    inp = make_phase_input(metric, "aggregate", quiz=make_quiz())
+    with pytest.raises(ValueError, match="requires output from score_question phase"):
+        inp.prompt_builder(inp)
+
+
+def test_homogeneous_options_aggregate_phase_builds_prompt():
+    """Aggregate prompt builder should compute aggregate values and build a prompt."""
+    metric = HomogeneousOptionsMetric()
+    accumulated = {
+        "score_question": PhaseOutput(
+            phase_name="score_question",
+            data={
+                "results": [
+                    {
+                        "question_id": "q1",
+                        "applicable": True,
+                        "grammatical_parallelism_score": 90.0,
+                        "content_type_homogeneity_score": 80.0,
+                        "format_consistency_score": 100.0,
+                        "question_score": 87.5,
+                        "severity": "none",
+                        "issues": [],
+                        "rationale": "parallel numeric values",
+                    }
+                ]
+            },
+        )
+    }
+    inp = make_phase_input(metric, "aggregate", quiz=make_quiz(), accumulated=accumulated)
+    prompt = inp.prompt_builder(inp)
+    assert isinstance(prompt, str)
+    assert len(prompt) > 0
+    assert '"score": 87.50' in prompt
+
+
+def test_homogeneous_options_evaluate_end_to_end():
+    """HomogeneousOptionsMetric should evaluate all phases with structured responses."""
+    metric = HomogeneousOptionsMetric()
+    mock_llm = MockLLMProvider(
+        model="mock-model",
+        responses=[
+            {
+                "question_id": "q1",
+                "applicable": True,
+                "exclusion_reason": None,
+                "option_analyses": [
+                    {
+                        "option_text": "2",
+                        "grammatical_form": "numeric_expression",
+                        "content_type": "numeric_value",
+                        "is_complete_sentence": False,
+                        "contains_code": False,
+                        "contains_numeric_expression": True,
+                        "length_bucket": "very_short",
+                        "reasoning": "A number",
+                    },
+                    {
+                        "option_text": "3",
+                        "grammatical_form": "numeric_expression",
+                        "content_type": "numeric_value",
+                        "is_complete_sentence": False,
+                        "contains_code": False,
+                        "contains_numeric_expression": True,
+                        "length_bucket": "very_short",
+                        "reasoning": "A number",
+                    },
+                ],
+                "dominant_grammatical_pattern": "numeric_expression",
+                "dominant_content_type": "numeric_value",
+                "structural_outliers": [],
+            },
+            {
+                "question_id": "q1",
+                "applicable": True,
+                "grammatical_parallelism_score": 95.0,
+                "content_type_homogeneity_score": 95.0,
+                "format_consistency_score": 100.0,
+                "question_score": 95.5,
+                "severity": "none",
+                "issues": [],
+                "rationale": "All options are parallel.",
+            },
+            {
+                "num_questions_total": 1,
+                "num_questions_applicable": 1,
+                "num_excluded": 0,
+                "mean_question_score": 95.5,
+                "median_question_score": 95.5,
+                "major_violation_rate": 0.0,
+                "perfect_homogeneity_rate": 1.0,
+                "issue_distribution": [],
+                "question_scores": [{"question_id": "q1", "applicable": True, "score": 95.5, "severity": "none"}],
+                "aggregation_reasoning": "Mean score adjusted by penalty for major violations.",
+                "score": 95.5,
+            },
+        ],
+    )
+
+    result = metric.evaluate(quiz=make_quiz(), llm_client=mock_llm)
+    assert result.score == 95.5
+    assert '"score": 95.5' in result.raw_response
