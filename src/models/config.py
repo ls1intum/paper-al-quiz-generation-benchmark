@@ -58,7 +58,7 @@ class InputOutputConfig:
     quiz_directory: str
     source_directory: str
     results_directory: str
-    instructions_directory: str = "data/instructions"
+    instructions_directory: str
 
 
 @dataclass

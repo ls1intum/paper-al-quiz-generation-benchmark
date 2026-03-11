@@ -462,10 +462,19 @@ Respond with ONLY this JSON object:
                 instructions=instructions,
             )
 
-        # Patch final_score back into the phase data so format_insights
+        # Patch the adjusted score back into the phase data so format_insights
         # (which reads from raw_response) displays the adjusted score, not the raw one.
-        if final_score != raw_score and "final_score" in final_phase_output.data:
-            final_phase_output.data["final_score"] = final_score
+        # Score-only metrics store the value under "score"; multi-phase metrics
+        # may use "final_score". Both keys are updated when present so that
+        # raw_response stays consistent with EvaluationResult.score.
+        # The original raw score is always preserved under "raw_score_before_adjustment"
+        # to maintain provenance.
+        if final_score != raw_score:
+            final_phase_output.data["raw_score_before_adjustment"] = raw_score
+            if "final_score" in final_phase_output.data:
+                final_phase_output.data["final_score"] = final_score
+            if "score" in final_phase_output.data:
+                final_phase_output.data["score"] = final_score
 
         return EvaluationResult(
             score=final_score,

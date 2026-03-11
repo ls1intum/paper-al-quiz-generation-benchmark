@@ -8,7 +8,7 @@ class QuizInstructions(BaseModel):
     Passed to every metric so scoring can be intent-aware.
     """
 
-    language: str = "English"
+    language: Optional[str] = None
     num_questions: Optional[int] = None
     question_types: List[str] = Field(default_factory=list)
     difficulty: Optional[Literal["easy", "medium", "hard"]] = None
