@@ -153,26 +153,29 @@ sidebar_position: 4
 
 **Purpose**: Ensure all answer choices are parallel in grammatical structure and homogeneous in content type.
 
-**References**: Downing [8], Haladyna et al. [10]
+**References**: Haladyna et al. [10], Downing [8], Applegate et al. [18]
 
-**Scope**: Question-level
+**Scope**: Quiz-level, with per-question analysis and quiz-level aggregation
+
+**Implementation Notes**:
+- The metric runs in three phases: per-question option analysis, per-question scoring, and quiz-level aggregation.
+- For each applicable question, answer choices are classified by grammatical form, content type, and formatting signals before being scored.
+- The final quiz-level score combines the per-question scores and applies a small penalty when major heterogeneity issues recur across a quiz.
+- True/false questions are treated as not applicable and are excluded from the aggregate denominator.
 
 **Evaluation Criteria**:
-- Parallel grammatical structure
-- Similar length and complexity
-- Consistent content type
-- Same level of specificity
-- Uniform formatting
+- Parallel grammatical structure across answer choices
+- Homogeneous content type across answer choices
+- Consistent formatting, punctuation, and broad length patterns
+- Detection of structural outliers such as one full sentence among short phrases or one code fragment among prose options
+- Transparent issue reporting through per-question diagnostics retained in the metric output
 
 **Example Configuration**:
 ```yaml
-- name: "homogeneity"
+- name: "homogeneous_options"
   version: "1.0"
   evaluators: ["gpt4"]
-  parameters:
-    check_grammar: true
-    check_length: true
-    check_specificity: true
+  enabled: true
 ```
 
 ---
@@ -234,4 +237,3 @@ sidebar_position: 4
 ```
 
 ---
-
