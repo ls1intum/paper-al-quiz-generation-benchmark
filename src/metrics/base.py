@@ -122,7 +122,7 @@ class BaseMetric(ABC):
 
     @staticmethod
     def interpret_custom_prompt(
-            custom_prompt: str,
+        custom_prompt: str,
         llm_client: Any,
     ) -> Dict[str, Any]:
         """Interpret free-text custom_prompt into a single clear directive.
