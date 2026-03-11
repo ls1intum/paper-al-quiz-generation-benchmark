@@ -12,6 +12,11 @@ class GrammaticalCorrectnessMetric(BaseMetric):
     Uses a single-stage pipeline:
     1. score: scores grammar, spelling, punctuation, and sentence structure
        across all questions in the quiz.
+
+    Instructions integration:
+    - language: if instructions.language is set, it overrides the metric's
+      language parameter. The LLM evaluates grammar in that language.
+    - custom_prompt: handled entirely in BaseMetric.evaluate().
     """
 
     @property
@@ -20,7 +25,7 @@ class GrammaticalCorrectnessMetric(BaseMetric):
 
     @property
     def version(self) -> str:
-        return "1.1"
+        return "1.2"
 
     @property
     def scope(self) -> MetricScope:
@@ -38,8 +43,8 @@ class GrammaticalCorrectnessMetric(BaseMetric):
             MetricParameter(
                 name="language",
                 param_type=str,
-                default="en",
-                description="Language for grammatical evaluation (affects error types checked)",
+                default="English",
+                description="Language for grammatical evaluation",
             ),
         ]
 
@@ -48,9 +53,7 @@ class GrammaticalCorrectnessMetric(BaseMetric):
         return [Phase("score", ScoreResponse)]
 
     def get_prompt_builder(self, phase_name: str) -> Callable[[PhaseInput], str]:
-        builders = {
-            "score": self._build_score_prompt,
-        }
+        builders = {"score": self._build_score_prompt}
         if phase_name not in builders:
             raise ValueError(f"Unknown phase '{phase_name}' for metric '{self.name}'")
         return builders[phase_name]
@@ -60,12 +63,21 @@ class GrammaticalCorrectnessMetric(BaseMetric):
             raise ValueError("grammatical_correctness score phase requires a quiz")
 
         error_weights: Dict = self.get_param_value("error_weights", **inp.params)
-        language: str = self.get_param_value("language", **inp.params)
+
+        # Instructions language takes precedence over metric parameter
+        if inp.instructions and inp.instructions.language:
+            language = inp.instructions.language
+            language_note = f"**Note**: This quiz was intended to be written in {language}. Evaluate grammar strictly according to {language} conventions."
+        else:
+            language = self.get_param_value("language", **inp.params)
+            language_note = ""
+
         quiz_content = self._format_quiz_for_prompt(inp.quiz)
 
         return f"""You are evaluating the grammatical correctness of quiz content.
 
 Language: {language}
+{language_note}
 
 Error Severity Levels (for your reference):
 - Critical (weight {error_weights['critical']}): Errors that make the text incomprehensible or change meaning
@@ -114,7 +126,7 @@ Guidelines:
 - Evaluate ALL parts: question text AND all answer options
 - A single error in any option affects the score
 - Technical terms should be spelled correctly
-- Consider standard grammar rules
+- Consider standard grammar rules for {language}
 - Deduct points proportionally to severity and frequency
 
 Respond with ONLY a JSON object in this format:

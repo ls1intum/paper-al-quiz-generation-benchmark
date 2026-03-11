@@ -54,20 +54,18 @@ class CustomPromptContext(BaseModel):
 
 
 class CustomPromptAdjustment(BaseModel):
-    """Structured output from the custom_prompt adjustment call."""
+    """Structured output from the instruction compliance adjustment call."""
 
     relevant: bool = Field(
-        description="Whether the custom_prompt instruction is relevant to this metric."
+        description="Whether any of the instructions are relevant to this metric."
     )
     reasoning: str = Field(
-        description="Explanation of why the score was adjusted, increased, or left unchanged."
+        description="Explanation of the compliance assessment and what adjustment was applied."
     )
     adjustment: float = Field(
         description=(
-            "Score adjustment to apply. "
-            "Positive (+5 to +20) rewards exceptional compliance or hitting specific requested features. "
-            "Negative (-5 to -50) penalizes partial or total non-compliance. "
-            "0 if the instruction is irrelevant or just meets baseline expectations without standing out."
+            "Score adjustment to apply. Positive increases the score, negative decreases it. "
+            "0 if no instructions are relevant or the quiz fully complies."
         )
     )
 
@@ -122,9 +120,9 @@ class BaseMetric(ABC):
     def get_prompt_builder(self, phase_name: str) -> Callable[[PhaseInput], str]:
         pass
 
+    @staticmethod
     def interpret_custom_prompt(
-        self,
-        custom_prompt: str,
+            custom_prompt: str,
         llm_client: Any,
     ) -> Dict[str, Any]:
         """Interpret free-text custom_prompt into a single clear directive.
@@ -156,6 +154,69 @@ class BaseMetric(ABC):
 
         return result
 
+    def _has_adjustable_instructions(self, instructions: "QuizInstructions") -> bool:
+        """Return True if any instruction field is relevant to this metric.
+
+        Structured fields are coupled to specific metrics:
+          language       → grammatical_correctness
+          difficulty     → difficulty
+          question_types → clarity
+          custom_prompt  → coverage only (topic/content focus is not relevant
+                           to grammar, difficulty, or clarity metrics)
+        """
+        if instructions.custom_prompt and self.name == "coverage":
+            return True
+        if instructions.language and self.name == "grammatical_correctness":
+            return True
+        if instructions.question_types and self.name == "clarity":
+            return True
+        return False
+
+    def adjust_difficulty_for_instructions(
+        self,
+        raw_score: float,
+        requested_difficulty: str,
+    ) -> float:
+        """Adjust a difficulty score based on how far it falls outside the requested band.
+
+        Rather than penalising a low score further (which distorts the meaning of the
+        metric), this computes the distance from the target band and applies a penalty
+        proportional to that distance. A score already inside the band is unchanged.
+
+        Bands:
+          easy:   0–40
+          medium: 35–65
+          hard:   60–100
+        """
+        bands = {
+            "easy": (0.0, 40.0),
+            "medium": (35.0, 65.0),
+            "hard": (60.0, 100.0),
+        }
+        low, high = bands.get(requested_difficulty, (0.0, 100.0))
+
+        if low <= raw_score <= high:
+            # Already in band — no adjustment needed
+            print(
+                f"\n[Difficulty Band Check — {self.name}]\n"
+                f"  Requested: {requested_difficulty} ({low}–{high})\n"
+                f"  Raw score: {raw_score} — within band, no adjustment."
+            )
+            return raw_score
+
+        # Distance outside the band as a fraction of the full 0-100 scale
+        distance = max(raw_score - high, low - raw_score)
+        penalty = round(min(distance * 0.5, 20.0), 1)  # cap penalty at 20pts
+        adjusted = round(max(0.0, min(100.0, raw_score - penalty)), 1)
+
+        print(
+            f"\n[Difficulty Band Check — {self.name}]\n"
+            f"  Requested: {requested_difficulty} ({low}–{high})\n"
+            f"  Raw score: {raw_score} — outside band by {distance:.1f} pts\n"
+            f"  Penalty:   -{penalty} → {adjusted}"
+        )
+        return adjusted
+
     def adjust_score_for_custom_prompt(
         self,
         raw_score: float,
@@ -163,23 +224,28 @@ class BaseMetric(ABC):
         quiz: Optional[Quiz],
         source_text: Optional[str],
         llm_client: Any,
+        instructions: Optional["QuizInstructions"] = None,
     ) -> float:
-        """Apply a custom_prompt compliance adjustment to the raw metric score.
+        """Apply an instruction compliance adjustment to the raw metric score.
 
-        Called once after all phases complete, only when instructions.custom_prompt
-        is set. The LLM decides:
-          - Whether the instruction is even relevant to this metric.
-          - If relevant, what adjustment to apply (positive, negative, or zero).
+        Called once after all phases complete when any structured instruction
+        field is present. All instruction fields are presented together so the
+        LLM can reason holistically about compliance.
 
-        The adjustment is applied in Python and clamped to [0, 100], so the LLM
-        only controls the delta — not the final value directly.
+        Crucially, grammar is scored on the actual language of the quiz — not
+        the requested language. A perfectly written German quiz receives a high
+        grammar score even if English was requested. The language mismatch is
+        captured here as a compliance adjustment, keeping the two concerns separate.
+
+        The adjustment is applied in Python and clamped to [0, 100].
 
         Args:
             raw_score: Score produced by the metric's phases.
-            interpreted_instruction: Output of interpret_custom_prompt().
+            interpreted_instruction: Interpreted custom_prompt (empty string if none).
             quiz: The quiz being evaluated.
             source_text: The source material text.
             llm_client: LLM provider for the adjustment call.
+            instructions: Full QuizInstructions object for structured fields.
 
         Returns:
             Adjusted score clamped to [0, 100].
@@ -191,11 +257,54 @@ class BaseMetric(ABC):
             )
             quiz_summary = f"**Quiz title**: {quiz.title}\n**Questions**:\n{question_lines}"
 
-        prompt = f"""You are reviewing whether a quiz respects a user instruction, 
+        # Each instruction field is only passed to the metric it is semantically
+        # coupled with. This prevents e.g. a language mismatch from penalising
+        # coverage, or a difficulty mismatch from penalising grammar.
+        #
+        # Mapping:
+        #   language       → grammatical_correctness only
+        #   difficulty     → difficulty only
+        #   question_types → clarity only
+        #   custom_prompt  → all metrics (open-ended, metric decides relevance)
+        field_metric_map = {
+            "language": "grammatical_correctness",
+            "difficulty": "difficulty",
+            "question_types": "clarity",
+        }
+
+        # custom_prompt is only meaningful for metrics that evaluate content/topic
+        # relevance. Difficulty, clarity, and grammatical_correctness have their
+        # own structured fields — injecting a topic-focused custom_prompt into them
+        # causes the LLM to conflate topic compliance with metric-specific compliance.
+        custom_prompt_metrics = {"coverage"}
+
+        instruction_lines = []
+        if interpreted_instruction and self.name in custom_prompt_metrics:
+            instruction_lines.append(f"- Custom intent: {interpreted_instruction}")
+        if instructions:
+            if instructions.language and field_metric_map["language"] == self.name:
+                instruction_lines.append(
+                    f"- Language: the quiz must be written in {instructions.language}. "
+                    f"First determine whether the quiz is actually written in {instructions.language}. "
+                    f"If it is NOT, a deduction is mandatory — your job is only to decide the magnitude. "
+                    f"Do not set adjustment=0 if the language does not match."
+                )
+            if instructions.difficulty and field_metric_map["difficulty"] == self.name:
+                instruction_lines.append(
+                    f"- Difficulty: questions should be {instructions.difficulty}"
+                )
+            if instructions.question_types and field_metric_map["question_types"] == self.name:
+                instruction_lines.append(
+                    f"- Question types: only {instructions.question_types} are permitted"
+                )
+
+        instructions_block = "\n".join(instruction_lines) if instruction_lines else "None"
+
+        prompt = f"""You are reviewing whether a quiz respects a set of instructions,
 in the context of the metric: '{self.name}'.
 
-**User instruction**:
-{interpreted_instruction}
+**Instructions**:
+{instructions_block}
 
 **Source material (excerpt)**:
 {(source_text or '')[:500]}
@@ -205,21 +314,22 @@ in the context of the metric: '{self.name}'.
 **Raw score from '{self.name}' metric**: {raw_score}/100
 
 Your task:
-1. Decide whether this instruction is relevant to the '{self.name}' metric.
-   - If NOT relevant (e.g. the instruction is about topics but this metric measures grammar),
-     set relevant=false and adjustment=0.
-2. If relevant, assess how well the quiz complies with the instruction:
-   - Exceptional compliance (hits the requested target perfectly) → positive adjustment (+5 to +20).
-   - Baseline compliance (technically follows the rule but nothing special) → adjustment=0.
-   - Partial compliance → moderate negative adjustment (-10 to -20).
-   - Total non-compliance → large negative adjustment (-30 to -50).
-3. Reason carefully about magnitude. The adjustment should be proportional to the
-   degree of violation or success.
+1. Decide whether any of these instructions are relevant to the '{self.name}' metric.
+   - If NONE are relevant, set relevant=false and adjustment=0.
+2. If relevant, assess compliance for each applicable instruction using this scale:
+   - A quiz that does exactly what was asked and does it well deserves a score in the excellent range.
+   - Full compliance but mediocre raw score → small or no adjustment. Compliance does not compensate for poor quality.
+   - Partial compliance → moderate negative adjustment proportional to the degree of violation.
+   - No compliance at all → large negative adjustment.
+3. For language: only adjust if the quiz is actually written in a different language
+   than requested. Do not penalise grammar quality — only the language mismatch itself.
+4. Reason carefully about magnitude. Think about what final score the quiz deserves
+   given both its quality AND its compliance with the instructions.
 
 Respond with ONLY this JSON object:
 {{
   "relevant": true/false,
-  "reasoning": "explanation of compliance assessment and adjustment rationale",
+  "reasoning": "explanation of which instructions apply, compliance assessment, and adjustment rationale",
   "adjustment": <float>
 }}"""
 
@@ -229,19 +339,19 @@ Respond with ONLY this JSON object:
         )
 
         adjustment = float(result.get("adjustment", 0.0))
-        reasoning = result.get("reasoning", "No reasoning provided.")
+        reasoning = result.get("reasoning", "")
         relevant = result.get("relevant", False)
-
-        print("\n" + "⚠️" * 25)
-        print(f"🎯 CUSTOM PROMPT PENALTY TRIGGERED ({self.name.upper()})")
-        print(f"   Raw Score Before:  {raw_score}")
-        print(f"   Relevant to rule?: {relevant}")
-        print(f"   Adjustment Appld:  {adjustment} points")
-        print(f"   LLM Reasoning:     {reasoning}")
-        print("⚠️" * 25 + "\n")
-
         adjusted = raw_score + adjustment
-        return round(max(0.0, min(100.0, adjusted)), 1)
+        final = round(max(0.0, min(100.0, adjusted)), 1)
+
+        print(
+            f"\n[Instruction Adjustment — {self.name}]\n"
+            f"  Relevant:   {relevant}\n"
+            f"  Adjustment: {adjustment:+.2f} ({raw_score:.1f} → {final:.1f})\n"
+            f"  Reasoning:  {reasoning}"
+        )
+
+        return final
 
     def evaluate(
         self,
@@ -284,7 +394,7 @@ Respond with ONLY this JSON object:
 
         accumulated: Dict[str, PhaseOutput] = {}
 
-        # Step 1: Interpret custom_prompt once before any phase runs
+        # ── Step 1: Interpret custom_prompt once before any phase runs ── #
         if instructions and instructions.custom_prompt:
             context = self.interpret_custom_prompt(instructions.custom_prompt, llm_client)
             accumulated["custom_prompt_context"] = PhaseOutput(
@@ -292,7 +402,7 @@ Respond with ONLY this JSON object:
                 data=context,
             )
 
-        # Step 2: Run all declared phases in order
+        # ── Step 2: Run all declared phases in order ──────────────────── #
         for phase in self.phases:
             builder = self.get_prompt_builder(phase.name)
 
@@ -329,29 +439,33 @@ Respond with ONLY this JSON object:
                 result_data = phase.process(inp, llm_client)
                 accumulated[phase.name] = PhaseOutput(phase_name=phase.name, data=result_data)
 
-        # Step 3: Parse raw score from final phase
+        # ── Step 3: Parse raw score from final phase ──────────────────── #
         final_phase_output = accumulated[self.phases[-1].name]
         raw_score = self.parse_score(final_phase_output)
 
-        # Step 4: Apply custom_prompt adjustment in Python
+        # ── Step 4: Apply instruction compliance adjustment in Python ─── #
+        # Fires when any structured instruction field is present, not just custom_prompt.
+        # All fields are passed together in one LLM call so the model can reason
+        # holistically about compliance across all instructions.
         final_score = raw_score
-        if instructions and instructions.custom_prompt:
+        if instructions and self._has_adjustable_instructions(instructions):
             context_data = accumulated.get("custom_prompt_context")
-            interpreted = (
+            interpreted_custom = (
                 context_data.data.get("interpreted_instruction", "") if context_data else ""
             )
-            if interpreted:
-                final_score = self.adjust_score_for_custom_prompt(
-                    raw_score=raw_score,
-                    interpreted_instruction=interpreted,
-                    quiz=quiz,
-                    source_text=source_text,
-                    llm_client=llm_client,
-                )
+            final_score = self.adjust_score_for_custom_prompt(
+                raw_score=raw_score,
+                interpreted_instruction=interpreted_custom,
+                quiz=quiz,
+                source_text=source_text,
+                llm_client=llm_client,
+                instructions=instructions,
+            )
 
-                if final_score != raw_score:
-                    final_phase_output.data["final_score"] = final_score
-                    final_phase_output.data["penalty_applied"] = round(final_score - raw_score, 1)
+        # Patch final_score back into the phase data so format_insights
+        # (which reads from raw_response) displays the adjusted score, not the raw one.
+        if final_score != raw_score and "final_score" in final_phase_output.data:
+            final_phase_output.data["final_score"] = final_score
 
         return EvaluationResult(
             score=final_score,

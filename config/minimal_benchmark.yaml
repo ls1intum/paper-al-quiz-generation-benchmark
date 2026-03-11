@@ -17,7 +17,7 @@ evaluators:
     max_tokens: 1500
 
 metrics:
-  - name: "coverage"
+  - name: "difficulty"
     version: "1.6"
     evaluators: [ "gpt4" ]
     enabled: true

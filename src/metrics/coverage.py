@@ -104,12 +104,12 @@ class CoverageMetric(BaseMetric):
         ]
 
     @staticmethod
-    def _get_weights(granularity: str) -> Dict[str, int]:
+    def _get_weights(granularity: str) -> Dict[str, float]:
         if granularity == "broad":
-            return {"breadth": 40, "depth": 20, "balance": 20, "critical": 20}
+            return {"breadth": 40.0, "depth": 20.0, "balance": 20.0, "critical": 20.0}
         elif granularity == "detailed":
-            return {"breadth": 20, "depth": 40, "balance": 20, "critical": 20}
-        return {"breadth": 30, "depth": 30, "balance": 20, "critical": 20}
+            return {"breadth": 20.0, "depth": 40.0, "balance": 20.0, "critical": 20.0}
+        return {"breadth": 30.0, "depth": 30.0, "balance": 20.0, "critical": 20.0}
 
     def get_prompt_builder(self, phase_name: str) -> Callable[[PhaseInput], str]:
         builders = {
@@ -224,7 +224,8 @@ Respond with ONLY a JSON object:
 
         # Pre-compute deduction_a in Python so the LLM cannot recalculate it
         deduction_a = round(
-            max(0, (ideal_questions - num_questions) / ideal_questions) * (weights["balance"] // 2),
+            max(0.0, (ideal_questions - num_questions) / ideal_questions)
+            * (weights["balance"] / 2),
             2,
         )
 
@@ -242,8 +243,23 @@ Respond with ONLY a JSON object:
             else "**No critical concepts extracted — identify 4-6 from the source topics above.**"
         )
 
+        # When custom_prompt narrows the topic scope, breadth should be scored
+        # against only the relevant topics — not all source topics.
+        focused_topics_block = ""
+        context = inp.accumulated.get("custom_prompt_context")
+        if context:
+            interpreted = context.data.get("interpreted_instruction", "")
+            if interpreted:
+                focused_topics_block = (
+                    f"\n**Focused Scope (from instructions)**: {interpreted}\n"
+                    f"For breadth scoring, identify which of the source topics are relevant "
+                    f"to this instruction. Use ONLY those as your denominator — not all {num_topics} topics. "
+                    f"A quiz that covers all relevant topics scores full breadth even if it "
+                    f"ignores topics outside the stated scope.\n"
+                )
+
         return f"""You are an expert quiz evaluator. Score quiz coverage against the source material.
-{instructions_note}
+{instructions_note}{focused_topics_block}
 **Source Topics** ({num_topics} total):
 {", ".join(source_topics)}
 
@@ -258,8 +274,10 @@ Questions: {num_questions} | Source topics: {num_topics} | Ideal question count:
 **Scoring Framework (Granularity: {granularity})**:
 
 1. **Breadth** (max {weights['breadth']} pts):
-   - Count how many of the {num_topics} source topics are tested by ≥1 question
-   - Score = (topics_covered / {num_topics}) × {weights['breadth']}
+   - If a focused scope is specified above, first identify which source topics fall within that scope (call this N_relevant).
+   - Count how many of those N_relevant topics are tested by ≥1 question (topics_covered).
+   - If no scope is specified, use all {num_topics} topics as the denominator.
+   - Score = (topics_covered / N_relevant) × {weights['breadth']}
 
 2. **Depth** (max {weights['depth']} pts):
    - Sum the cognitive_level_score values from all {num_questions} questions above
@@ -269,7 +287,7 @@ Questions: {num_questions} | Source topics: {num_topics} | Ideal question count:
 3. **Balance** (max {weights['balance']} pts):
    - Start at {weights['balance']} pts, then apply two deductions:
    a. Question count shortfall (pre-computed, use this exact value): deduction_a = {deduction_a}
-   b. Topic imbalance: 0-{weights['balance'] // 2} pts deducted subjectively for over/under-represented topics
+   b. Topic imbalance: 0-{weights['balance'] / 2} pts deducted subjectively for over/under-represented topics
    - balance = {weights['balance']} - deduction_a - deduction_b  (floor at 0)
 
 4. **Critical Coverage** (max {weights['critical']} pts):
@@ -286,7 +304,7 @@ Respond with ONLY this JSON object:
   "topics_covered": ["topic1", ...],
   "critical_concepts": ["concept1", ...],
   "critical_covered": ["concept1", ...],
-  "breadth_reasoning": "X of {num_topics} topics covered → score",
+  "breadth_reasoning": "X of N_relevant in-scope topics covered → (X/N_relevant) × {weights['breadth']} = score",
   "depth_reasoning": "level sum / {num_questions} = avg → avg/3 × {weights['depth']} = score",
   "balance_reasoning": "deduction_a={deduction_a} (pre-computed), deduction_b=Y → {weights['balance']}-{deduction_a}-Y=score",
   "critical_reasoning": "X of Y critical concepts covered → score",
@@ -339,10 +357,6 @@ Respond with ONLY this JSON object:
                 f"Balance:  {data.get('balance_reasoning')}",
                 f"Critical: {data.get('critical_reasoning')}",
             ]
-
-            if "penalty_applied" in data:
-                lines.append(f"Penalty: {data.get('penalty_applied')} (Custom Prompt Violation)")
-
             instr_r = data.get("instructions_reasoning", "").strip()
             if instr_r and instr_r.lower() not in ("null", "none", ""):
                 lines.append(f"Instructions: {instr_r}")
