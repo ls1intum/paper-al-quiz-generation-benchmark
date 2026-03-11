@@ -2,6 +2,7 @@
   "quiz_id": "quiz_example_001",
   "title": "Python Fundamentals Quiz",
   "source_material": "python_intro.md",
+  "instructions": "threads_and_streams.json",
   "questions": [
     {
       "question_id": "q1",

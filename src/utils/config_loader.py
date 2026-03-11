@@ -110,6 +110,7 @@ class ConfigLoader:
             quiz_directory=io_section.get("quiz_directory", "data/quizzes"),
             source_directory=io_section.get("source_directory", "data/inputs"),
             results_directory=outputs_section.get("results_directory", "data/results"),
+            instructions_directory=io_section.get("instructions_directory", "data/instructions"),
         )
 
         # Create config object
