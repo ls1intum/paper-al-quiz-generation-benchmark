@@ -116,15 +116,27 @@ class IOUtils:
 
     @staticmethod
     def load_instructions(quiz: Quiz, instructions_dir: str) -> Optional[QuizInstructions]:
+        logger = logging.getLogger(__name__)
         if not quiz.instructions:
             return None
         instructions_file = Path(instructions_dir) / quiz.instructions
         if not instructions_file.exists():
-            raise FileNotFoundError(
-                f"Instructions file '{quiz.instructions}' not found in {instructions_dir}"
+            logger.warning(
+                "Instructions file '%s' not found in %s; proceeding without instructions",
+                quiz.instructions,
+                instructions_dir,
             )
-        with open(instructions_file, "r", encoding="utf-8") as f:
-            return QuizInstructions.model_validate_json(f.read())
+            return None
+        try:
+            with open(instructions_file, "r", encoding="utf-8") as f:
+                return QuizInstructions.model_validate_json(f.read())
+        except Exception as e:
+            logger.warning(
+                "Failed to parse instructions file '%s': %s; proceeding without instructions",
+                quiz.instructions,
+                e,
+            )
+            return None
 
     @staticmethod
     def save_results(results: List[BenchmarkResult], output_path: str, pretty: bool = True) -> None:

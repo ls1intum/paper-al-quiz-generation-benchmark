@@ -206,7 +206,7 @@ class BaseMetric(ABC):
 
         # Distance outside the band as a fraction of the full 0-100 scale
         distance = max(raw_score - high, low - raw_score)
-        penalty = round(min(distance * 0.5, 20.0), 1)  # cap penalty at 20pts
+        penalty = round(min(distance * 0.5, 30.0), 1)  # cap penalty at 30pts
         adjusted = round(max(0.0, min(100.0, raw_score - penalty)), 1)
 
         print(

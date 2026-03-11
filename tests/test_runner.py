@@ -50,7 +50,7 @@ def test_runner_skips_missing_evaluator(registered_metrics, mock_llm_provider, s
         quiz_directory="data/quizzes",
         source_directory="data/inputs",
         results_directory="data/results",
-        instructions_directory="data/instructions"
+        instructions_directory="data/instructions",
     )
 
     config = BenchmarkConfig(
