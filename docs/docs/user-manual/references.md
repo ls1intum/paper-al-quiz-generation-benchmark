@@ -19,6 +19,8 @@ sidebar_position: 8
 
 [17] Sireci, S. G. (1998). The construct of content validity. *Social Indicators Research*, 45(1-3), 83–117.
 
+[18] Applegate, B., Jensen, J. L., Morphew, J. W., & Blackman, A. (2019). The effect of option homogeneity on multiple-choice item functioning. *Educational and Psychological Measurement*, 79(2), 341–364. https://doi.org/10.1177/0013164418783517
+
 ---
 
 ## Citation
