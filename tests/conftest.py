@@ -221,6 +221,7 @@ def sample_config(tmp_path) -> BenchmarkConfig:
         quiz_directory=str(tmp_path / "quizzes"),
         source_directory=str(tmp_path / "sources"),
         results_directory=str(tmp_path / "results"),
+        instructions_directory=str(tmp_path / "instructions"),
     )
     return BenchmarkConfig(
         name="test_benchmark",

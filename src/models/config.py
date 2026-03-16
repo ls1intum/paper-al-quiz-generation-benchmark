@@ -52,11 +52,13 @@ class InputOutputConfig:
         quiz_directory: Directory containing quiz JSON files
         source_directory: Directory containing source markdown files
         results_directory: Directory for output results
+        instructions_directory: Directory containing instructions JSON files
     """
 
     quiz_directory: str
     source_directory: str
     results_directory: str
+    instructions_directory: str
 
 
 @dataclass

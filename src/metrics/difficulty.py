@@ -10,7 +10,20 @@ class DifficultyMetric(BaseMetric):
 
     Uses a single-stage pipeline:
     1. score: scores cognitive complexity for the target audience.
+
+    Instructions integration:
+    - difficulty: if instructions.difficulty is set (easy/medium/hard), the
+      prompt is adjusted to score how well the question matches the requested
+      difficulty level, rather than scoring absolute difficulty.
+    - custom_prompt: handled entirely in BaseMetric.evaluate().
     """
+
+    # Maps instructions difficulty label to expected score range midpoint
+    DIFFICULTY_RANGES = {
+        "easy": (0, 40, 20),  # (min, max, midpoint)
+        "medium": (35, 65, 50),
+        "hard": (60, 100, 80),
+    }
 
     @property
     def name(self) -> str:
@@ -18,7 +31,7 @@ class DifficultyMetric(BaseMetric):
 
     @property
     def version(self) -> str:
-        return "1.1"
+        return "1.2"
 
     @property
     def scope(self) -> MetricScope:
@@ -46,9 +59,7 @@ class DifficultyMetric(BaseMetric):
         return [Phase("score", ScoreResponse)]
 
     def get_prompt_builder(self, phase_name: str) -> Callable[[PhaseInput], str]:
-        builders = {
-            "score": self._build_score_prompt,
-        }
+        builders = {"score": self._build_score_prompt}
         if phase_name not in builders:
             raise ValueError(f"Unknown phase '{phase_name}' for metric '{self.name}'")
         return builders[phase_name]
@@ -78,10 +89,23 @@ class DifficultyMetric(BaseMetric):
         else:
             rubric_description = "Evaluate difficulty on a scale from 0-100."
 
+        # Inject target difficulty note if instructions specify it
+        difficulty_note = ""
+        if inp.instructions and inp.instructions.difficulty:
+            requested = inp.instructions.difficulty
+            low, high, mid = self.DIFFICULTY_RANGES[str(requested)]
+            difficulty_note = (
+                f"\n**Instructions note**: The quiz was intended to be '{requested}' difficulty "
+                f"(expected score range: {low}–{high}). "
+                f"Score this question based on its actual cognitive demand. "
+                f"If the question falls well outside the {low}–{high} range, "
+                f"that is a meaningful signal about compliance with the difficulty instruction."
+            )
+
         options_text = "\n".join(f"{i}. {option}" for i, option in enumerate(question.options, 1))
 
         return f"""Evaluate the difficulty of the following quiz question for a {target_audience} audience.
-
+{difficulty_note}
 {rubric_description}
 
 Question Type: {question.question_type.value}

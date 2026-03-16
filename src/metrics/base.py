@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from ..models.quiz import Quiz, QuizQuestion
 from ..models.result import EvaluationResult
 from .phase import Phase, PhaseInput, PhaseOutput
+from ..models.instruction import QuizInstructions
 
 
 class MetricScope(str, Enum):
@@ -41,6 +42,34 @@ class ScoreResponse(BaseModel):
     score: float = Field(ge=0, le=100)
 
 
+class CustomPromptContext(BaseModel):
+    """Structured output from interpreting instructions.custom_prompt."""
+
+    interpreted_instruction: str = Field(
+        description=(
+            "A clear, concise restatement of the user's intent, "
+            "suitable for injecting into a scoring prompt."
+        )
+    )
+
+
+class CustomPromptAdjustment(BaseModel):
+    """Structured output from the instruction compliance adjustment call."""
+
+    relevant: bool = Field(
+        description="Whether any of the instructions are relevant to this metric."
+    )
+    reasoning: str = Field(
+        description="Explanation of the compliance assessment and what adjustment was applied."
+    )
+    adjustment: float = Field(
+        description=(
+            "Score adjustment to apply. Positive increases the score, negative decreases it. "
+            "0 if no instructions are relevant or the quiz fully complies."
+        )
+    )
+
+
 class BaseMetric(ABC):
     """Abstract base class for all metrics.
 
@@ -49,64 +78,280 @@ class BaseMetric(ABC):
     the source text, quiz, accumulated outputs from all prior phases, and
     the phase's prompt builder. The phase is the sole point of LLM contact.
 
+    When instructions.custom_prompt is set, evaluate() runs two additional
+    LLM calls automatically:
+      1. interpret_custom_prompt() — once, before any phase runs. Interprets
+         the free-text prompt into a clear directive stored in
+         accumulated["custom_prompt_context"].
+      2. adjust_score_for_custom_prompt() — once, after all phases complete.
+         The LLM decides whether the instruction is relevant to this specific
+         metric and what adjustment (positive, negative, or zero) to apply.
+         The adjustment is applied in Python and clamped to [0, 100].
+
     Subclasses define their pipeline by implementing the `phases` property
-    and `get_prompt_builder()`:
-     - Single-stage metrics: declare one Phase.
-     - Multi-stage metrics: declare multiple phases in order
-       (e.g. extract → map → score).
+    and `get_prompt_builder()`. They do not need to handle custom_prompt at all.
     """
 
     @property
     @abstractmethod
     def name(self) -> str:
-        """Unique identifier for this metric.
-
-        Returns:
-            Metric name
-        """
         pass
 
     @property
     @abstractmethod
     def version(self) -> str:
-        """Version of this metric implementation.
-
-        Returns:
-            Version string (e.g., "1.0")
-        """
         pass
 
     @property
     @abstractmethod
     def scope(self) -> MetricScope:
-        """Scope at which this metric operates.
-
-        Returns:
-            MetricScope.QUESTION_LEVEL or MetricScope.QUIZ_LEVEL
-        """
         pass
 
     @property
     def parameters(self) -> List[MetricParameter]:
-        """Configurable parameters for this metric."""
         return []
 
     @property
     @abstractmethod
     def phases(self) -> List[Phase]:
-        """Ordered list of phases that define this metric's evaluation pipeline.
-
-        Returns:
-            List of Phase instances to execute in order. Each phase's output
-            is accumulated and made available to all subsequent phases via
-            PhaseInput.accumulated.
-        """
         pass
 
     @abstractmethod
     def get_prompt_builder(self, phase_name: str) -> Callable[[PhaseInput], str]:
-        """Return the prompt builder callable for the given phase name."""
         pass
+
+    @staticmethod
+    def interpret_custom_prompt(
+        custom_prompt: str,
+        llm_client: Any,
+    ) -> Dict[str, Any]:
+        """Interpret free-text custom_prompt into a single clear directive.
+
+        Called once at the start of evaluate() when instructions.custom_prompt
+        is set. The result is stored in accumulated["custom_prompt_context"]
+        and is available to all subsequent phases via PhaseInput.accumulated.
+
+        Args:
+            custom_prompt: Free-text constraint from QuizInstructions.
+            llm_client: LLM provider used for interpretation.
+
+        Returns:
+            Dict with key: interpreted_instruction.
+        """
+        prompt = (
+            "You are analysing the intent behind a quiz generation instruction.\n\n"
+            f'Instruction: "{custom_prompt}"\n\n'
+            "Restate the instruction as a single clear, concise directive "
+            "suitable for injecting into a quiz scoring prompt. "
+            "Do not add assumptions — only reflect what is explicitly stated.\n\n"
+            "Return a JSON object with a single key: 'interpreted_instruction'."
+        )
+
+        result: Dict[str, Any] = llm_client.generate_structured(
+            prompt=prompt,
+            schema=CustomPromptContext,
+        )
+
+        return result
+
+    def _has_adjustable_instructions(self, instructions: "QuizInstructions") -> bool:
+        """Return True if any instruction field is relevant to this metric.
+
+        Structured fields are coupled to specific metrics:
+          language       → grammatical_correctness
+          difficulty     → difficulty
+          question_types → clarity
+          custom_prompt  → coverage only (topic/content focus is not relevant
+                           to grammar, difficulty, or clarity metrics)
+        """
+        if instructions.custom_prompt and self.name == "coverage":
+            return True
+        if instructions.language and self.name == "grammatical_correctness":
+            return True
+        if instructions.question_types and self.name == "clarity":
+            return True
+        return False
+
+    def adjust_difficulty_for_instructions(
+        self,
+        raw_score: float,
+        requested_difficulty: str,
+    ) -> float:
+        """Adjust a difficulty score based on how far it falls outside the requested band.
+
+        Rather than penalising a low score further (which distorts the meaning of the
+        metric), this computes the distance from the target band and applies a penalty
+        proportional to that distance. A score already inside the band is unchanged.
+
+        Bands:
+          easy:   0–40
+          medium: 35–65
+          hard:   60–100
+        """
+        bands = {
+            "easy": (0.0, 40.0),
+            "medium": (35.0, 65.0),
+            "hard": (60.0, 100.0),
+        }
+        low, high = bands.get(requested_difficulty, (0.0, 100.0))
+
+        if low <= raw_score <= high:
+            # Already in band — no adjustment needed
+            print(
+                f"\n[Difficulty Band Check — {self.name}]\n"
+                f"  Requested: {requested_difficulty} ({low}–{high})\n"
+                f"  Raw score: {raw_score} — within band, no adjustment."
+            )
+            return raw_score
+
+        # Distance outside the band as a fraction of the full 0-100 scale
+        distance = max(raw_score - high, low - raw_score)
+        penalty = round(min(distance * 0.5, 30.0), 1)  # cap penalty at 30pts
+        adjusted = round(max(0.0, min(100.0, raw_score - penalty)), 1)
+
+        print(
+            f"\n[Difficulty Band Check — {self.name}]\n"
+            f"  Requested: {requested_difficulty} ({low}–{high})\n"
+            f"  Raw score: {raw_score} — outside band by {distance:.1f} pts\n"
+            f"  Penalty:   -{penalty} → {adjusted}"
+        )
+        return adjusted
+
+    def adjust_score_for_custom_prompt(
+        self,
+        raw_score: float,
+        interpreted_instruction: str,
+        quiz: Optional[Quiz],
+        source_text: Optional[str],
+        llm_client: Any,
+        instructions: Optional["QuizInstructions"] = None,
+    ) -> float:
+        """Apply an instruction compliance adjustment to the raw metric score.
+
+        Called once after all phases complete when any structured instruction
+        field is present. All instruction fields are presented together so the
+        LLM can reason holistically about compliance.
+
+        Crucially, grammar is scored on the actual language of the quiz — not
+        the requested language. A perfectly written German quiz receives a high
+        grammar score even if English was requested. The language mismatch is
+        captured here as a compliance adjustment, keeping the two concerns separate.
+
+        The adjustment is applied in Python and clamped to [0, 100].
+
+        Args:
+            raw_score: Score produced by the metric's phases.
+            interpreted_instruction: Interpreted custom_prompt (empty string if none).
+            quiz: The quiz being evaluated.
+            source_text: The source material text.
+            llm_client: LLM provider for the adjustment call.
+            instructions: Full QuizInstructions object for structured fields.
+
+        Returns:
+            Adjusted score clamped to [0, 100].
+        """
+        quiz_summary = ""
+        if quiz:
+            question_lines = "\n".join(
+                f"- [{q.question_type.value}] {q.question_text[:120]}" for q in quiz.questions
+            )
+            quiz_summary = f"**Quiz title**: {quiz.title}\n**Questions**:\n{question_lines}"
+
+        # Each instruction field is only passed to the metric it is semantically
+        # coupled with. This prevents e.g. a language mismatch from penalising
+        # coverage, or a difficulty mismatch from penalising grammar.
+        #
+        # Mapping:
+        #   language       → grammatical_correctness only
+        #   difficulty     → difficulty only
+        #   question_types → clarity only
+        #   custom_prompt  → all metrics (open-ended, metric decides relevance)
+        field_metric_map = {
+            "language": "grammatical_correctness",
+            "difficulty": "difficulty",
+            "question_types": "clarity",
+        }
+
+        # custom_prompt is only meaningful for metrics that evaluate content/topic
+        # relevance. Difficulty, clarity, and grammatical_correctness have their
+        # own structured fields — injecting a topic-focused custom_prompt into them
+        # causes the LLM to conflate topic compliance with metric-specific compliance.
+        custom_prompt_metrics = {"coverage"}
+
+        instruction_lines = []
+        if interpreted_instruction and self.name in custom_prompt_metrics:
+            instruction_lines.append(f"- Custom intent: {interpreted_instruction}")
+        if instructions:
+            if instructions.language and field_metric_map["language"] == self.name:
+                instruction_lines.append(
+                    f"- Language: the quiz must be written in {instructions.language}. "
+                    f"First determine whether the quiz is actually written in {instructions.language}. "
+                    f"If it is NOT, a deduction is mandatory — your job is only to decide the magnitude. "
+                    f"Do not set adjustment=0 if the language does not match."
+                )
+            if instructions.difficulty and field_metric_map["difficulty"] == self.name:
+                instruction_lines.append(
+                    f"- Difficulty: questions should be {instructions.difficulty}"
+                )
+            if instructions.question_types and field_metric_map["question_types"] == self.name:
+                instruction_lines.append(
+                    f"- Question types: only {instructions.question_types} are permitted"
+                )
+
+        instructions_block = "\n".join(instruction_lines) if instruction_lines else "None"
+
+        prompt = f"""You are reviewing whether a quiz respects a set of instructions,
+in the context of the metric: '{self.name}'.
+
+**Instructions**:
+{instructions_block}
+
+**Source material (excerpt)**:
+{(source_text or '')[:500]}
+
+{quiz_summary}
+
+**Raw score from '{self.name}' metric**: {raw_score}/100
+
+Your task:
+1. Decide whether any of these instructions are relevant to the '{self.name}' metric.
+   - If NONE are relevant, set relevant=false and adjustment=0.
+2. If relevant, assess compliance for each applicable instruction using this scale:
+   - A quiz that does exactly what was asked and does it well deserves a score in the excellent range.
+   - Full compliance but mediocre raw score → small or no adjustment. Compliance does not compensate for poor quality.
+   - Partial compliance → moderate negative adjustment proportional to the degree of violation.
+   - No compliance at all → large negative adjustment.
+3. For language: only adjust if the quiz is actually written in a different language
+   than requested. Do not penalise grammar quality — only the language mismatch itself.
+4. Reason carefully about magnitude. Think about what final score the quiz deserves
+   given both its quality AND its compliance with the instructions.
+
+Respond with ONLY this JSON object:
+{{
+  "relevant": true/false,
+  "reasoning": "explanation of which instructions apply, compliance assessment, and adjustment rationale",
+  "adjustment": <float>
+}}"""
+
+        result = llm_client.generate_structured(
+            prompt=prompt,
+            schema=CustomPromptAdjustment,
+        )
+
+        adjustment = float(result.get("adjustment", 0.0))
+        reasoning = result.get("reasoning", "")
+        relevant = result.get("relevant", False)
+        adjusted = raw_score + adjustment
+        final = round(max(0.0, min(100.0, adjusted)), 1)
+
+        print(
+            f"\n[Instruction Adjustment — {self.name}]\n"
+            f"  Relevant:   {relevant}\n"
+            f"  Adjustment: {adjustment:+.2f} ({raw_score:.1f} → {final:.1f})\n"
+            f"  Reasoning:  {reasoning}"
+        )
+
+        return final
 
     def evaluate(
         self,
@@ -114,20 +359,23 @@ class BaseMetric(ABC):
         quiz: Optional[Quiz] = None,
         source_text: Optional[str] = None,
         llm_client: Optional[Any] = None,
+        instructions: Optional[QuizInstructions] = None,
         **params: Any,
     ) -> EvaluationResult:
         """Evaluate and return a score by executing all declared phases in order.
 
-        Iterates over self.phases, building a PhaseInput for each phase that
-        includes the source text, quiz, and all previously accumulated
-        PhaseOutputs. Fan-out phases are executed once per question.
-        The final phase's output is parsed for the score.
+        When instructions.custom_prompt is set:
+          - interpret_custom_prompt() runs before any phase and stores its output
+            in accumulated["custom_prompt_context"].
+          - adjust_score_for_custom_prompt() runs after all phases and applies a
+            compliance adjustment to the raw score in Python.
 
         Args:
             question: Question to evaluate (for question-level metrics).
             quiz: Quiz to evaluate (for quiz-level metrics).
             source_text: Source material text.
             llm_client: LLM provider for generating responses.
+            instructions: Optional quiz instructions — drives intent-aware scoring.
             **params: Metric-specific parameters passed to phases.
 
         Returns:
@@ -146,6 +394,15 @@ class BaseMetric(ABC):
 
         accumulated: Dict[str, PhaseOutput] = {}
 
+        # ── Step 1: Interpret custom_prompt once before any phase runs ── #
+        if instructions and instructions.custom_prompt:
+            context = self.interpret_custom_prompt(instructions.custom_prompt, llm_client)
+            accumulated["custom_prompt_context"] = PhaseOutput(
+                phase_name="custom_prompt_context",
+                data=context,
+            )
+
+        # ── Step 2: Run all declared phases in order ──────────────────── #
         for phase in self.phases:
             builder = self.get_prompt_builder(phase.name)
 
@@ -162,6 +419,7 @@ class BaseMetric(ABC):
                         question=q,
                         params=params,
                         accumulated=accumulated,
+                        instructions=instructions,
                     )
                     results.append(phase.process(inp, llm_client))
 
@@ -176,64 +434,71 @@ class BaseMetric(ABC):
                     question=question,
                     params=params,
                     accumulated=accumulated,
+                    instructions=instructions,
                 )
                 result_data = phase.process(inp, llm_client)
                 accumulated[phase.name] = PhaseOutput(phase_name=phase.name, data=result_data)
 
-            # Final phase determines the score
+        # ── Step 3: Parse raw score from final phase ──────────────────── #
         final_phase_output = accumulated[self.phases[-1].name]
-        score = self.parse_score(final_phase_output)
+        raw_score = self.parse_score(final_phase_output)
+
+        # ── Step 4: Apply instruction compliance adjustment in Python ─── #
+        # Fires when any structured instruction field is present, not just custom_prompt.
+        # All fields are passed together in one LLM call so the model can reason
+        # holistically about compliance across all instructions.
+        final_score = raw_score
+        if instructions and self._has_adjustable_instructions(instructions):
+            context_data = accumulated.get("custom_prompt_context")
+            interpreted_custom = (
+                context_data.data.get("interpreted_instruction", "") if context_data else ""
+            )
+            final_score = self.adjust_score_for_custom_prompt(
+                raw_score=raw_score,
+                interpreted_instruction=interpreted_custom,
+                quiz=quiz,
+                source_text=source_text,
+                llm_client=llm_client,
+                instructions=instructions,
+            )
+
+        # Patch the adjusted score back into the phase data so format_insights
+        # (which reads from raw_response) displays the adjusted score, not the raw one.
+        # Score-only metrics store the value under "score"; multi-phase metrics
+        # may use "final_score". Both keys are updated when present so that
+        # raw_response stays consistent with EvaluationResult.score.
+        # The original raw score is always preserved under "raw_score_before_adjustment"
+        # to maintain provenance.
+        if final_score != raw_score:
+            final_phase_output.data["raw_score_before_adjustment"] = raw_score
+            if "final_score" in final_phase_output.data:
+                final_phase_output.data["final_score"] = final_score
+            if "score" in final_phase_output.data:
+                final_phase_output.data["score"] = final_score
 
         return EvaluationResult(
-            score=score,
+            score=final_score,
             raw_response=json.dumps(final_phase_output.data, ensure_ascii=True),
-            metadata={"phases": {name: output.data for name, output in accumulated.items()}},
+            metadata={
+                "phases": {name: output.data for name, output in accumulated.items()},
+                "instructions": instructions.model_dump() if instructions else None,
+                "raw_score_before_adjustment": raw_score if final_score != raw_score else None,
+            },
         )
 
     def parse_score(self, final_output: PhaseOutput) -> float:
-        """Extract the final score from the last phase's output.
-
-        Override in subclasses that use a non-standard score field
-        (e.g. CoverageMetric uses "final_score" instead of "score").
-
-        Args:
-            final_output: PhaseOutput from the last phase in the pipeline.
-
-        Returns:
-            Score as a float between 0 and 100.
-
-        Raises:
-            ValueError: If the score is missing or out of range.
-        """
+        """Extract the final score from the last phase's output."""
         score = float(final_output.data["score"])
         if not 0 <= score <= 100:
             raise ValueError(f"Score must be between 0 and 100, got {score}")
         return score
 
     def format_insights(self, raw_response: str, quiz_id: str) -> Optional[str]:
-        """Extract qualitative insights from a metric's raw response for display.
-
-        Override in subclasses that produce reasoning or detailed output.
-        Returns None by default (no insights to display).
-
-        Args:
-            raw_response: Raw JSON string from the metric's final phase.
-            quiz_id: Quiz identifier for labelling output.
-
-        Returns:
-            Formatted string of insights, or None if not applicable.
-        """
+        """Extract qualitative insights from a metric's raw response for display."""
         return None
 
     def validate_params(self, **params: Any) -> None:
-        """Validate provided parameters against metric's parameter definitions.
-
-        Args:
-            **params: Parameters to validate.
-
-        Raises:
-            ValueError: If parameters are invalid or of wrong type.
-        """
+        """Validate provided parameters against metric's parameter definitions."""
         expected_params = {p.name: p for p in self.parameters}
 
         for param_name in params:
@@ -253,18 +518,7 @@ class BaseMetric(ABC):
                 )
 
     def get_param_value(self, param_name: str, **params: Any) -> Any:
-        """Get parameter value with fallback to default.
-
-        Args:
-            param_name: Name of the parameter.
-            **params: Provided parameters.
-
-        Returns:
-            Parameter value from params, or the defined default.
-
-        Raises:
-            ValueError: If the parameter is not defined for this metric.
-        """
+        """Get parameter value with fallback to default."""
         param_def = next((p for p in self.parameters if p.name == param_name), None)
 
         if param_def is None:

@@ -1,0 +1,7 @@
+{
+  "language": "English",
+  "num_questions": 10,
+  "question_types": ["multiple_choice"],
+  "difficulty": "medium",
+  "custom_prompt": "This quiz should focus exclusively on basic I/O, lists, and recursion."
+}

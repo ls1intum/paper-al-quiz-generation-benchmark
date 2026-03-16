@@ -309,6 +309,122 @@ class BenchmarkRunner:
         pass
 ```
 
+#### 5. Quiz Instructions and Intent-Aware Scoring (`src/models/instruction.py`)
+
+The benchmark system supports optional **quiz instructions**—user-supplied intent that informs how quizzes are evaluated. This enables **intent-aware scoring** where metrics understand not just what a quiz *is*, but what it was *supposed to be*.
+
+**Instructions Schema**
+
+```python
+from typing import List, Literal, Optional
+from pydantic import BaseModel, Field
+
+class QuizInstructions(BaseModel):
+    """User-supplied intent for what the quiz should be."""
+    
+    language: Optional[str] = None
+    # Language the quiz should be written in (e.g., "English", "Spanish")
+    # Couple: grammatical_correctness metric only
+    
+    num_questions: Optional[int] = None
+    # Ideal number of questions; drives breadth penalty in coverage metric
+    # Couple: coverage metric only
+    
+    question_types: List[str] = Field(default_factory=list)
+    # Only these question types permitted (e.g., ["multiple_choice", "true_false"])
+    # Validated against QuestionType enum at load time
+    # Couple: clarity metric only
+    
+    difficulty: Optional[Literal["easy", "medium", "hard"]] = None
+    # Difficulty band questions should fall into
+    # Couple: difficulty metric only
+    
+    custom_prompt: Optional[str] = None
+    # Free-form topic/content directive (e.g., "focus on recursion only")
+    # Couple: all metrics decide relevance individually
+```
+
+**Two-Stage Adjustment Mechanism**
+
+Instructions are processed in two stages during metric evaluation:
+
+1. **Interpretation** (before any metric phase runs):
+   - `interpret_custom_prompt()` normalizes free-text `custom_prompt` into a clear directive
+   - Result stored in `accumulated["custom_prompt_context"]` for all phases to access
+   - One LLM call per quiz, reused across all metrics
+
+2. **Compliance Adjustment** (after all metric phases complete):
+   - `adjust_score_for_custom_prompt()` runs once per metric
+   - Assesses whether instructions are relevant to *this specific metric*
+   - Computes compliance adjustment (positive, negative, or zero)
+   - Adjustment applied in Python and clamped to [0, 100]
+
+**Field-to-Metric Coupling**
+
+Each structured instruction field is coupled to specific metrics to prevent logical conflicts:
+
+| Instruction Field | Target Metrics | Reasoning |
+|---|---|---|
+| `language` | `grammatical_correctness` only | Language mismatch is a compliance issue, not a quality issue; grammar is scored on actual language |
+| `difficulty` | `difficulty` only | Difficulty band compliance is separate from other quality metrics |
+| `question_types` | `clarity` only | Question type mismatch affects clarity (type expectations), not other metrics |
+| `custom_prompt` | All metrics | Content/topic directives are open-ended; each metric decides whether relevant |
+
+**Loading Instructions**
+
+Instructions are loaded from JSON files and linked via the `Quiz.instructions` field:
+
+```python
+# src/utils/io.py
+@staticmethod
+def load_instructions(quiz: Quiz, instructions_dir: str) -> Optional[QuizInstructions]:
+    """Load instructions for a quiz.
+    
+    Returns None (with warning) if:
+    - No instructions linked (quiz.instructions is None)
+    - Instructions file not found
+    - JSON parsing fails
+    
+    Never crashes the benchmark — allows graceful degradation.
+    """
+```
+
+**Example Instructions File**
+
+```json
+{
+  "language": "English",
+  "num_questions": 10,
+  "question_types": ["multiple_choice", "true_false"],
+  "difficulty": "medium",
+  "custom_prompt": "Focus exclusively on recursion, lists, and I/O operations. Do not include questions on object-oriented programming."
+}
+```
+
+**Validation**
+
+All instruction values are validated at deserialization:
+- `question_types` are validated against `QuestionType` enum; invalid types raise `ValueError` with helpful guidance
+- `difficulty` is limited to `"easy" | "medium" | "hard"` by Pydantic
+- Invalid instructions fail early during loading, not during evaluation
+
+**Difficulty Compliance Bands**
+
+The difficulty metric applies scoring bands to assess compliance:
+
+| Band | Score Range | Penalty Cap |
+|---|---|---|
+| Easy | 0–40 | 30 pts |
+| Medium | 35–65 | 30 pts |
+| Hard | 60–100 | 30 pts |
+
+When a difficulty score falls outside the target band, a penalty is applied proportional to the distance:
+- Distance = absolute gap from nearest band edge
+- Penalty = min(distance × 0.5, 30 pts)
+- Adjustment = raw_score − penalty
+
+Example: If difficulty is requested as "hard" (60–100) but the quiz scores 45, the distance is 15 pts → penalty = 7.5 pts → adjusted score = 37.5.
+
 ### Project Structure
 
 ```
