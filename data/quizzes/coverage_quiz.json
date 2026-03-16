@@ -2,6 +2,7 @@
   "quiz_id": "quiz_comprehensive_001",
   "title": "Python Fundamentals - Comprehensive Review",
   "source_material": "python_intro.md",
+  "instructions": "mutability.json",
   "questions": [
     {
       "question_id": "q1",

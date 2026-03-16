@@ -1,0 +1,7 @@
+{
+  "language": "English",
+  "num_questions": 15,
+  "question_types": ["multiple_choice"],
+  "difficulty": "easy",
+  "custom_prompt": "This quiz should focus exclusively on threads and streams. Questions about unrelated topics such as basic I/O, lists, or recursion should not be included."
+}

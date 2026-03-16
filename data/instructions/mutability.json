@@ -1,0 +1,7 @@
+{
+  "language": "English",
+  "num_questions": 8,
+  "question_types": ["single_choice", "multiple_choice", "true_false"],
+  "difficulty": "medium",
+  "custom_prompt": "This quiz is intended as a mid-term exam spanning multiple sections. To achieve full compliance, the quiz must successfully include at least one question from each of these three core areas: function arguments, mutable/immutable data types, and control flow (loops or conditionals). A quiz that successfully touches all three areas deserves a positive score adjustment."
+}

@@ -31,9 +31,13 @@ def test_preflight_fails_when_server_unreachable(monkeypatch: pytest.MonkeyPatch
     def _raise_unreachable(base_url: str, api_key: str, timeout: int = 5):
         raise RuntimeError("Ollama preflight failed: cannot reach server")
 
-    monkeypatch.setattr(OllamaProvider, "_fetch_available_model_ids", classmethod(
-        lambda cls, base_url, api_key, timeout=5: _raise_unreachable(base_url, api_key, timeout)
-    ))
+    monkeypatch.setattr(
+        OllamaProvider,
+        "_fetch_available_model_ids",
+        classmethod(
+            lambda cls, base_url, api_key, timeout=5: _raise_unreachable(base_url, api_key, timeout)
+        ),
+    )
 
     evaluators = {
         "local_a": EvaluatorConfig(
@@ -63,9 +67,7 @@ def test_preflight_fails_when_required_model_missing(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(
         OllamaProvider,
         "_pull_missing_models",
-        classmethod(
-            lambda cls, base_url, api_key, missing_models: pulled.extend(missing_models)
-        ),
+        classmethod(lambda cls, base_url, api_key, missing_models: pulled.extend(missing_models)),
     )
 
     evaluators = {
