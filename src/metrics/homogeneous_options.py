@@ -313,7 +313,7 @@ Respond with ONLY a JSON object in this format:
     @staticmethod
     def _get_question_result(
         phase_output: Optional[PhaseOutput], question_id: str
-    ) -> Optional[Dict[str, Any]]:
+    ) -> Optional[dict[str, object]]:
         if phase_output is None:
             return None
 
