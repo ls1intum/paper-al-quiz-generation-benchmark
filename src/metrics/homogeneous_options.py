@@ -173,7 +173,9 @@ Respond with ONLY a JSON object in this format:
         if inp.question is None:
             raise ValueError("score_question phase requires a question")
 
-        analysis = self._get_question_result(inp.accumulated.get("analyze_options"), inp.question.question_id)
+        analysis = self._get_question_result(
+            inp.accumulated.get("analyze_options"), inp.question.question_id
+        )
         if analysis is None:
             raise ValueError("score_question phase requires output from analyze_options phase")
 
@@ -239,7 +241,9 @@ Respond with ONLY a JSON object in this format:
 
         num_applicable = len(applicable_results)
         num_excluded = total_questions - num_applicable
-        mean_question_score = sum(applicable_scores) / num_applicable if applicable_scores else 100.0
+        mean_question_score = (
+            sum(applicable_scores) / num_applicable if applicable_scores else 100.0
+        )
         median_question_score = median(applicable_scores) if applicable_scores else 100.0
         major_violation_rate = (
             sum(1 for r in applicable_results if r.get("severity") == "major") / num_applicable
@@ -247,7 +251,8 @@ Respond with ONLY a JSON object in this format:
             else 0.0
         )
         perfect_homogeneity_rate = (
-            sum(1 for r in applicable_results if float(r.get("question_score", 0)) >= 95) / num_applicable
+            sum(1 for r in applicable_results if float(r.get("question_score", 0)) >= 95)
+            / num_applicable
             if applicable_results
             else 0.0
         )
