@@ -25,6 +25,7 @@ Systematically evaluate the quality of quizzes using research-backed metrics:
 - **Homogeneous Options**: Check parallel structure across answer choices
 - **Absence of Cueing**: Detect inadvertent clues to correct answers
 - **Grammatical Correctness**: Ensure proper language usage throughout
+- **Factual Accuracy**: Verify content is factually correct, evidence-based, and free from errors and biases
 
 ### Key Features
 
