@@ -25,7 +25,7 @@ class DistractorQualityMetric(BaseMetric):
 
     @property
     def version(self) -> str:
-        return "1.0"
+        return "1.1"
 
     @property
     def scope(self) -> MetricScope:
@@ -55,25 +55,44 @@ class DistractorQualityMetric(BaseMetric):
                 "Only single_choice and multiple_choice are supported."
             )
 
-        options_text = "\n".join(
-            f"{i}. {option}" for i, option in enumerate(question.options or [], 1)
+        # Extract correct answer(s) and distractors
+        if question.question_type == QuestionType.MULTIPLE_CHOICE:
+            if isinstance(question.correct_answer, list):
+                correct_answers = set(question.correct_answer)
+            else:
+                correct_answers = {question.correct_answer}
+        else:
+            correct_answers = {str(question.correct_answer)}
+
+        # Build distractor list (all options except correct answers)
+        distractors = [opt for opt in (question.options or []) if opt not in correct_answers]
+        distractors_text = "\n".join(
+            f"{i}. {distractor}" for i, distractor in enumerate(distractors, 1)
         )
+
+        # Format correct answer(s) for display
+        if question.question_type == QuestionType.MULTIPLE_CHOICE:
+            correct_answer_display = ", ".join(question.correct_answer)
+        else:
+            correct_answer_display = str(question.correct_answer)
 
         source_context = f"Source Material: {inp.source_text}"
 
         return f"""Evaluate the pedagogical quality of the incorrect options (distractors) in the following quiz question.
-Assume all options have already been fact-checked. Your sole job is to evaluate how effective the incorrect options are at distracting an unprepared student.
+
+Your sole job is to assess how effective these incorrect options are at identifying unprepared students. All options provided have been assumed to be factually accurate; you are evaluating pedagogical effectiveness only.
 
 {source_context}
 
 **Question Details**:
 Text: {question.question_text}
-Options: 
-{options_text if options_text else "(No options provided)"}
-Correct Answer: {question.correct_answer if hasattr(question, 'correct_answer') else "(Not specified)"}
+Correct Answer(s): {correct_answer_display}
+
+Incorrect Options (Distractors):
+{distractors_text if distractors_text else "(No distractors provided)"}
 
 **Evaluation Criteria**:
-1. Plausibility & Source Alignment: Distractors should seem highly plausible to a student who has not mastered the material. They should utilize familiar terms, concepts, or related ideas from the **Source Material** (if provided), making them attractive to someone who only skimmed the text.
+1. Plausibility & Source Alignment: Distractors should seem highly plausible to a student who has not mastered the material. They should utilize familiar terms, concepts, or related ideas from the **Source Material**, making them attractive to someone who only skimmed the text.
 2. Common Misconceptions: The best distractors are rooted in predictable student errors, faulty reasoning, or typical conceptual misunderstandings. If a student selects it, a teacher should understand *why* they made that mistake.
 3. Discriminatory Power: Good distractors require true comprehension to eliminate. They shouldn't be obvious throwaways or joke answers that anyone could guess are wrong.
 
