@@ -1,6 +1,6 @@
 import json
 from typing import Callable, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from .base import BaseMetric, MetricScope
 from .phase import Phase, PhaseInput, PhaseOutput
@@ -18,25 +18,13 @@ class FactualAccuracyMetric(BaseMetric):
     class FactualAccuracyResponse(BaseModel):
         """Structured reasoning and scoring for factual accuracy."""
 
-        factual_correctness: str = Field(
-            description="Reasoning about factual correctness and errors."
-        )
-        evidence_based: str = Field(
-            description="Reasoning about whether it is evidence-based vs opinion."
-        )
-        bias_and_distortion: str = Field(
-            description="Reasoning about bias, loaded language, or distortion."
-        )
-        source_alignment: str = Field(
-            description="Reasoning about alignment with provided source material."
-        )
-        objectivity: str = Field(
-            description="Reasoning about objectivity vs subjective interpretation."
-        )
-        major_errors_found: List[str] = Field(
-            default_factory=list, description="List of any specific factual errors found."
-        )
-        score: float = Field(ge=0, le=100, description="Overall factual accuracy score (0-100).")
+        factual_correctness: str
+        evidence_based: str
+        bias_and_distortion: str
+        source_alignment: str
+        objectivity: str
+        major_errors_found: List[str]
+        score: float
 
     @property
     def name(self) -> str:
@@ -69,11 +57,7 @@ class FactualAccuracyMetric(BaseMetric):
         question = inp.question
         options_text = "\n".join(f"{i}. {option}" for i, option in enumerate(question.options, 1))
 
-        source_context = (
-            f"Source Material: {inp.source_text}"
-            if inp.source_text
-            else "(No source material provided)"
-        )
+        source_context = f"Source Material: {inp.source_text}"
 
         return f"""Evaluate the factual accuracy of the following quiz question and its answers.
 
