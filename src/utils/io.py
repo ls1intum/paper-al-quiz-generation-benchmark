@@ -4,6 +4,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
+from pypdf import PdfReader
 from typing import List, Optional
 
 from ..models.quiz import Quiz, QuizQuestion, QuestionType
@@ -85,6 +86,10 @@ class IOUtils:
 
         quizzes = []
         logger = logging.getLogger(__name__)
+        # Support pointing directly to a single file
+        if quiz_dir.is_file():
+            return [IOUtils.load_quiz(str(quiz_dir))]
+
         for quiz_file in quiz_dir.glob("*.json"):
             try:
                 quiz = IOUtils.load_quiz(str(quiz_file))
@@ -96,23 +101,81 @@ class IOUtils:
 
     @staticmethod
     def load_source_text(source_path: str) -> str:
-        """Load source material text from markdown file.
+        """Load source material text from markdown or PDF file.
 
         Args:
-            source_path: Path to source markdown file
+            source_path: Path to source file (supports .md and .pdf)
 
         Returns:
             Source text content
 
         Raises:
             FileNotFoundError: If source file doesn't exist
+            ValueError: If file type is not supported
         """
         path = Path(source_path)
         if not path.exists():
             raise FileNotFoundError(f"Source file not found: {source_path}")
 
-        with open(path, "r", encoding="utf-8") as f:
+        suffix = path.suffix.lower()
+
+        if suffix == ".pdf":
+            return IOUtils._load_pdf_text(str(path))
+        elif suffix == ".md":
+            return IOUtils._load_markdown_text(str(path))
+        else:
+            raise ValueError(f"Unsupported file format: {suffix}. Supported formats: .md, .pdf")
+
+    @staticmethod
+    def _load_markdown_text(source_path: str) -> str:
+        """Load text from a markdown file.
+
+        Args:
+            source_path: Path to markdown file
+
+        Returns:
+            File content as string
+        """
+        with open(source_path, "r", encoding="utf-8") as f:
             return f.read()
+
+    @staticmethod
+    def _load_pdf_text(source_path: str) -> str:
+        """Load and extract text from a PDF file.
+
+        Args:
+            source_path: Path to PDF file
+
+        Returns:
+            Extracted text from all pages
+
+        Raises:
+            ValueError: If PDF cannot be read
+        """
+        logger = logging.getLogger(__name__)
+        try:
+            pdf_reader = PdfReader(source_path)
+            text_content = []
+
+            for page_num, page in enumerate(pdf_reader.pages, 1):
+                try:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text_content.append(page_text)
+                except Exception as e:
+                    logger.warning(
+                        "Failed to extract text from page %d of %s: %s",
+                        page_num,
+                        source_path,
+                        e,
+                    )
+
+            if not text_content:
+                raise ValueError(f"No text extracted from PDF: {source_path}")
+
+            return "\n\n".join(text_content)
+        except Exception as e:
+            raise ValueError(f"Failed to read PDF file {source_path}: {e}") from e
 
     @staticmethod
     def load_instructions(quiz: Quiz, instructions_dir: str) -> Optional[QuizInstructions]:
