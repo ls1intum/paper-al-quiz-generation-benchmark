@@ -306,7 +306,7 @@ Respond with ONLY a JSON object in this format:
             return None
 
         for result in phase_output.data.get("results", []):
-            if result.get("question_id") == question_id:
-                return result
+            if isinstance(result, dict) and result.get("question_id") == question_id:
+                return dict(result)
 
         return None
