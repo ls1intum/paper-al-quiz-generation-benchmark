@@ -435,57 +435,58 @@ paper-al-quiz-generation-benchmark/
 │   │
 │   ├── models/
 │   │   ├── __init__.py
-│   │   ├── quiz.py              # Quiz and Question schemas
-│   │   ├── result.py            # Result schemas
-│   │   └── config.py            # Configuration models
+│   │   ├── quiz.py               # Quiz and Question schemas
+│   │   ├── result.py             # Result schemas
+│   │   └── config.py             # Configuration models
 │   │
 │   ├── metrics/
 │   │   ├── __init__.py
-│   │   ├── base.py              # BaseMetric interface
-│   │   ├── alignment.py         # Learning objective alignment
-│   │   ├── cognitive_level.py   # Bloom's taxonomy evaluation
-│   │   ├── clarity.py           # Language clarity assessment
+│   │   ├── base.py               # BaseMetric interface
+│   │   ├── accuracy.py           # Factual accuracy assessment
+│   │   ├── alignment.py          # Learning objective alignment
+│   │   ├── cognitive_level.py    # Bloom's taxonomy evaluation
+│   │   ├── clarity.py            # Language clarity assessment
 │   │   ├── answer_correctness.py # Answer key validation
 │   │   ├── distractor_quality.py # Distractor plausibility
-│   │   ├── homogeneity.py       # Option parallelism check
-│   │   ├── cueing_absence.py    # Inadvertent clue detection
-│   │   ├── grammar.py           # Grammatical correctness
-│   │   └── registry.py          # Metric registration/discovery
+│   │   ├── homogeneity.py        # Option parallelism check
+│   │   ├── cueing_absence.py     # Inadvertent clue detection
+│   │   ├── grammar.py            # Grammatical correctness
+│   │   └── registry.py           # Metric registration/discovery
 │   │
 │   ├── evaluators/
 │   │   ├── __init__.py
-│   │   ├── base.py              # LLMProvider interface
-│   │   ├── azure_openai.py      # Azure OpenAI implementation
-│   │   ├── openai.py            # OpenAI direct API
-│   │   ├── anthropic.py         # Anthropic Claude
-│   │   ├── ollama.py            # Ollama local runtime
-│   │   ├── openai_compatible.py # Generic OpenAI-compatible
-│   │   └── factory.py           # LLMProviderFactory
+│   │   ├── base.py               # LLMProvider interface
+│   │   ├── azure_openai.py       # Azure OpenAI implementation
+│   │   ├── openai.py             # OpenAI direct API
+│   │   ├── anthropic.py          # Anthropic Claude
+│   │   ├── ollama.py             # Ollama local runtime
+│   │   ├── openai_compatible.py  # Generic OpenAI-compatible
+│   │   └── factory.py            # LLMProviderFactory
 │   │
 │   ├── runners/
 │   │   ├── __init__.py
-│   │   └── benchmark.py         # BenchmarkRunner orchestration
+│   │   └── benchmark.py          # BenchmarkRunner orchestration
 │   │
 │   ├── analysis/
 │   │   ├── __init__.py
-│   │   ├── aggregator.py        # Statistical aggregation
-│   │   ├── reporter.py          # Report generation
-│   │   └── visualizer.py        # (Future) Result visualization
+│   │   ├── aggregator.py         # Statistical aggregation
+│   │   ├── reporter.py           # Report generation
+│   │   └── visualizer.py         # (Future) Result visualization
 │   │
 │   └── utils/
 │       ├── __init__.py
-│       ├── config_loader.py     # YAML config loading
-│       ├── io.py                # File I/O utilities
-│       └── validation.py        # Data validation helpers
+│       ├── config_loader.py      # YAML config loading
+│       ├── io.py                 # File I/O utilities
+│       └── validation.py         # Data validation helpers
 │
 ├── data/
-│   ├── inputs/                  # Source markdown files
+│   ├── inputs/                   # Source markdown files
 │   │   └── example_lecture.md
 │   │
-│   ├── quizzes/                 # Generated quizzes (JSON)
+│   ├── quizzes/                  # Generated quizzes (JSON)
 │   │   └── example_quiz.json
 │   │
-│   └── results/                 # Benchmark results
+│   └── results/                  # Benchmark results
 │       └── <run-bundle>/
 │           ├── results.json
 │           ├── aggregated.json
@@ -509,23 +510,23 @@ paper-al-quiz-generation-benchmark/
 │       └── sample_sources.md
 │
 ├── docs/
-│   ├── metrics/                 # Detailed metric documentation
+│   ├── metrics/                  # Detailed metric documentation
 │   │   ├── alignment.md
 │   │   ├── cognitive_level.md
 │   │   └── ...
 │   │
-│   ├── examples/                # Usage examples
+│   ├── examples/                 # Usage examples
 │   │   └── custom_metric.md
 │   │
-│   └── api/                     # API documentation
+│   └── api/                      # API documentation
 │       └── reference.md
 │
-├── .env                         # Local environment (not in git)
+├── .env                          # Local environment (not in git)
 ├── .gitignore
 ├── pyproject.toml
 ├── requirements.txt
-├── README.md                    # This file
-└── main.py                      # CLI entry point
+├── README.md                     # This file
+└── main.py                       # CLI entry point
 ```
 
 ### Workflow Diagram

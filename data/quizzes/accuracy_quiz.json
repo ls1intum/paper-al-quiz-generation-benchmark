@@ -1,0 +1,197 @@
+{
+  "quiz_id": "quiz_ambiguous_002",
+  "title": "Python Concepts - Ambiguity and Edge Case Test",
+  "source_material": "python_intro.md",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "single_choice",
+      "question_text": "Based strictly on the lecture, which of the following is required to define a function in Python?",
+      "options": [
+        "The 'def' keyword",
+        "Parentheses",
+        "Parameters",
+        "A return statement"
+      ],
+      "correct_answer": "The 'def' keyword",
+      "source_reference": "Section 1.1: Defining Functions",
+      "metadata": {
+        "topic": "functions",
+        "difficulty_level": "medium",
+        "ambiguity_note": "Both 'def' and parentheses are strictly required by Python syntax and mentioned in the text. Marking 'def' as the sole correct answer creates a factual ambiguity for the metric to catch."
+      }
+    },
+    {
+      "question_id": "q2",
+      "question_type": "single_choice",
+      "question_text": "What is the precise definition of the 'pass' statement in Python control flow?",
+      "options": [
+        "It does nothing",
+        "It acts as a placeholder",
+        "It skips to the next iteration",
+        "It exits the current loop"
+      ],
+      "correct_answer": "It does nothing",
+      "source_reference": "Section 3.2: Loops and Control Statements",
+      "metadata": {
+        "topic": "control_flow",
+        "difficulty_level": "medium",
+        "ambiguity_note": "The lecture literally defines it as 'Do nothing (placeholder)'. Both options A and B are correct based on the text, making this a flawed question design."
+      }
+    },
+    {
+      "question_id": "q3",
+      "question_type": "single_choice",
+      "question_text": "Which of the following data types can be used as a key in a Dictionary?",
+      "options": [
+        "String",
+        "Integer",
+        "Tuple",
+        "List"
+      ],
+      "correct_answer": "String",
+      "source_reference": "Section 2.3: Mutability",
+      "metadata": {
+        "topic": "data_types",
+        "difficulty_level": "hard",
+        "ambiguity_note": "Strings, Integers, and Tuples are all immutable and thus valid dictionary keys. Providing only one as the 'correct' answer in a single-choice format is factually incorrect."
+      }
+    },
+    {
+      "question_id": "q4",
+      "question_type": "single_choice",
+      "question_text": "Consider the code: `a = [1, 2]`; `b = a`; `a = [3, 4]`. What is the value of `b`?",
+      "options": [
+        "[1, 2]",
+        "[3, 4]",
+        "Both variables are updated",
+        "An error occurs"
+      ],
+      "correct_answer": "[1, 2]",
+      "source_reference": "Section 2.3: Mutability",
+      "metadata": {
+        "topic": "mutability_vs_reassignment",
+        "difficulty_level": "hard",
+        "ambiguity_note": "The lecture discusses mutation, but this question tests reassignment. It forces the evaluator to distinguish between mutating an object and rebinding a variable."
+      }
+    },
+    {
+      "question_id": "q5",
+      "question_type": "single_choice",
+      "question_text": "According to the lecture, are Strings basic data types or collection types?",
+      "options": [
+        "Basic Data Types",
+        "Collection Types",
+        "Immutable Sequences",
+        "Both Basic and Collection Types"
+      ],
+      "correct_answer": "Basic Data Types",
+      "source_reference": "Section 2.1 & Section 2.2",
+      "metadata": {
+        "topic": "taxonomy",
+        "difficulty_level": "medium",
+        "ambiguity_note": "Conceptually, strings are collections of characters (sequences). However, the lecture rigidly places them under 'Basic Data Types', testing if the metric aligns with general truth vs. source text truth."
+      }
+    },
+    {
+      "question_id": "q6",
+      "question_type": "single_choice",
+      "question_text": "Which loop pattern is the 'best' way to iterate over a sequence in Python?",
+      "options": [
+        "Iterating over sequences directly",
+        "Using range()",
+        "While loops",
+        "List comprehensions"
+      ],
+      "correct_answer": "Iterating over sequences directly",
+      "source_reference": "Section 3.3: Loop Patterns",
+      "metadata": {
+        "topic": "loop_patterns",
+        "difficulty_level": "medium",
+        "ambiguity_note": "The use of the subjective word 'best' makes this question technically unanswerable purely by factual evidence, testing the 'Objectivity' criteria of your metric."
+      }
+    },
+    {
+      "question_id": "q7",
+      "question_type": "single_choice",
+      "question_text": "If `x = (1, [2, 3])`, what happens if you execute `x[1].append(4)`?",
+      "options": [
+        "The list inside the tuple becomes [2, 3, 4]",
+        "A TypeError is raised because Tuples are immutable",
+        "The entire tuple is reassigned in memory",
+        "Nothing happens"
+      ],
+      "correct_answer": "The list inside the tuple becomes [2, 3, 4]",
+      "source_reference": "Section 2.3: Mutability",
+      "metadata": {
+        "topic": "nested_mutability",
+        "difficulty_level": "hard",
+        "ambiguity_note": "A classic Python edge case. The tuple is immutable, but the list inside it is mutable. A good LLM judge should recognize this as factually accurate."
+      }
+    },
+    {
+      "question_id": "q8",
+      "question_type": "single_choice",
+      "question_text": "What happens if a function encounters a `continue` statement as the absolute final line of code inside a loop?",
+      "options": [
+        "It skips to the next iteration",
+        "It functionally does nothing",
+        "It exits the function",
+        "It raises a SyntaxError"
+      ],
+      "correct_answer": "It skips to the next iteration",
+      "source_reference": "Section 3.2: Loops and Control Statements",
+      "metadata": {
+        "topic": "control_flow",
+        "difficulty_level": "hard",
+        "ambiguity_note": "Structurally it skips to the next iteration, but practically/functionally it does nothing since it's at the end of the block. Both options A and B have valid arguments."
+      }
+    },
+    {
+      "question_id": "q9",
+      "question_type": "multiple_choice",
+      "question_text": "Which characteristics apply to Sets?",
+      "options": [
+        "Unordered",
+        "Contain unique elements",
+        "Mutable",
+        "Can contain lists"
+      ],
+      "correct_answer": [
+        "Unordered",
+        "Contain unique elements",
+        "Mutable"
+      ],
+      "source_reference": "Section 2.2: Collection Types",
+      "metadata": {
+        "topic": "sets",
+        "difficulty_level": "medium",
+        "ambiguity_note": "Sets are mutable (can add/remove elements), but their elements must be immutable (so they can't contain lists). This tests if the judge accurately cross-references different sections of the text."
+      }
+    },
+    {
+      "question_id": "q10",
+      "question_type": "single_choice",
+      "question_text": "If a developer needs a syntactically correct placeholder, which should they use?",
+      "options": [
+        "pass",
+        "continue",
+        "TODO comments",
+        "break"
+      ],
+      "correct_answer": "pass",
+      "source_reference": "Section 3.2: Loops and Control Statements",
+      "metadata": {
+        "topic": "control_flow",
+        "difficulty_level": "easy",
+        "ambiguity_note": "Comments also serve as placeholders, but are not 'syntactically' evaluated by the interpreter in the way 'pass' is required for empty blocks. A good test of precise wording."
+      }
+    }
+  ],
+  "metadata": {
+    "target_audience": "qa_evaluators",
+    "estimated_time_minutes": 20,
+    "purpose": "Stress testing the FactualAccuracyMetric LLM evaluator"
+  },
+  "created_at": "2026-03-17T11:20:00"
+}
