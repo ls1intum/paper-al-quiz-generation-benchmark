@@ -275,6 +275,8 @@ def test_homogeneous_options_analyze_phase_requires_question():
     """Analyze prompt builder should raise when question is missing."""
     metric = HomogeneousOptionsMetric()
     inp = make_phase_input(metric, "analyze_options")
+    with pytest.raises(ValueError, match="requires a question"):
+        inp.prompt_builder(inp)
 
 
 def test_factual_accuracy_phase_requires_question():
