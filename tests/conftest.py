@@ -16,6 +16,7 @@ from src.metrics.difficulty import DifficultyMetric
 from src.metrics.coverage import CoverageMetric
 from src.metrics.clarity import ClarityMetric
 from src.metrics.homogeneous_options import HomogeneousOptionsMetric
+from src.metrics.accuracy import FactualAccuracyMetric
 from src.models.config import BenchmarkConfig, EvaluatorConfig, InputOutputConfig, MetricConfig
 from src.models.quiz import Quiz, QuizQuestion, QuestionType
 
@@ -145,6 +146,7 @@ def registered_metrics() -> Iterable[str]:
     MetricRegistry.register(CoverageMetric)
     MetricRegistry.register(ClarityMetric)
     MetricRegistry.register(HomogeneousOptionsMetric)
+    MetricRegistry.register(FactualAccuracyMetric)
     yield MetricRegistry.list_metrics()
     MetricRegistry.clear()
 

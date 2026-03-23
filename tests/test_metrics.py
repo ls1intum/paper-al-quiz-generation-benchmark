@@ -8,6 +8,7 @@ from src.metrics.clarity import ClarityMetric
 from src.metrics.base import ScoreResponse
 from src.metrics.homogeneous_options import HomogeneousOptionsMetric
 from src.metrics.phase import Phase, PhaseInput, PhaseOutput
+from src.metrics.accuracy import FactualAccuracyMetric
 from src.models.quiz import QuizQuestion, QuestionType, Quiz
 from tests.conftest import MockLLMProvider
 
@@ -40,7 +41,7 @@ def make_phase_input(metric, phase_name, **kwargs) -> PhaseInput:
 
 
 @pytest.mark.parametrize("score", [42.0, 88.0, 85.5])
-@pytest.mark.parametrize("metric_cls", [DifficultyMetric, ClarityMetric])
+@pytest.mark.parametrize("metric_cls", [DifficultyMetric, ClarityMetric, FactualAccuracyMetric])
 def test_simple_metric_parse_score_success(metric_cls, score):
     """Single-stage metrics should parse a PhaseOutput with a valid score."""
     metric = metric_cls()
@@ -49,7 +50,7 @@ def test_simple_metric_parse_score_success(metric_cls, score):
 
 
 @pytest.mark.parametrize("score", [-1, 101])
-@pytest.mark.parametrize("metric_cls", [DifficultyMetric, ClarityMetric])
+@pytest.mark.parametrize("metric_cls", [DifficultyMetric, ClarityMetric, FactualAccuracyMetric])
 def test_simple_metric_parse_score_failure(metric_cls, score):
     """Single-stage metrics should reject out-of-range scores."""
     metric = metric_cls()
@@ -248,7 +249,6 @@ def test_coverage_param_validation():
     with pytest.raises(ValueError, match="should be of type str"):
         metric.validate_params(granularity=10)
 
-
 def test_homogeneous_options_parse_score_success():
     """HomogeneousOptionsMetric should extract score from aggregate output."""
     metric = HomogeneousOptionsMetric()
@@ -275,6 +275,12 @@ def test_homogeneous_options_analyze_phase_requires_question():
     """Analyze prompt builder should raise when question is missing."""
     metric = HomogeneousOptionsMetric()
     inp = make_phase_input(metric, "analyze_options")
+
+
+def test_factual_accuracy_phase_requires_question():
+    """Factual accuracy prompt builder should raise ValueError when question is missing."""
+    metric = FactualAccuracyMetric()
+    inp = make_phase_input(metric, "score")
     with pytest.raises(ValueError, match="requires a question"):
         inp.prompt_builder(inp)
 
@@ -345,6 +351,15 @@ def test_homogeneous_options_aggregate_phase_requires_score_results():
     inp = PhaseInput(prompt_builder=None, quiz=make_quiz())
     with pytest.raises(ValueError, match="requires output from score_question phase"):
         metric.phases[-1].process(inp, llm_client=None)
+
+
+def test_factual_accuracy_phase_builds_prompt():
+    """Factual accuracy prompt builder should return a non-empty string."""
+    metric = FactualAccuracyMetric()
+    inp = make_phase_input(metric, "score", question=make_question())
+    prompt = inp.prompt_builder(inp)
+    assert isinstance(prompt, str)
+    assert len(prompt) > 0
 
 
 def test_python_phase_processor_validates_schema():

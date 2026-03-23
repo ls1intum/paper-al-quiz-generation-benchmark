@@ -7,6 +7,7 @@ from .coverage import CoverageMetric
 from .clarity import ClarityMetric
 from .grammatic import GrammaticalCorrectnessMetric
 from .homogeneous_options import HomogeneousOptionsMetric
+from .accuracy import FactualAccuracyMetric
 
 __all__ = [
     "BaseMetric",
@@ -18,4 +19,5 @@ __all__ = [
     "ClarityMetric",
     "GrammaticalCorrectnessMetric",
     "HomogeneousOptionsMetric",
+    "FactualAccuracyMetric",
 ]
