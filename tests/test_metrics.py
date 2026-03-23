@@ -5,8 +5,9 @@ import pytest
 from src.metrics.difficulty import DifficultyMetric
 from src.metrics.coverage import CoverageMetric
 from src.metrics.clarity import ClarityMetric
+from src.metrics.base import ScoreResponse
 from src.metrics.homogeneous_options import HomogeneousOptionsMetric
-from src.metrics.phase import PhaseInput, PhaseOutput
+from src.metrics.phase import Phase, PhaseInput, PhaseOutput
 from src.models.quiz import QuizQuestion, QuestionType, Quiz
 from tests.conftest import MockLLMProvider
 
@@ -339,15 +340,26 @@ def test_homogeneous_options_score_phase_builds_prompt():
 
 
 def test_homogeneous_options_aggregate_phase_requires_score_results():
-    """Aggregate prompt builder should raise when score results are missing."""
+    """Aggregate processor should raise when score results are missing."""
     metric = HomogeneousOptionsMetric()
-    inp = make_phase_input(metric, "aggregate", quiz=make_quiz())
+    inp = PhaseInput(prompt_builder=None, quiz=make_quiz())
     with pytest.raises(ValueError, match="requires output from score_question phase"):
-        inp.prompt_builder(inp)
+        metric.phases[-1].process(inp, llm_client=None)
 
 
-def test_homogeneous_options_aggregate_phase_builds_prompt():
-    """Aggregate prompt builder should compute aggregate values and build a prompt."""
+def test_python_phase_processor_validates_schema():
+    """Phase.process should support deterministic Python processors."""
+    phase = Phase(
+        "score",
+        ScoreResponse,
+        processor=lambda inp: {"score": 77.5},
+    )
+    result = phase.process(PhaseInput(prompt_builder=None), llm_client=None)
+    assert result == {"score": 77.5}
+
+
+def test_homogeneous_options_aggregate_phase_computes_result():
+    """Aggregate phase should compute quiz-level metrics without an LLM call."""
     metric = HomogeneousOptionsMetric()
     accumulated = {
         "score_question": PhaseOutput(
@@ -369,11 +381,11 @@ def test_homogeneous_options_aggregate_phase_builds_prompt():
             },
         )
     }
-    inp = make_phase_input(metric, "aggregate", quiz=make_quiz(), accumulated=accumulated)
-    prompt = inp.prompt_builder(inp)
-    assert isinstance(prompt, str)
-    assert len(prompt) > 0
-    assert '"score": 87.50' in prompt
+    inp = PhaseInput(prompt_builder=None, quiz=make_quiz(), accumulated=accumulated)
+    result = metric.phases[-1].process(inp, llm_client=None)
+    assert result["score"] == 87.5
+    assert result["num_questions_applicable"] == 1
+    assert "Aggregated 1 applicable questions" in result["aggregation_reasoning"]
 
 
 def test_homogeneous_options_evaluate_end_to_end():
@@ -422,19 +434,6 @@ def test_homogeneous_options_evaluate_end_to_end():
                 "severity": "none",
                 "issues": [],
                 "rationale": "All options are parallel.",
-            },
-            {
-                "num_questions_total": 1,
-                "num_questions_applicable": 1,
-                "num_excluded": 0,
-                "mean_question_score": 95.5,
-                "median_question_score": 95.5,
-                "major_violation_rate": 0.0,
-                "perfect_homogeneity_rate": 1.0,
-                "issue_distribution": [],
-                "question_scores": [{"question_id": "q1", "applicable": True, "score": 95.5, "severity": "none"}],
-                "aggregation_reasoning": "Mean score adjusted by penalty for major violations.",
-                "score": 95.5,
             },
         ],
     )

@@ -76,7 +76,8 @@ class BaseMetric(ABC):
     Orchestrates the evaluation pipeline by iterating over a metric's
     declared phases in order. Each phase receives a PhaseInput containing
     the source text, quiz, accumulated outputs from all prior phases, and
-    the phase's prompt builder. The phase is the sole point of LLM contact.
+    an optional prompt builder. Phases can either call the LLM or run a
+    deterministic Python processor.
 
     When instructions.custom_prompt is set, evaluate() runs two additional
     LLM calls automatically:
@@ -404,7 +405,7 @@ Respond with ONLY this JSON object:
 
         # ── Step 2: Run all declared phases in order ──────────────────── #
         for phase in self.phases:
-            builder = self.get_prompt_builder(phase.name)
+            builder = None if phase.processor is not None else self.get_prompt_builder(phase.name)
 
             if phase.fan_out:
                 if quiz is None:

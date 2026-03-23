@@ -100,14 +100,13 @@ class HomogeneousOptionsMetric(BaseMetric):
         return [
             Phase("analyze_options", AnalyzeOptionsResponse, fan_out=True),
             Phase("score_question", QuestionHomogeneityScoreResponse, fan_out=True),
-            Phase("aggregate", AggregateHomogeneityResponse),
+            Phase("aggregate", AggregateHomogeneityResponse, processor=self._aggregate_results),
         ]
 
     def get_prompt_builder(self, phase_name: str) -> Callable[[PhaseInput], str]:
         builders = {
             "analyze_options": self._build_analyze_options_prompt,
             "score_question": self._build_score_question_prompt,
-            "aggregate": self._build_aggregate_prompt,
         }
         if phase_name not in builders:
             raise ValueError(f"Unknown phase '{phase_name}' for metric '{self.name}'")
@@ -223,7 +222,7 @@ Respond with ONLY a JSON object in this format:
   "rationale": "brief explanation"
 }}"""
 
-    def _build_aggregate_prompt(self, inp: PhaseInput) -> str:
+    def _aggregate_results(self, inp: PhaseInput) -> dict[str, object]:
         if inp.quiz is None:
             raise ValueError("aggregate phase requires a quiz")
 
@@ -278,42 +277,26 @@ Respond with ONLY a JSON object in this format:
         penalty = min(15.0, 20.0 * major_violation_rate)
         computed_score = max(0.0, min(100.0, mean_question_score - penalty))
 
-        return f"""Aggregate these per-question homogeneous-options scores into a quiz-level result.
+        aggregation_reasoning = (
+            f"Aggregated {num_applicable} applicable questions out of {total_questions}; "
+            f"mean question score {mean_question_score:.2f}, "
+            f"major violation rate {major_violation_rate:.2%}, "
+            f"penalty {penalty:.2f}."
+        )
 
-Quiz: {inp.quiz.title}
-Total questions: {total_questions}
-Applicable questions: {num_applicable}
-Excluded questions: {num_excluded}
-
-Per-question scoring results:
-{results}
-
-Use these precomputed values exactly:
-- mean_question_score = {mean_question_score:.4f}
-- median_question_score = {median_question_score:.4f}
-- major_violation_rate = {major_violation_rate:.4f}
-- perfect_homogeneity_rate = {perfect_homogeneity_rate:.4f}
-- issue_distribution = {issue_distribution_items}
-- question_scores = {question_scores}
-- penalty = min(15, 20 * major_violation_rate) = {penalty:.4f}
-- score = mean_question_score - penalty = {computed_score:.4f}
-
-Return the values exactly as provided unless rounding to two decimals is needed.
-
-Respond with ONLY a JSON object in this format:
-{{
-  "num_questions_total": {total_questions},
-  "num_questions_applicable": {num_applicable},
-  "num_excluded": {num_excluded},
-  "mean_question_score": {mean_question_score:.2f},
-  "median_question_score": {median_question_score:.2f},
-  "major_violation_rate": {major_violation_rate:.4f},
-  "perfect_homogeneity_rate": {perfect_homogeneity_rate:.4f},
-  "issue_distribution": {issue_distribution_items},
-  "question_scores": {question_scores},
-  "aggregation_reasoning": "Mean score adjusted by penalty for major violations.",
-  "score": {computed_score:.2f}
-}}"""
+        return {
+            "num_questions_total": total_questions,
+            "num_questions_applicable": num_applicable,
+            "num_excluded": num_excluded,
+            "mean_question_score": round(mean_question_score, 2),
+            "median_question_score": round(median_question_score, 2),
+            "major_violation_rate": round(major_violation_rate, 4),
+            "perfect_homogeneity_rate": round(perfect_homogeneity_rate, 4),
+            "issue_distribution": issue_distribution_items,
+            "question_scores": question_scores,
+            "aggregation_reasoning": aggregation_reasoning,
+            "score": round(computed_score, 2),
+        }
 
     @staticmethod
     def _get_question_result(
