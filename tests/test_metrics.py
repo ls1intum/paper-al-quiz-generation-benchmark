@@ -6,6 +6,7 @@ from src.metrics.difficulty import DifficultyMetric
 from src.metrics.coverage import CoverageMetric
 from src.metrics.clarity import ClarityMetric
 from src.metrics.distractor import DistractorQualityMetric
+from src.metrics.accuracy import FactualAccuracyMetric
 from src.metrics.phase import PhaseInput, PhaseOutput
 from src.models.quiz import QuizQuestion, QuestionType, Quiz
 from tests.conftest import MockLLMProvider
@@ -39,7 +40,7 @@ def make_phase_input(metric, phase_name, **kwargs) -> PhaseInput:
 
 
 @pytest.mark.parametrize("score", [42.0, 88.0, 85.5])
-@pytest.mark.parametrize("metric_cls", [DifficultyMetric, ClarityMetric, DistractorQualityMetric])
+@pytest.mark.parametrize("metric_cls", [DifficultyMetric, ClarityMetric, DistractorQualityMetric, FactualAccuracyMetric])
 def test_simple_metric_parse_score_success(metric_cls, score):
     """Single-stage metrics should parse a PhaseOutput with a valid score."""
     metric = metric_cls()
@@ -48,7 +49,7 @@ def test_simple_metric_parse_score_success(metric_cls, score):
 
 
 @pytest.mark.parametrize("score", [-1, 101])
-@pytest.mark.parametrize("metric_cls", [DifficultyMetric, ClarityMetric, DistractorQualityMetric])
+@pytest.mark.parametrize("metric_cls", [DifficultyMetric, ClarityMetric, DistractorQualityMetric, FactualAccuracyMetric])
 def test_simple_metric_parse_score_failure(metric_cls, score):
     """Single-stage metrics should reject out-of-range scores."""
     metric = metric_cls()
@@ -288,6 +289,21 @@ def test_distractor_quality_score_phase_builds_prompt():
         "score",
         accumulated={"analyze": analyze_output}
     )
+    prompt = inp.prompt_builder(inp)
+    assert isinstance(prompt, str)
+    assert len(prompt) > 0
+def test_factual_accuracy_phase_requires_question():
+    """Factual accuracy prompt builder should raise ValueError when question is missing."""
+    metric = FactualAccuracyMetric()
+    inp = make_phase_input(metric, "score")
+    with pytest.raises(ValueError, match="requires a question"):
+        inp.prompt_builder(inp)
+
+
+def test_factual_accuracy_phase_builds_prompt():
+    """Factual accuracy prompt builder should return a non-empty string."""
+    metric = FactualAccuracyMetric()
+    inp = make_phase_input(metric, "score", question=make_question())
     prompt = inp.prompt_builder(inp)
     assert isinstance(prompt, str)
     assert len(prompt) > 0

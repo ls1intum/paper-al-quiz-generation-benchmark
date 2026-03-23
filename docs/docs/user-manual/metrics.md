@@ -301,3 +301,37 @@ The metric produces structured analysis and scoring output:
 
 ---
 
+### 9. Factual Accuracy
+
+**Purpose**: Verify questions and answers are factually correct, evidence-based, free from errors and biases, and aligned with provided source material.
+
+**Scope**: Question-level
+
+**Evaluation Dimensions**:
+- **Factual Correctness**: Are all statements accurate? Are there outdated facts or clear errors?
+- **Evidence-Based Content**: Is the answer verifiable fact rather than opinion or theory?
+- **Bias and Distortion**: Is it free from political, cultural, or personal bias? Are all options presented fairly?
+- **Source Alignment**: Does it align with the provided source material? Does it contradict it?
+- **Objectivity**: Would reasonable experts agree with the factual claims?
+
+**Scoring Scale**:
+- **0-20**: Highly Inaccurate (major errors, built on false premises)
+- **21-40**: Inaccurate (notable errors, partially opinion)
+- **41-60**: Moderately Accurate (mostly factual but minor inaccuracies)
+- **61-80**: Accurate (factually correct and evidence-based)
+- **81-100**: Highly Accurate (objective, perfectly grounded in evidence)
+
+**Output**:
+- Detailed reasoning across all five dimensions
+- List of specific major errors found (if any)
+- Numerical score (0-100)
+
+**Example Configuration**:
+```yaml
+- name: "accuracy"
+  version: "1.1"
+  evaluators: ["gpt4", "claude_opus"]
+```
+
+---
+

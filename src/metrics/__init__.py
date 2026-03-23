@@ -6,7 +6,8 @@ from .difficulty import DifficultyMetric
 from .coverage import CoverageMetric
 from .clarity import ClarityMetric
 from .grammatic import GrammaticalCorrectnessMetric
-from src.metrics.distractor import DistractorQualityMetric
+from .distractor import DistractorQualityMetric
+from .accuracy import FactualAccuracyMetric
 
 __all__ = [
     "BaseMetric",
@@ -18,4 +19,5 @@ __all__ = [
     "ClarityMetric",
     "GrammaticalCorrectnessMetric",
     "DistractorQualityMetric",
+    "FactualAccuracyMetric",
 ]
