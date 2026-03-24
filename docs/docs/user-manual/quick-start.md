@@ -136,6 +136,38 @@ outputs:
 
 To switch local models per metric, define multiple `ollama` evaluators (different `model` values) and assign them in each metric's `evaluators` list.
 
+#### Step 4: Prepare Source Materials
+
+The framework supports two ways to organize source materials:
+
+**Option A: Single File**
+```json
+{
+  "quiz_id": "python101",
+  "source_material": "python_intro.md"
+}
+```
+
+**Option B: Multiple Lectures in Folder**
+Create a folder in `data/inputs/` with multiple lecture materials:
+```
+data/inputs/advanced_python/
+  ├── decorators.md
+  ├── async_programming.pdf
+  ├── metaclasses.md
+  └── type_hints.pdf
+```
+
+Then reference the folder:
+```json
+{
+  "quiz_id": "advanced_python",
+  "source_material": "advanced_python"
+}
+```
+
+Supported formats: `.md` (Markdown) and `.pdf` (PDF). The system automatically combines all materials with clear file headers so the LLM knows which content comes from which source.
+
 ### Running Your First Benchmark
 
 The repository includes example quiz and source material. Just run:
