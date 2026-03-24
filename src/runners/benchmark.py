@@ -116,7 +116,7 @@ class BenchmarkRunner:
         loaded_files = []
 
         # Supported file extensions
-        supported_extensions = {".md", ".pdf", ".txt"}
+        supported_extensions = {".md", ".pdf"}
 
         # Sort files for consistent ordering
         files = sorted(folder_path.iterdir())
