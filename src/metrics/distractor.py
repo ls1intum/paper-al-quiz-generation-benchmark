@@ -86,6 +86,11 @@ class DistractorQualityMetric(BaseMetric):
         if inp.question is None:
             raise ValueError("distractor_quality analyze phase requires a question")
 
+        if inp.source_text is None:
+            raise ValueError(
+                "distractor_quality analyze phase requires source_text (source material is essential for evaluating distractor quality)"
+            )
+
         question = inp.question
 
         if question.question_type not in (QuestionType.SINGLE_CHOICE, QuestionType.MULTIPLE_CHOICE):
@@ -95,7 +100,7 @@ class DistractorQualityMetric(BaseMetric):
             )
 
         correct_answers, distractors = _extract_distractors(question)
-        correct_display = ", ".join(correct_answers)
+        correct_display = ", ".join(sorted(correct_answers))
         distractors_text = "\n".join(f"{i}. {d}" for i, d in enumerate(distractors, 1))
 
         return f"""You are a pedagogical assessment expert. Analyze the distractors in this quiz question WITHOUT assigning a score yet.

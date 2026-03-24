@@ -255,6 +255,13 @@ def test_distractor_quality_analyze_phase_requires_question():
     with pytest.raises(ValueError, match="distractor_quality analyze phase requires a question"):
         inp.prompt_builder(inp)
 
+def test_distractor_quality_analyze_phase_requires_source_text():
+    """Distractor quality analyze prompt builder should raise ValueError when source_text is missing."""
+    metric = DistractorQualityMetric()
+    inp = make_phase_input(metric, "analyze", question=make_question())
+    with pytest.raises(ValueError, match="distractor_quality analyze phase requires source_text"):
+        inp.prompt_builder(inp)
+
 def test_distractor_quality_analyze_phase_builds_prompt():
     """Distractor quality analyze prompt builder should return a non-empty string."""
     metric = DistractorQualityMetric()
