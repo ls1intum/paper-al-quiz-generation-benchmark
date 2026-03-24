@@ -84,15 +84,60 @@ class BenchmarkRunner:
         source_texts = {}
         source_dir = Path(self.config.input_output.source_directory)
         for quiz in quizzes:
-            source_file = source_dir / quiz.source_material
-            if source_file.exists():
+            source_path = source_dir / quiz.source_material
+            if source_path.exists():
                 try:
-                    source_texts[quiz.quiz_id] = IOUtils.load_source_text(str(source_file))
+                    # Check if it's a directory (folder with multiple lecture files)
+                    if source_path.is_dir():
+                        source_texts[quiz.quiz_id] = self._load_multiple_sources(source_path)
+                        self.logger.info(
+                            "Loaded source folder for quiz %s: %s", quiz.quiz_id, source_path
+                        )
+                    else:
+                        # Single file
+                        source_texts[quiz.quiz_id] = IOUtils.load_source_text(str(source_path))
                 except Exception as e:
                     self.logger.warning("Failed to load source for %s: %s", quiz.quiz_id, e)
             else:
-                self.logger.warning("Source file not found: %s", source_file)
+                self.logger.warning("Source path not found: %s", source_path)
         return source_texts
+
+    def _load_multiple_sources(self, folder_path: Path) -> str:
+        """Load and combine multiple source files from a folder.
+
+        Args:
+            folder_path: Path to folder containing source files
+
+        Returns:
+            Combined text from all source files, separated by headers
+
+        """
+        combined_text = ""
+        loaded_files = []
+
+        # Supported file extensions
+        supported_extensions = {".md", ".pdf", ".txt"}
+
+        # Sort files for consistent ordering
+        files = sorted(folder_path.iterdir())
+
+        for file_path in files:
+            if file_path.suffix.lower() in supported_extensions and file_path.is_file():
+                try:
+                    file_content = IOUtils.load_source_text(str(file_path))
+                    # Add a header for each file so the LLM knows where content comes from
+                    file_header = f"\n\n{'=' * 60}\n[Source: {file_path.name}]\n{'=' * 60}\n\n"
+                    combined_text += file_header + file_content
+                    loaded_files.append(file_path.name)
+                except Exception as e:
+                    self.logger.warning("Failed to load file %s: %s", file_path.name, e)
+
+        if not loaded_files:
+            raise ValueError(f"No supported source files found in {folder_path}")
+
+        self.logger.info("Loaded %d source files from folder: %s", len(loaded_files), loaded_files)
+
+        return combined_text
 
     def _evaluate_quiz_level(
         self,

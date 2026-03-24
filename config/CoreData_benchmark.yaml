@@ -1,5 +1,5 @@
 benchmark:
-  name: "CoreData-benchmark"
+  name: "CoreData_benchmark"
   version: "1.0.0"
   runs: 1  # Number of times to repeat the evaluation
 
