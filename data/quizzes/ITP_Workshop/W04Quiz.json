@@ -1,0 +1,86 @@
+{
+  "quiz_id": "W04E01",
+  "title": "Introduction to Programming – Loops and Control Flow Quiz",
+  "source_material": "03_InDepthCoreConcepts.pdf",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "multiple_choice",
+      "question_text": "Predict the code's console output.\n\n```java\npublic class Main {\n    public static void main(String[] args) {\n        for (int i = 0; i < 10; i++) {\n            if (i == 5) {\n                break;\n            }\n            System.out.print(i);\n        }\n    }\n}\n```",
+      "options": [
+        "`012345`",
+        "`01234`",
+        "`0123456789`",
+        "`12345`"
+      ],
+      "correct_answer": "`01234`",
+      "explanation": {
+        "`012345`": "Incorrect. The loop stops when `i` equals 5, so 5 is never printed — the `break` exits before `System.out.print(i)` is reached.",
+        "`01234`": "Correct. The loop prints 0 through 4. When `i` reaches 5, the `break` statement is executed and the loop terminates immediately, so 5 and all higher numbers are never printed.",
+        "`0123456789`": "Incorrect. The `break` statement at `i == 5` terminates the loop early, so numbers 5 through 9 are never printed.",
+        "`12345`": "Incorrect. The loop counter `i` starts at 0 (not 1), so 0 is the first value printed. The loop also exits before printing 5, not after."
+      },
+      "source_reference": "W03 In-Depth Core Concepts – Recap: Loops (For-Loop)",
+      "metadata": {
+        "topic": "for_loop_and_break_statement",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q2",
+      "question_type": "multiple_choice",
+      "question_text": "Take a look at the following code snippet:\n\n```java\npublic class Main {\n    public static void main(String[] args) {\n        int[] numbers = new int[]{0, 1, 2, 3, 4, 5, 6, 7, 8, 9};\n        for (int i = 1; i < numbers.length; i += 2) {\n            System.out.print(numbers[i] + \"; \");\n        }\n    }\n}\n```\n\nWhat will be the output on the console?",
+      "options": [
+        "`1; 3; 5; 7; 9; `",
+        "`0; 2; 4; 6; 8; `",
+        "`1; 2; 3; 4; 5; 6; 7; 8; 9; `",
+        "The code does not compile."
+      ],
+      "correct_answer": "`1; 3; 5; 7; 9; `",
+      "explanation": {
+        "`1; 3; 5; 7; 9; `": "Correct. Array indices start at 0, so `numbers[1]` is 1. The loop starts at index 1 and increments by 2 each iteration (`i += 2`), visiting indices 1, 3, 5, 7, 9 — which hold the values 1, 3, 5, 7, 9.",
+        "`0; 2; 4; 6; 8; `": "Incorrect. This would require the loop to start at index 0 (even indices). Because the loop starts at `i = 1`, it accesses the odd-indexed elements, which hold the values 1, 3, 5, 7, 9.",
+        "`1; 2; 3; 4; 5; 6; 7; 8; 9; `": "Incorrect. The loop increments `i` by 2 each iteration, so every other element is skipped. To print every element from index 1 onward, the loop would need `i++` instead of `i += 2`.",
+        "The code does not compile.": "Incorrect. The code compiles without errors: the `main` signature is correct, the array initialisation and for-loop syntax are both valid, and there are no type errors."
+      },
+      "source_reference": "W03 In-Depth Core Concepts – Recap: Arrays and Loops (For-Loop)",
+      "metadata": {
+        "topic": "array_access_and_for_loop_step",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q3",
+      "question_type": "multiple_choice",
+      "question_text": "What will be the output on the console?\n\n```java\npublic final class Main {\n    public static void main(String[] args) {\n        int[] numbers = new int[]{0, 1, 2, 3};\n        int counter = 0;\n\n        while (counter < numbers.length) {\n            counter++;\n        }\n\n        switch (counter) {\n            case 0:\n                System.out.println(\"zero\");\n                break;\n            case 1:\n                System.out.println(\"one\");\n                break;\n            case 2:\n            case 3:\n                System.out.println(\"two or three\");\n                break;\n            default:\n                System.out.println(\"-\");\n                break;\n        }\n    }\n}\n```",
+      "options": [
+        "`-`",
+        "`zero`",
+        "`one`",
+        "`two or three`"
+      ],
+      "correct_answer": "`-`",
+      "explanation": {
+        "`-`": "Correct. The while loop increments `counter` until it equals `numbers.length`, which is 4. Since 4 does not match any explicit `case` (0, 1, 2, or 3), the `default` branch executes and prints `-`.",
+        "`zero`": "Incorrect. `case 0` would only be reached if `counter` were 0 after the loop — meaning the array was empty. The array has 4 elements, so `counter` ends at 4.",
+        "`one`": "Incorrect. `case 1` would only be reached if the array had exactly 1 element. Because the array has 4 elements, the loop runs 4 times.",
+        "`two or three`": "Incorrect. `case 2` and `case 3` (fall-through) would only be reached if the array had 2 or 3 elements. The array has 4 elements, so `counter` ends at 4 and falls through to `default`."
+      },
+      "source_reference": "W03 In-Depth Core Concepts – Recap: Loops (While-Loop) and Conditional Statements (Switch Statement)",
+      "metadata": {
+        "topic": "while_loop_and_switch_statement",
+        "difficulty_level": "medium"
+      }
+    }
+  ],
+  "metadata": {
+    "target_audience": "undergraduate",
+    "estimated_time_minutes": 10,
+    "learning_objectives": [
+      "Trace the execution of a for-loop with a break statement to predict console output",
+      "Understand array indexing and the effect of a custom loop step value on which elements are accessed",
+      "Combine while-loop termination logic with switch-statement fall-through and default-case behaviour"
+    ]
+  },
+  "created_at": "2026-03-26T00:00:00"
+}

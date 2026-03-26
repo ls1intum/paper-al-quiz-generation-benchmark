@@ -13,13 +13,13 @@ evaluators:
     max_tokens: 2000
 
 metrics:
-  - name: "coverage"
+  - name: "accuracy"
     version: "1.1"
     evaluators: ["gpt4"]
     enabled: true
 
 inputs:
-  quiz_directory: "data/quizzes"
+  quiz_directory: "data/quizzes/ITP_SE1Quiz"
   source_directory: "data/inputs"
   instructions_directory: "data/instructions"
 

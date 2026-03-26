@@ -1,0 +1,69 @@
+{
+  "quiz_id": "W10E01",
+  "title": "Introduction to Programming – Algorithms and Data Handling Quiz",
+  "source_material": "09_AlgorithmsAndDataHandling.pdf",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "multiple_choice",
+      "question_text": "Take a look at the following piece of code. What will be printed out?\n\n```java\npublic class Main {\n    public static void main(String[] args) {\n        StringBuilder sb = new StringBuilder(\"Chosen Magicians:\");\n        List<String> magicians = Arrays.asList(\"Harry\", \"Ron\", \"Luna\", \"Fred\", \"Ginny\");\n        magicians.forEach(magician -> {\n            if (magician.length() < 5) {\n                sb.append(\" \").append(magician).append(\";\");\n            }\n        });\n        System.out.println(sb);\n    }\n}\n```",
+      "options": [
+        "`Chosen Magicians: Ron; Luna; Fred;`",
+        "`Ron; Luna; Fred;`",
+        "`Chosen Magicians: Harry; Ron; Luna; Fred; Ginny;`",
+        "` Harry; Ron; Luna; Fred; Ginny;`"
+      ],
+      "correct_answer": [
+        "`Chosen Magicians: Ron; Luna; Fred;`"
+      ],
+      "explanation": {
+        "`Chosen Magicians: Ron; Luna; Fred;`": "Correct. The `StringBuilder` is constructed with the initial value `\"Chosen Magicians:\"`, so that prefix is always present in the output. The `forEach` lambda appends only names whose `length()` is strictly less than 5. `Harry` (5) and `Ginny` (5) are excluded; `Ron` (3), `Luna` (4), and `Fred` (4) are included. Each is appended with a leading space and a trailing semicolon, producing `Chosen Magicians: Ron; Luna; Fred;`.",
+        "`Ron; Luna; Fred;`": "Incorrect. The initial value passed to the `StringBuilder` constructor is `\"Chosen Magicians:\"`. Unlike `String` concatenation, `StringBuilder` carries this seed value through all subsequent `append()` calls, so the output always starts with `Chosen Magicians:`.",
+        "`Chosen Magicians: Harry; Ron; Luna; Fred; Ginny;`": "Incorrect. The condition `magician.length() < 5` filters out names with 5 or more characters. Both `Harry` and `Ginny` have exactly 5 characters, so they do not satisfy the strict less-than check and are not appended.",
+        "` Harry; Ron; Luna; Fred; Ginny;`": "Incorrect. The output begins with the seed string `\"Chosen Magicians:\"` from the constructor, not a blank space. Additionally, `Harry` and `Ginny` are excluded because their length is not less than 5."
+      },
+      "source_reference": "W09 Algorithms and Data Handling – StringBuilder (constructor, append(), lambda with forEach)",
+      "metadata": {
+        "topic": "stringbuilder_append_lambda_filtering",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q2",
+      "question_type": "multiple_choice",
+      "question_text": "Have a look at the following code. Which of the statements are correct?\n`Assumption:` There are no Wizards with the same first name, last name, and age.\n\n```java\nclass Wizard {\n    private String firstName;\n    private String lastName;\n    private int age;\n    public Wizard(String firstName, String lastName, int age) {\n        this.firstName = firstName;\n        this.lastName = lastName;\n        this.age = age;\n    }\n    @Override\n    public boolean equals(Object obj) {\n        if (obj == null || this.getClass() != obj.getClass()) {\n            return false;\n        }\n        Wizard wizard = (Wizard) obj;\n        return firstName.equals(wizard.firstName) && lastName.equals(wizard.lastName) && age == wizard.age;\n    }\n    @Override\n    public int hashCode() {\n        return (age + 17) * firstName.hashCode() + lastName.hashCode();\n    }\n}\npublic class Main {\n    public static void main(String[] args) {\n        Wizard percy = new Wizard(\"Percy\", \"Weasley\", 15);\n        Wizard bill = new Wizard(\"Bill\", \"Weasley\", 21);\n        System.out.println(bill.hashCode() == percy.hashCode());\n    }\n}\n```",
+      "options": [
+        "`false` is printed to the console.",
+        "The implementation of `equals()` and `hashCode()` follows the consistency rule (equal objects must have the same hash code).",
+        "`true` is printed to the console.",
+        "The implementation of `equals()` and `hashCode()` does not follow the consistency rule (equal objects must have the same hash code)."
+      ],
+      "correct_answer": [
+        "`false` is printed to the console.",
+        "The implementation of `equals()` and `hashCode()` follows the consistency rule (equal objects must have the same hash code)."
+      ],
+      "explanation": {
+        "`false` is printed to the console.": "Correct. The formula `(age + 17) * firstName.hashCode() + lastName.hashCode()` combines all three fields. `percy` has `age = 15` and `firstName = \"Percy\"`, while `bill` has `age = 21` and `firstName = \"Bill\"`. Because both `age` and `firstName` differ between the two objects, their hash codes will differ, so the comparison prints `false`.",
+        "The implementation of `equals()` and `hashCode()` follows the consistency rule (equal objects must have the same hash code).": "Correct. The consistency rule requires that if `a.equals(b)` is `true`, then `a.hashCode() == b.hashCode()` must also be `true`. Here `equals()` considers two `Wizard` objects equal only when all three fields (`firstName`, `lastName`, `age`) are identical. `hashCode()` is computed deterministically from those same three fields. Therefore any two objects that `equals()` deems equal will always produce the same hash code, satisfying the contract.",
+        "`true` is printed to the console.": "Incorrect. `percy` and `bill` differ in both `age` (15 vs. 21) and `firstName` (`\"Percy\"` vs. `\"Bill\"`). Because `age` is multiplied with `firstName.hashCode()` in the formula, these differences produce distinct hash values, making the equality check `false`, not `true`.",
+        "The implementation of `equals()` and `hashCode()` does not follow the consistency rule (equal objects must have the same hash code).": "Incorrect. Both `equals()` and `hashCode()` use the same set of fields (`firstName`, `lastName`, `age`) and compute results deterministically. Any pair of `Wizard` objects considered equal by `equals()` will necessarily yield the same hash code, so the consistency rule is satisfied."
+      },
+      "source_reference": "W09 Algorithms and Data Handling – Hashing in Java (hashCode(), equals(), consistency rule, hash function design)",
+      "metadata": {
+        "topic": "hashcode_equals_consistency_rule",
+        "difficulty_level": "medium"
+      }
+    }
+  ],
+  "metadata": {
+    "target_audience": "undergraduate",
+    "estimated_time_minutes": 10,
+    "learning_objectives": [
+      "Apply StringBuilder correctly, distinguishing the constructor seed value from subsequent append() calls",
+      "Predict the output of lambda-based filtering combined with StringBuilder in a forEach loop",
+      "Evaluate whether a custom hashCode() and equals() implementation satisfies the Java consistency rule",
+      "Trace a hash function formula across two objects to determine whether their hash codes are equal"
+    ]
+  },
+  "created_at": "2026-03-26T00:00:00"
+}

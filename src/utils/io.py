@@ -101,24 +101,19 @@ class IOUtils:
 
     @staticmethod
     def load_source_text(source_path: str) -> str:
-        """Load source material text from markdown or PDF file.
-
-        Args:
-            source_path: Path to source file (supports .md and .pdf)
-
-        Returns:
-            Source text content
-
-        Raises:
-            FileNotFoundError: If source file doesn't exist
-            ValueError: If file type is not supported
-        """
         path = Path(source_path)
         if not path.exists():
             raise FileNotFoundError(f"Source file not found: {source_path}")
 
-        suffix = path.suffix.lower()
+        if path.is_dir():
+            texts = []
+            for pdf in sorted(path.rglob("*.pdf")):
+                texts.append(IOUtils._load_pdf_text(str(pdf)))
+            if not texts:
+                raise ValueError(f"No PDF files found in directory: {source_path}")
+            return "\n\n".join(texts)
 
+        suffix = path.suffix.lower()
         if suffix == ".pdf":
             return IOUtils._load_pdf_text(str(path))
         elif suffix == ".md":

@@ -1,0 +1,83 @@
+{
+  "quiz_id": "SE1_Volcano",
+  "title": "Introduction to Programming – Volcano Quiz",
+  "source_material": "ITP/ITP_SE1",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "single_choice",
+      "question_text": "What should be written instead of `/* GAP A */` and `/* GAP B */` to achieve the following output:\n\n```\nSeal 0 on height 0\nSeal 0 on height 1\nSeal 0 on height 2\nSeal 1 on height 0\nSeal 1 on height 1\nSeal 1 on height 2\n```\n\n```java\n1  public class VolcanoClimb {\n2      public static void main(String[] args) {\n3          for (int i = 0; i < 5; i++) {\n4              for (int j = 0; j < 5; j++) {\n5                  System.out.println(\"Seal \" + i + \" on height \" + j);\n6                  if (j == /* GAP A */) {\n7                      break;\n8                  }\n9              }\n10             if (i == /* GAP B */) {\n11                 return;\n12             }\n13         }\n14     }\n15 }\n```",
+      "options": [
+        "`A: 2`, `B: 1`",
+        "`A: 1`, `B: 2`",
+        "`A: 2 - i`, `B: 1`",
+        "`A: 2`, `B: i + j == 3`"
+      ],
+      "correct_answer": "`A: 2`, `B: 1`",
+      "explanation": {
+        "`A: 2`, `B: 1`": "Correct. Breaking at j == 2 prints heights 0 through 2 for each seal, and returning at i == 1 stops the program after the second seal (i = 0 and i = 1).",
+        "`A: 1`, `B: 2`": "Incorrect. Breaking at j == 1 would stop printing at height 1 per seal, and waiting for i == 2 would incorrectly print a third seal.",
+        "`A: 2 - i`, `B: 1`": "Incorrect. Making the inner break condition dependent on i causes Seal 1 to stop climbing prematurely at height 1 instead of height 2.",
+        "`A: 2`, `B: i + j == 3`": "Incorrect. The variable j is out of scope in the outer loop, so this code would fail to compile."
+      },
+      "metadata": {
+        "topic": "nested_loops_break_return",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q2",
+      "question_type": "single_choice",
+      "question_text": "Which single line of code must be put on line `5` to produce the following console output:\n\n```\nHeartshapedRock LavaJar VolcanicRock \n```\n\n```java\n1  import java.util.*;\n2\n3  public class VolcanicSouvenirs {\n4       public static void main(String[] args) {\n5          /* GAP */\n6\n7          souvenirBag.push(\"VolcanicRock \");\n8          souvenirBag.push(\"LavaJar \");\n9          souvenirBag.push(\"HeartshapedRock \");\n10\n11         System.out.print(souvenirBag.pop());\n12         System.out.print(souvenirBag.pop());\n13         System.out.print(souvenirBag.pop());\n14     }\n15 }\n```",
+      "options": [
+        "`Stack<String> souvenirBag = new Stack<>();`",
+        "`List<String> souvenirBag = new ArrayList<>();`",
+        "`Set<String> souvenirBag = new HashSet<>();`",
+        "`Queue souvenirTube = new Queue();`"
+      ],
+      "correct_answer": "`Stack<String> souvenirBag = new Stack<>();`",
+      "explanation": {
+        "`Stack<String> souvenirBag = new Stack<>();`": "Correct. A Stack follows the LIFO (Last In, First Out) principle, ensuring the last item pushed is the first one popped — matching the required output order.",
+        "`List<String> souvenirBag = new ArrayList<>();`": "Incorrect. ArrayList uses add() and get() methods rather than push() and pop(), so the code would not compile as written.",
+        "`Set<String> souvenirBag = new HashSet<>();`": "Incorrect. Set is an interface for unique unordered elements and does not support push() or pop() operations.",
+        "`Queue souvenirTube = new Queue();`": "Incorrect. Queue follows FIFO logic, which would produce the wrong print order. Additionally, Queue is an interface and cannot be instantiated directly."
+      },
+      "metadata": {
+        "topic": "stack_lifo_push_pop",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q3",
+      "question_type": "single_choice",
+      "question_text": "Which single line of code must be put on line `25` to produce the following console output:\n\n```\nClimbs Generic-Mammal\n```\n\n```java\n1  class Seal {\n2      String move() {\n3          return \"Hikes\";\n4      }\n5      String category() {\n6          return \"Generic-Mammal\";\n7      }\n8  }\n9  class VolcanoSeal extends Seal {\n10     @Override\n11     String move() {\n12         return \"Climbs\";\n13     }\n14     @Override\n15     String category() {\n16         return \"Brave-Climber\";\n17     }\n18     String describe() {\n19         return super.category();\n20     }\n21 }\n22 public class PolyVolcano {\n23     public static void main(String[] args) {\n24         Seal mySeal = new VolcanoSeal();\n25         // GAP: Which line of code goes here?\n26     }\n27 }\n```",
+      "options": [
+        "`System.out.print(mySeal.move() + \" \" + ((VolcanoSeal) mySeal).describe());`",
+        "`System.out.print(mySeal.move() + \" \" + mySeal.category());`",
+        "`System.out.print(mySeal.category() + \" \" + mySeal.move());`",
+        "`System.out.print(mySeal.category() + \" \" + super.move());`"
+      ],
+      "correct_answer": "`System.out.print(mySeal.move() + \" \" + ((VolcanoSeal) mySeal).describe());`",
+      "explanation": {
+        "`System.out.print(mySeal.move() + \" \" + ((VolcanoSeal) mySeal).describe());`": "Correct. Casting to VolcanoSeal gives access to describe(), which calls super.category() and returns \"Generic-Mammal\". Polymorphism ensures mySeal.move() calls the overridden version, returning \"Climbs\".",
+        "`System.out.print(mySeal.move() + \" \" + mySeal.category());`": "Incorrect. Due to polymorphism, mySeal.category() dispatches to the overridden version in VolcanoSeal and returns \"Brave-Climber\" instead of \"Generic-Mammal\".",
+        "`System.out.print(mySeal.category() + \" \" + mySeal.move());`": "Incorrect. This reverses the output order and also incorrectly calls the overridden category(), returning \"Brave-Climber\" rather than \"Generic-Mammal\".",
+        "`System.out.print(mySeal.category() + \" \" + super.move());`": "Incorrect. The super keyword is instance-specific and cannot be used inside a static main method to access parent class members."
+      },
+      "metadata": {
+        "topic": "polymorphism_override_super_casting",
+        "difficulty_level": "hard"
+      }
+    }
+  ],
+  "metadata": {
+    "target_audience": "undergraduate",
+    "estimated_time_minutes": 15,
+    "learning_objectives": [
+      "Apply nested loops with break and return to control program flow and predict the resulting output",
+      "Select the correct Java collection (Stack) based on LIFO behaviour required by push() and pop() operations",
+      "Predict method dispatch under polymorphism and use super and downcasting to access parent-class behaviour"
+    ]
+  },
+  "created_at": "2026-03-26T00:00:00"
+}

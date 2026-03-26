@@ -1,0 +1,83 @@
+{
+  "quiz_id": "SE1_SouthPole",
+  "title": "Introduction to Programming – South Pole Quiz",
+  "source_material": "ITP/ITP_SE1",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "single_choice",
+      "question_text": "What should be written instead of `/* GAP A */` and `/* GAP B */` to achieve the following output:\n\n```\nSeal 0 on iceberg 0\nSeal 0 on iceberg 1\nSeal 0 on iceberg 2\nSeal 1 on iceberg 0\nSeal 1 on iceberg 1\nSeal 1 on iceberg 2\n```\n\n```java\n1  public class SouthPoleVacation {\n2      public static void main(String[] args) {\n3          for (int x = 0; x < 5; x++) {\n4              for (int y = 0; y < 5; y++) {\n5                  System.out.println(\"Seal \" + x + \" on iceberg \" + y);\n6                  if (y == /* GAP A */) {\n7                      break;\n8                  }\n9              }\n10             if (x == /* GAP B */) {\n11                 return;\n12             }\n13         }\n14     }\n15 }\n```",
+      "options": [
+        "`A: 2`, `B: 1`",
+        "`A: 1`, `B: 2`",
+        "`A: 2 - x`, `B: 1`",
+        "`A: 2`, `B: x + y == 3`"
+      ],
+      "correct_answer": "`A: 2`, `B: 1`",
+      "explanation": {
+        "`A: 2`, `B: 1`": "Correct. Breaking at y == 2 prints icebergs 0 through 2 for each seal, and returning at x == 1 stops the program after the second seal (x = 0 and x = 1).",
+        "`A: 1`, `B: 2`": "Incorrect. Breaking at y == 1 would stop printing at iceberg 1 per seal, and waiting for x == 2 would incorrectly print a third seal.",
+        "`A: 2 - x`, `B: 1`": "Incorrect. Making the inner break condition dependent on x causes Seal 1 to stop moving prematurely at iceberg 1 instead of iceberg 2.",
+        "`A: 2`, `B: x + y == 3`": "Incorrect. The variable y is out of scope in the outer loop, so this code would fail to compile."
+      },
+      "metadata": {
+        "topic": "nested_loops_break_return",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q2",
+      "question_type": "single_choice",
+      "question_text": "Which single line of code must be put on line `5` to produce the following console output:\n\n```\nPenguinEgg Iceberg FrozenFish \n```\n\n```java\n1  import java.util.*;\n2\n3  public class SouthPoleSouvenirs {\n4       public static void main(String[] args) {\n5          /* GAP */\n6\n7          souvenirBottle.add(\"Iceberg \");\n8          souvenirBottle.add(\"PenguinEgg \");\n9          souvenirBottle.add(\"FrozenFish \");\n10\n11         System.out.print(souvenirBottle.get(1));\n12         System.out.print(souvenirBottle.get(0));\n13         System.out.print(souvenirBottle.get(2));\n14     }\n15 }\n```",
+      "options": [
+        "`List<String> souvenirBottle = new ArrayList<>();`",
+        "`Stack<String> souvenirBottle = new Stack<>();`",
+        "`Set<Integer> souvenirBottle = new HashSet<>();`",
+        "`Queue souvenirTube = new Queue();`"
+      ],
+      "correct_answer": "`List<String> souvenirBottle = new ArrayList<>();`",
+      "explanation": {
+        "`List<String> souvenirBottle = new ArrayList<>();`": "Correct. ArrayList preserves insertion order and supports the get(int index) method needed to access elements at specific positions.",
+        "`Stack<String> souvenirBottle = new Stack<>();`": "Incorrect. Stack is designed for LIFO operations (push/pop) and is not intended for random index-based access.",
+        "`Set<Integer> souvenirBottle = new HashSet<>();`": "Incorrect. Set collections are unordered and do not support the get() method for accessing elements by index.",
+        "`Queue souvenirTube = new Queue();`": "Incorrect. Queue is an interface designed for FIFO processing and does not support random access via an index. It also cannot be instantiated directly."
+      },
+      "metadata": {
+        "topic": "list_arraylist_index_access",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q3",
+      "question_type": "single_choice",
+      "question_text": "Which single line of code must be put on line `25` to produce the following console output:\n\n```\nDives Generic-Mammal\n```\n\n```java\n1  class Seal {\n2      String swim() {\n3          return \"Swims\";\n4      }\n5      String title() {\n6          return \"Generic-Mammal\";\n7      }\n8  }\n9  class SouthPoleSeal extends Seal {\n10     @Override\n11     String swim() {\n12         return \"Dives\";\n13     }\n14     @Override\n15     String title() {\n16         return \"Brave-Swimmer\";\n17     }\n18     String information() {\n19         return super.title();\n20     }\n21 }\n22 public class PolySouthPole {\n23     public static void main(String[] args) {\n24         Seal mySeal = new SouthPoleSeal();\n25         /* GAP */\n26     }\n27 }\n```",
+      "options": [
+        "`System.out.print(mySeal.swim() + \" \" + ((SouthPoleSeal) mySeal).information());`",
+        "`System.out.print(mySeal.swim() + \" \" + mySeal.title());`",
+        "`System.out.print(mySeal.title() + \" \" + mySeal.swim());`",
+        "`System.out.print(mySeal.title() + \" \" + super.swim());`"
+      ],
+      "correct_answer": "`System.out.print(mySeal.swim() + \" \" + ((SouthPoleSeal) mySeal).information());`",
+      "explanation": {
+        "`System.out.print(mySeal.swim() + \" \" + ((SouthPoleSeal) mySeal).information());`": "Correct. Casting to SouthPoleSeal grants access to information(), which calls super.title() and returns \"Generic-Mammal\". Polymorphism ensures mySeal.swim() dispatches to the overridden version, returning \"Dives\".",
+        "`System.out.print(mySeal.swim() + \" \" + mySeal.title());`": "Incorrect. Due to polymorphism, mySeal.title() executes the overridden version in SouthPoleSeal and returns \"Brave-Swimmer\" instead of \"Generic-Mammal\".",
+        "`System.out.print(mySeal.title() + \" \" + mySeal.swim());`": "Incorrect. This reverses the output order and also incorrectly calls the overridden title(), returning \"Brave-Swimmer\" rather than \"Generic-Mammal\".",
+        "`System.out.print(mySeal.title() + \" \" + super.swim());`": "Incorrect. The super keyword is instance-specific and cannot be used inside a static main method to access parent class members."
+      },
+      "metadata": {
+        "topic": "polymorphism_override_super_casting",
+        "difficulty_level": "hard"
+      }
+    }
+  ],
+  "metadata": {
+    "target_audience": "undergraduate",
+    "estimated_time_minutes": 15,
+    "learning_objectives": [
+      "Apply nested loops with break and return to control program flow and predict the resulting output",
+      "Select the correct Java collection (ArrayList) based on index-based access requirements using get()",
+      "Predict method dispatch under polymorphism and use super and downcasting to access parent-class behaviour"
+    ]
+  },
+  "created_at": "2026-03-26T00:00:00"
+}

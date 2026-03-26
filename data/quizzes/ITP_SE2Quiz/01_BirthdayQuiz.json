@@ -1,0 +1,83 @@
+{
+  "quiz_id": "SE2_Birthday",
+  "title": "Introduction to Programming – Birthday Quiz",
+  "source_material": "ITP",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "single_choice",
+      "question_text": "Which statement correctly describes what this method does (assuming `data` contains only strings of length at least 2)?\n\n```java\nimport java.util.*;\n\npublic class BirthdaySort {\n    public static void applyGuestNameOrder(List<String> data) {\n        data.sort(new Comparator<String>() {\n            @Override\n            public int compare(String a, String b) {\n                if (a.charAt(1) != b.charAt(1)) {\n                    return a.charAt(1) - b.charAt(1);\n                } else {\n                    return a.charAt(0) - b.charAt(0);\n                }\n            }\n        });\n    }\n}\n```",
+      "options": [
+        "`applyGuestNameOrder` sorts the list first by the second character, and if equal, by the first character.",
+        "`applyGuestNameOrder` sorts the list alphabetically by the complete string.",
+        "`applyGuestNameOrder` sorts the list first by the first character, and if equal, by the second character.",
+        "`applyGuestNameOrder` keeps the list unchanged because the `compare(String, String)` method has no return value."
+      ],
+      "correct_answer": "`applyGuestNameOrder` sorts the list first by the second character, and if equal, by the first character.",
+      "explanation": {
+        "`applyGuestNameOrder` sorts the list first by the second character, and if equal, by the first character.": "Correct. The comparator compares the characters at index 1 first and only falls back to comparing characters at index 0 if those are equal.",
+        "`applyGuestNameOrder` sorts the list alphabetically by the complete string.": "Incorrect. Alphabetical sorting compares characters from the beginning of the string onward, but this comparator starts at index 1, not index 0.",
+        "`applyGuestNameOrder` sorts the list first by the first character, and if equal, by the second character.": "Incorrect. The comparator checks the character at index 1 before checking the character at index 0, not the other way around.",
+        "`applyGuestNameOrder` keeps the list unchanged because the `compare(String, String)` method has no return value.": "Incorrect. The compare() method returns an int, which is required by the Comparator contract. Since a valid Comparator is provided, sort() will reorder the list in-place."
+      },
+      "metadata": {
+        "topic": "sorting_comparator_custom",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q2",
+      "question_type": "single_choice",
+      "question_text": "Which statement about this use of `parallelStream()` is correct (assuming this program is executed multiple times)?\n\n```java\nimport java.util.*;\n\npublic class ParallelGuestRanks {\n    public static void printGuestRanks() {\n        List<Integer> numbers = Arrays.asList(5, 3, 2, 4, 1);\n\n        numbers.parallelStream()\n               .forEach(n -> System.out.print(n + \" \"));\n    }\n}\n```",
+      "options": [
+        "The order of the console output is not guaranteed and may differ from `5 3 2 4 1`.",
+        "The console output is always `5 3 2 4 1` because the list defines the order of processing.",
+        "The console output is always `1 2 3 4 5` because parallel streams reorder elements.",
+        "The program does not compile because `parallelStream()` is only allowed for `Set`."
+      ],
+      "correct_answer": "The order of the console output is not guaranteed and may differ from `5 3 2 4 1`.",
+      "explanation": {
+        "The order of the console output is not guaranteed and may differ from `5 3 2 4 1`.": "Correct. A parallel stream processes elements concurrently across multiple threads. forEach() does not guarantee encounter order in parallel execution, so the printed order may vary between runs.",
+        "The console output is always `5 3 2 4 1` because the list defines the order of processing.": "Incorrect. Encounter order is not preserved when using parallelStream() together with forEach().",
+        "The console output is always `1 2 3 4 5` because parallel streams reorder elements.": "Incorrect. Parallel streams do not sort elements unless a sorted() operation is explicitly added to the pipeline.",
+        "The program does not compile because `parallelStream()` is only allowed for `Set`.": "Incorrect. parallelStream() is defined on the Collection interface and works for List, Set, and all other collection types."
+      },
+      "metadata": {
+        "topic": "parallel_streams_forEach_ordering",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q3",
+      "question_type": "single_choice",
+      "question_text": "For `isGuestAllowed(GuestType.UNKNOWN)`, the returned result is `false`. Which statement correctly explains why this happens?\n\n```java\npublic enum GuestType {\n    FRIEND, FAMILY, UNKNOWN;\n}\n\npublic class BirthdayParty {\n\n    public static boolean isGuestAllowed(GuestType guestType) {\n        if (guestType == GuestType.UNKNOWN) {\n            return false;\n        }\n        return true;\n    }\n}\n```",
+      "options": [
+        "The method returns `false` only for `UNKNOWN`, and `true` for all other guest types.",
+        "The method returns `false` for all guest types except `UNKNOWN`.",
+        "The code does not compile because `FRIEND` and `FAMILY` are not handled explicitly.",
+        "The method throws a `NullPointerException` when `UNKNOWN` is passed."
+      ],
+      "correct_answer": "The method returns `false` only for `UNKNOWN`, and `true` for all other guest types.",
+      "explanation": {
+        "The method returns `false` only for `UNKNOWN`, and `true` for all other guest types.": "Correct. The method explicitly returns false only when the guest type is UNKNOWN. For all other enum constants such as FRIEND and FAMILY, the condition is false and execution reaches the final return true.",
+        "The method returns `false` for all guest types except `UNKNOWN`.": "Incorrect. The if condition checks only for UNKNOWN. If the guest type is FRIEND or FAMILY, the method returns true, not false.",
+        "The code does not compile because `FRIEND` and `FAMILY` are not handled explicitly.": "Incorrect. Java does not require all enum constants to be handled in an if statement. The method compiles because all execution paths return a value.",
+        "The method throws a `NullPointerException` when `UNKNOWN` is passed.": "Incorrect. UNKNOWN is a valid enum constant. Comparing enums with == is safe and does not cause a NullPointerException."
+      },
+      "metadata": {
+        "topic": "enums_comparison_control_flow",
+        "difficulty_level": "easy"
+      }
+    }
+  ],
+  "metadata": {
+    "target_audience": "undergraduate",
+    "estimated_time_minutes": 15,
+    "learning_objectives": [
+      "Read and interpret a custom Comparator to determine the sort order it produces",
+      "Understand that parallelStream() with forEach() does not guarantee encounter order across multiple executions",
+      "Trace control flow through an enum-based if statement and identify which values trigger each return path"
+    ]
+  },
+  "created_at": "2026-03-26T00:00:00"
+}
