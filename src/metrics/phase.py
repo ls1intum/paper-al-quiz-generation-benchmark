@@ -1,8 +1,10 @@
 """Evaluation phase DTOs for the metric pipeline."""
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Type, Callable
+from typing import Any, Callable, Dict, Optional, Type
+
 from pydantic import BaseModel
+
 from ..models.quiz import Quiz, QuizQuestion
 from ..models.instruction import QuizInstructions
 
@@ -13,7 +15,7 @@ class PhaseInput:
 
     Attributes:
         prompt_builder: Callable that builds the prompt from this input.
-            Required — phases will raise if absent.
+            Optional for deterministic Python phases.
         source_text: Raw source material text.
         quiz: Full quiz being evaluated.
         question: Current question, populated only during fan-out phases.
@@ -21,7 +23,7 @@ class PhaseInput:
         accumulated: Outputs from all previously completed phases, keyed by phase name.
     """
 
-    prompt_builder: Callable[["PhaseInput"], str]
+    prompt_builder: Optional[Callable[["PhaseInput"], str]]
     source_text: Optional[str] = None
     quiz: Optional[Quiz] = None
     question: Optional[QuizQuestion] = None
@@ -49,28 +51,34 @@ class PhaseOutput:
 class Phase:
     """A single stage in a metric's evaluation pipeline.
 
-    Each Phase is responsible for building its own prompt from a PhaseInput
-    and declaring the schema the LLM response should conform to. The
-    evaluation orchestrator in BaseMetric.evaluate() calls build_prompt(),
-    runs the LLM call, and stores the result as a PhaseOutput which is
+    Each Phase declares the schema its output should conform to. A phase can
+    either call the LLM using a prompt_builder or use a deterministic Python
+    processor. The evaluation orchestrator in BaseMetric.evaluate() calls
+    Phase.process() and stores the validated result as a PhaseOutput which is
     passed forward to subsequent phases via PhaseInput.accumulated.
 
     Attributes:
         name: Unique identifier for this phase within the pipeline.
         output_schema: Pydantic model class the LLM response is validated against.
-        fan_out: If True, build_prompt() is called once per question in the quiz,
-            producing one LLM call per question. Results are collected as a list
-            under PhaseOutput.data["results"].
+        fan_out: If True, the phase runs once per question in the quiz.
+        processor: Optional deterministic Python processor. When present, this
+            is used instead of an LLM call.
     """
 
     name: str
     output_schema: Type[BaseModel]
     fan_out: bool = False
+    processor: Optional[Callable[[PhaseInput], Dict[str, Any]]] = None
 
     def process(self, phase_input: PhaseInput, llm_client: Any) -> Dict[str, Any]:
-        """Builds the prompt from phase_input and calls the LLM."""
-        prompt = phase_input.prompt_builder(phase_input)
-        result: Dict[str, Any] = llm_client.generate_structured(
-            prompt=prompt, schema=self.output_schema
-        )
-        return result
+        """Run the phase and validate the result against output_schema."""
+        if self.processor is not None:
+            result = self.processor(phase_input)
+        else:
+            if phase_input.prompt_builder is None:
+                raise ValueError(f"Phase '{self.name}' requires a prompt_builder")
+            prompt = phase_input.prompt_builder(phase_input)
+            result = llm_client.generate_structured(prompt=prompt, schema=self.output_schema)
+
+        validated = self.output_schema.model_validate(result)
+        return validated.model_dump()
