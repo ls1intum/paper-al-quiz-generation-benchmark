@@ -17,6 +17,7 @@ from src.metrics.difficulty import DifficultyMetric
 from src.metrics.coverage import CoverageMetric
 from src.metrics.clarity import ClarityMetric
 from src.metrics.distractor import DistractorQualityMetric
+from src.metrics.homogeneous_options import HomogeneousOptionsMetric
 from src.metrics.accuracy import FactualAccuracyMetric
 from src.runners.benchmark import BenchmarkRunner
 from src.utils.config_loader import ConfigLoader
@@ -31,6 +32,7 @@ def register_metrics() -> None:
     MetricRegistry.register(ClarityMetric)
     MetricRegistry.register(GrammaticalCorrectnessMetric)
     MetricRegistry.register(DistractorQualityMetric)
+    MetricRegistry.register(HomogeneousOptionsMetric)
     MetricRegistry.register(FactualAccuracyMetric)
 
 
