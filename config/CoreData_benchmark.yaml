@@ -1,0 +1,32 @@
+benchmark:
+  name: "CoreData_benchmark"
+  version: "1.0.0"
+  runs: 1  # Number of times to repeat the evaluation
+
+evaluators:
+  gpt5:
+    provider: "azure_openai"
+    model: "gpt-5"  # Your Azure deployment name
+    temperature: 0.0
+    max_tokens: 1000
+
+  gpt4:
+    provider: "azure_openai"
+    model: "gpt-4o"
+    temperature: 0.0
+    max_tokens: 2000
+
+metrics:
+  - name: "coverage"
+    version: "1.0"
+    evaluators: [ "gpt4" ]
+    enabled: true
+
+inputs:
+  quiz_directory: "data/quizzes/CoreDataQuiz.json"
+  source_directory: "data/inputs"
+  instructions_directory: "data/instructions"
+
+outputs:
+  results_directory: "data/results"
+  aggregate: true

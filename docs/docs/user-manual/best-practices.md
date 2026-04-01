@@ -76,7 +76,35 @@ sidebar_position: 5
 - Use metrics inappropriate for question type
 - Deploy untested custom metrics
 
-### 6. Result Interpretation
+### 6. Source Material Management
+
+For single-file source materials:
+
+✅ **DO**:
+- Use clear Markdown formatting with proper headers
+- Include all content referenced in questions
+- Keep PDFs as text-based (not scanned images)
+- Verify file encoding is UTF-8
+
+For multi-file source materials (folders):
+
+✅ **DO**:
+- Group related content in a single folder
+- Name files with numeric prefixes for consistent ordering: `01_`, `02_`, etc.
+- Include a mix of formats where appropriate (PDFs for textbooks, Markdown for notes)
+- Test with 2-3 files before adding many
+- Document topic coverage in folder name (e.g., `module_1_basics/`)
+
+❌ **DON'T**:
+- Mix hundreds of files in a single folder
+- Use unclear file names without descriptive labels
+- Include unrelated materials in the source folder
+- Rely on alphabetical ordering without explicit naming
+- Use scanned/image-based PDFs (system can't extract text)
+
+**Performance Tip:** Multiple small files (5-20 files) generally perform better than one massive file, as LLMs handle structured, chunked material more effectively.
+
+### 7. Result Interpretation
 
 ✅ **DO**:
 - Look at trends across multiple quizzes

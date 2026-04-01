@@ -130,6 +130,10 @@ class CoverageMetric(BaseMetric):
 **Source Material**:
 {inp.source_text}
 
+**Important**: This source may contain a course schedule or table of contents listing 
+other lectures. IGNORE those — extract only topics that are actually taught in depth 
+in this document, not merely mentioned in a schedule or roadmap slide.
+
 **Task**:
 1. List 5-15 HIGH-LEVEL topics that the source covers. Group related concepts together.
 2. From those topics, identify the 4-6 most critical "must-know" concepts — the ones \
