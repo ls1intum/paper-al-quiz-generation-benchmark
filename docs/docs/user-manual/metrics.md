@@ -123,18 +123,84 @@ sidebar_position: 4
 
 ### 5. Distractor Quality
 
-**Purpose**: Evaluate whether incorrect options are plausible to students lacking mastery but clearly wrong to knowledgeable students; should be based on common misconceptions.
+**Purpose**: Evaluate whether incorrect options (distractors) are pedagogically effective—plausible to students lacking mastery but clearly wrong to knowledgeable students. Distractors should target specific misconceptions and discriminate between knowledge levels.
 
 **References**: Gierl et al. [9], Haladyna & Rodriguez [11]
 
 **Scope**: Question-level
 
-**Evaluation Criteria**:
-- Plausibility to novices
-- Based on documented misconceptions
-- Not obviously incorrect
-- Discriminates between knowledge levels
-- Avoids "all of the above" or "none of the above"
+**Supported Question Types**: Single-choice, Multiple-choice
+
+**Implementation Overview**
+
+The distractor quality metric uses a **two-phase pipeline** to ensure rigorous, consistent evaluation:
+
+1. **Phase 1 (Analyze)**: Dimensional analysis across five pedagogical dimensions without assigning a score
+2. **Phase 2 (Score)**: Calibrated scoring derived strictly from Phase 1 analysis, with explicit deduction triggers
+
+This approach reduces variance and improves consistency across multiple runs.
+
+**Five Analysis Dimensions**
+
+1. **Plausibility & Source Alignment**
+   - Does each distractor use specific vocabulary, values, or concepts from the source material?
+   - Would a student who skimmed the material find it attractive?
+   - Are distractors generic (not grounded in source) or transparently wrong?
+
+2. **Misconception Targeting**
+   - What specific cognitive error or knowledge gap does each distractor exploit?
+   - Are these real, predictable student mistakes—or arbitrary wrong answers?
+   - Can a teacher diagnose exactly what a student misunderstood from their answer selection?
+
+3. **Discriminatory Power**
+   - Can any distractor be eliminated by common sense alone (no domain knowledge required)?
+   - Does eliminating it require genuine mastery, or just surface familiarity?
+   - Is it a trap for students who partially understand the concept?
+
+4. **Collective Quality**
+   - Do distractors cover distinct misconceptions, or do multiple distractors exploit the same error?
+   - Does the distractor set as a whole discriminate better or worse than individual distractors alone?
+   - Does any distractor inadvertently hint at or narrow down the correct answer?
+
+5. **Audience Calibration**
+   - Are distractors appropriately difficult for the expected student level?
+   - Would an expert find them trivially eliminable? Would a total novice find them indistinguishable?
+   - Do they match the source material's complexity level?
+
+**Scoring Rubric (0-100)**
+
+|  Score  |    Level   |                                                      Characteristics                                                                   |
+|---------|------------|----------------------------------------------------------------------------------------------------------------------------------------|
+|  0–20   |    Poor    | Distractors are absurd, unrelated, or obviously wrong to any reader                                                                    |
+|  21–40  |    Weak    | Easily eliminated by common sense; no domain knowledge needed                                                                          |
+|  41–60  |    Fair    | Plausible but generic; not grounded in source material or real misconceptions                                                          |
+|  61–80  |    Good    | Grounded in source material, requires real knowledge to eliminate                                                                      |
+|  81–100 |  Excellent | Highly plausible, exploits specific student errors, covers distinct misconceptions, calibrated to audience, set is collectively strong |
+
+**Deduction Triggers** (Applied additively from starting score of 100)
+
+- Any distractor eliminable by common sense alone: **−10 to −20**
+- Any distractor not tied to source material (generic): **−5 to −15**
+- Two or more distractors exploit same misconception: **−5 to −10**
+- Any distractor inadvertently hints at correct answer: **−10 to −15**
+- Distractor set poorly calibrated for expected audience: **−5 to −10**
+- Predictable, obvious student error missing as distractor: **−5**
+
+**Output Format**
+
+The metric produces structured analysis and scoring output:
+
+```json
+{
+  "plausibility_analysis": "Per-distractor analysis of source alignment",
+  "misconception_analysis": "Per-distractor analysis of cognitive errors targeted",
+  "discrimination_analysis": "Per-distractor analysis of knowledge level discrimination",
+  "collective_analysis": "Analysis of distractor set as a whole",
+  "difficulty_calibration": "Audience-level fit analysis",
+  "deduction_explanation": "List of deductions applied with point values",
+  "score": 72.5
+}
+```
 
 **Example Configuration**:
 ```yaml

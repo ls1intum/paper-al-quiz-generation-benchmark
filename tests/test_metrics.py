@@ -5,6 +5,7 @@ import pytest
 from src.metrics.difficulty import DifficultyMetric
 from src.metrics.coverage import CoverageMetric
 from src.metrics.clarity import ClarityMetric
+from src.metrics.distractor import DistractorQualityMetric
 from src.metrics.base import ScoreResponse
 from src.metrics.homogeneous_options import HomogeneousOptionsMetric
 from src.metrics.phase import Phase, PhaseInput, PhaseOutput
@@ -41,7 +42,7 @@ def make_phase_input(metric, phase_name, **kwargs) -> PhaseInput:
 
 
 @pytest.mark.parametrize("score", [42.0, 88.0, 85.5])
-@pytest.mark.parametrize("metric_cls", [DifficultyMetric, ClarityMetric, FactualAccuracyMetric])
+@pytest.mark.parametrize("metric_cls", [DifficultyMetric, ClarityMetric, DistractorQualityMetric, FactualAccuracyMetric])
 def test_simple_metric_parse_score_success(metric_cls, score):
     """Single-stage metrics should parse a PhaseOutput with a valid score."""
     metric = metric_cls()
@@ -50,7 +51,7 @@ def test_simple_metric_parse_score_success(metric_cls, score):
 
 
 @pytest.mark.parametrize("score", [-1, 101])
-@pytest.mark.parametrize("metric_cls", [DifficultyMetric, ClarityMetric, FactualAccuracyMetric])
+@pytest.mark.parametrize("metric_cls", [DifficultyMetric, ClarityMetric, DistractorQualityMetric, FactualAccuracyMetric])
 def test_simple_metric_parse_score_failure(metric_cls, score):
     """Single-stage metrics should reject out-of-range scores."""
     metric = metric_cls()
@@ -249,6 +250,57 @@ def test_coverage_param_validation():
     with pytest.raises(ValueError, match="should be of type str"):
         metric.validate_params(granularity=10)
 
+def test_distractor_quality_analyze_phase_requires_question():
+    """Distractor quality analyze prompt builder should raise ValueError when question is missing."""
+    metric = DistractorQualityMetric()
+    inp = make_phase_input(metric, "analyze", source_text="Sample text")
+    with pytest.raises(ValueError, match="distractor_quality analyze phase requires a question"):
+        inp.prompt_builder(inp)
+
+def test_distractor_quality_analyze_phase_requires_source_text():
+    """Distractor quality analyze prompt builder should raise ValueError when source_text is missing."""
+    metric = DistractorQualityMetric()
+    inp = make_phase_input(metric, "analyze", question=make_question())
+    with pytest.raises(ValueError, match="distractor_quality analyze phase requires source_text"):
+        inp.prompt_builder(inp)
+
+def test_distractor_quality_analyze_phase_builds_prompt():
+    """Distractor quality analyze prompt builder should return a non-empty string."""
+    metric = DistractorQualityMetric()
+    inp = make_phase_input(metric, "analyze", question=make_question(), source_text="Sample text")
+    prompt = inp.prompt_builder(inp)
+    assert isinstance(prompt, str)
+    assert len(prompt) > 0
+
+def test_distractor_quality_score_phase_requires_analyze_output():
+    """Distractor quality score prompt builder should raise ValueError when analyze output is missing."""
+    metric = DistractorQualityMetric()
+    # Missing 'accumulated' entirely
+    inp = make_phase_input(metric, "score")
+    with pytest.raises(ValueError, match="requires 'analyze' phase output in accumulated"):
+        inp.prompt_builder(inp)
+
+def test_distractor_quality_score_phase_builds_prompt():
+    """Distractor quality score prompt builder should return a non-empty string."""
+    metric = DistractorQualityMetric()
+    analyze_output = PhaseOutput(
+        phase_name="analyze",
+        data={
+            "plausibility_analysis": "test",
+            "misconception_analysis": "test",
+            "discrimination_analysis": "test",
+            "collective_analysis": "test",
+            "difficulty_calibration": "test",
+        }
+    )
+    inp = make_phase_input(
+        metric,
+        "score",
+        accumulated={"analyze": analyze_output}
+    )
+    prompt = inp.prompt_builder(inp)
+    assert isinstance(prompt, str)
+    assert len(prompt) > 0
 def test_homogeneous_options_parse_score_success():
     """HomogeneousOptionsMetric should extract score from aggregate output."""
     metric = HomogeneousOptionsMetric()
