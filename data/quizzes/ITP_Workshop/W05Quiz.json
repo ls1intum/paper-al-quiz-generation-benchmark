@@ -1,0 +1,89 @@
+{
+  "quiz_id": "W05E01",
+  "title": "Introduction to Programming – Core Data Structures Quiz",
+  "source_material": "04_CoreDataStructures.pdf",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "single_choice",
+      "question_text": "Take a look at the following code and select the corresponding output of the console:\n\n```java\nimport java.util.ArrayList;\nimport java.util.List;\n\npublic class Main {\n    public static void main(String[] args) {\n        List<String> exampleList = new ArrayList<>();\n        exampleList.add(\"This\");\n        exampleList.add(\"list\");\n        exampleList.add(\"has\");\n        exampleList.add(\"size\");\n        System.out.print(exampleList + \" \" + exampleList.size());\n    }\n}\n```",
+      "options": [
+        "`[This, list, has, size] 4`",
+        "`[This, list, size] 3`",
+        "`[This, has, size, list] 4`",
+        "`[list, This, has, size] 4`"
+      ],
+      "correct_answer": "`[This, list, has, size] 4`",
+      "explanation": {
+        "`[This, list, has, size] 4`": "Correct. The four strings are added in order: \"This\", \"list\", \"has\", \"size\". A List preserves insertion order, so `toString()` produces `[This, list, has, size]`. After four `add()` calls, `size()` returns 4.",
+        "`[This, list, size] 3`": "Incorrect. \"has\" is explicitly added between \"list\" and \"size\" — it is not missing. A List retains all added elements in insertion order, and `size()` would be 4, not 3.",
+        "`[This, has, size, list] 4`": "Incorrect. \"list\" is added immediately after \"This\" and before \"has\". A List preserves the order in which elements were added, so this permutation cannot occur.",
+        "`[list, This, has, size] 4`": "Incorrect. \"This\" is the first element added, so it appears first. A List preserves insertion order, meaning \"list\" cannot appear before \"This\"."
+      },
+      "source_reference": "W04 Core Data Structures – java.util.List<E> (ArrayList, add(), size(), toString())",
+      "metadata": {
+        "topic": "list_insertion_order_and_size",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q2",
+      "question_type": "single_choice",
+      "question_text": "In which order will the numbers be printed to the console?\n\n```java\nimport java.util.Stack;\n\npublic class Main {\n    public static void main(String[] args) {\n        Stack<Integer> stack = new Stack<>();\n        stack.push(53);\n        stack.push(23);\n        stack.push(24);\n        stack.push(42);\n        while (!stack.isEmpty()) {\n            System.out.print(stack.pop() + \"; \");\n        }\n    }\n}\n```",
+      "options": [
+        "`42; 24; 23; 53; `",
+        "`53; 23; 24; 42; `",
+        "`53; 42; 24; 23; `",
+        "`23; 24; 42; 53; `"
+      ],
+      "correct_answer": "`42; 24; 23; 53; `",
+      "explanation": {
+        "`42; 24; 23; 53; `": "Correct. A Stack follows the LIFO (Last In, First Out) principle — the element pushed last is popped first. The push order is 53 → 23 → 24 → 42, so the pop order is the exact reverse: 42 → 24 → 23 → 53.",
+        "`53; 23; 24; 42; `": "Incorrect. This is the push order, not the pop order. A Stack operates on LIFO, meaning elements are removed in the reverse of the order they were added.",
+        "`53; 42; 24; 23; `": "Incorrect. A Stack does not sort its contents in descending order. It simply reverses the insertion order, so 42 (pushed last) is popped first and 53 (pushed first) is popped last.",
+        "`23; 24; 42; 53; `": "Incorrect. A Stack does not sort its contents in ascending order. The correct pop order is 42, 24, 23, 53 — the reverse of the push sequence."
+      },
+      "source_reference": "W04 Core Data Structures – Stack (LIFO principle, push(), pop(), isEmpty())",
+      "metadata": {
+        "topic": "stack_lifo_push_pop",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q3",
+      "question_type": "multiple_choice",
+      "question_text": "Take a look at the following code snippet. Which statements are correct?\n\n```java\nimport java.util.HashSet;\nimport java.util.Set;\n\npublic class Main {\n    public static void main(String[] args) {\n        Set<String> princesses = new HashSet<>();\n        princesses.add(\"Snow White\");\n        princesses.add(\"Cinderella\");\n        princesses.add(\"Ariel\");\n        princesses.add(\"Cinderella\");\n        princesses.add(\"Aurora\");\n        for (String princess : princesses) {\n            System.out.print(princess + \"; \");\n        }\n    }\n}\n```",
+      "options": [
+        "The Set contains the following elements: `Snow White`, `Cinderella`, `Ariel`, `Cinderella` and `Aurora`",
+        "A `DuplicateEntryException` is thrown",
+        "The Set contains the following elements: `Aurora`, `Ariel`, `Snow White` and `Cinderella`",
+        "The Set contains the following elements: `Aurora`, `Ariel`, `Cinderella` and `Snow White`"
+      ],
+      "correct_answer": [
+        "The Set contains the following elements: `Aurora`, `Ariel`, `Snow White` and `Cinderella`",
+        "The Set contains the following elements: `Aurora`, `Ariel`, `Cinderella` and `Snow White`"
+      ],
+      "explanation": {
+        "The Set contains the following elements: `Snow White`, `Cinderella`, `Ariel`, `Cinderella` and `Aurora`": "Incorrect. A Set stores only unique elements. The second attempt to add \"Cinderella\" is silently discarded, so the Set contains exactly four distinct elements, not five.",
+        "A `DuplicateEntryException` is thrown": "Incorrect. The `Set` interface is designed to store unique entries. When `add()` is called with a value already present in the Set, the method simply returns `false` — no exception is thrown.",
+        "The Set contains the following elements: `Aurora`, `Ariel`, `Snow White` and `Cinderella`": "Correct. A Set rejects duplicate entries, so only one \"Cinderella\" is stored. A HashSet does not guarantee any particular iteration order, so this is one valid ordering of the four unique elements.",
+        "The Set contains the following elements: `Aurora`, `Ariel`, `Cinderella` and `Snow White`": "Correct. The four unique elements are the same; only the iteration order differs. A HashSet does not guarantee a consistent ordering, so both this and the preceding option are valid outputs."
+      },
+      "source_reference": "W04 Core Data Structures – java.util.Set<E> (HashSet, uniqueness, unordered iteration)",
+      "metadata": {
+        "topic": "set_uniqueness_and_hashset_ordering",
+        "difficulty_level": "medium"
+      }
+    }
+  ],
+  "metadata": {
+    "target_audience": "undergraduate",
+    "estimated_time_minutes": 10,
+    "learning_objectives": [
+      "Understand that a List preserves insertion order and correctly report its size and string representation",
+      "Apply the LIFO principle of a Stack to predict the output order of push() and pop() operations",
+      "Distinguish Set behaviour from List behaviour: uniqueness enforcement, silent duplicate rejection, and unordered HashSet iteration"
+    ]
+  },
+  "created_at": "2026-03-26T00:00:00"
+}

@@ -1,0 +1,86 @@
+{
+  "quiz_id": "W09E01",
+  "title": "Introduction to Programming – Functional Programming Essentials Quiz",
+  "source_material": "08_FunctionalProgrammingEssentials.pdf",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "single_choice",
+      "question_text": "Have a look at the following code. Which of the statements is correct?\n\n```java\ninterface StringOperation {\n    String manipulate(String str1);\n}\npublic class Main {\n    public static void main(String[] args) {\n        StringOperation upperCase = String::toUpperCase;\n        StringOperation replaceChar = (input) -> input.replace(\"<\", \"=\");\n\n        String resultAfterToUpperCase = upperCase.manipulate(\"iris < ChatGPT\");\n        String resultAfterReplace = replaceChar.manipulate(resultAfterToUpperCase);\n        System.out.println(\"Ranking of LLMs: \" + resultAfterReplace);\n    }\n}\n```",
+      "options": [
+        "`Ranking of LLMs: IRIS = CHATGPT`",
+        "`Ranking of LLMs: iris = ChatGPT`",
+        "`Ranking of LLMs: IRIS < CHATGPT`",
+        "Compilation Error"
+      ],
+      "correct_answer": "`Ranking of LLMs: IRIS = CHATGPT`",
+      "explanation": {
+        "`Ranking of LLMs: IRIS = CHATGPT`": "Correct. The method reference `String::toUpperCase` is assigned to `upperCase` as a lambda implementation of `StringOperation`. Calling `upperCase.manipulate(\"iris < ChatGPT\")` converts the entire string to uppercase, yielding `\"IRIS < CHATGPT\"`. This result is then passed to `replaceChar.manipulate()`, which uses the lambda `(input) -> input.replace(\"<\", \"=\")` to replace the `<` symbol with `=`, producing the final output `\"IRIS = CHATGPT\"`.",
+        "`Ranking of LLMs: iris = ChatGPT`": "Incorrect. The method reference `String::toUpperCase` is applied first, converting the input to uppercase before the replacement step. The intermediate result is `\"IRIS < CHATGPT\"`, not the original lowercase string.",
+        "`Ranking of LLMs: IRIS < CHATGPT`": "Incorrect. While `toUpperCase()` is correctly applied, this would be the output only if `replaceChar.manipulate()` were never called. The code explicitly passes `resultAfterToUpperCase` to `replaceChar.manipulate()`, which replaces `<` with `=`.",
+        "Compilation Error": "Incorrect. The code is syntactically valid. `StringOperation` is a functional interface with a single abstract method `manipulate(String)`, so it can legally be implemented via a method reference (`String::toUpperCase`) or a lambda expression. No compilation error occurs."
+      },
+      "source_reference": "W08 Functional Programming Essentials – Lambda expressions, method references (String::toUpperCase), functional interfaces",
+      "metadata": {
+        "topic": "lambda_expressions_and_method_references",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q2",
+      "question_type": "single_choice",
+      "question_text": "Based on the code below, indicate the corresponding output.\n\n```java\nenum ChatApplication {\n    MOODLE, ZULIP, SLACK, DISCORD;\n    public int getUserNumbers() {\n        return switch (this) {\n            case MOODLE   -> 100;\n            case ZULIP    -> 250;\n            case SLACK    -> 500;\n            case DISCORD  -> 1000;\n        };\n    }\n}\npublic class Main {\n    public static void main(String[] args) {\n        ChatApplication chatApp = ChatApplication.SLACK;\n        System.out.println(\"The chat app \" + chatApp + \" is used by \" + chatApp.getUserNumbers() + \" users.\");\n    }\n}\n```",
+      "options": [
+        "`The chat app SLACK is used by 500 users.`",
+        "`The chat app DISCORD is used by 500 users.`",
+        "`The chat app ZULIP is used by 1000 users.`",
+        "`The chat app SLACK is used by 250 users.`"
+      ],
+      "correct_answer": "`The chat app SLACK is used by 500 users.`",
+      "explanation": {
+        "`The chat app SLACK is used by 500 users.`": "Correct. `chatApp` is assigned `ChatApplication.SLACK`. When concatenated in the print statement, an enum value's `toString()` returns its name, so `chatApp` prints as `SLACK`. The switch expression inside `getUserNumbers()` matches `case SLACK` and returns `500`.",
+        "`The chat app DISCORD is used by 500 users.`": "Incorrect. `DISCORD` is not assigned to `chatApp`; the variable holds `ChatApplication.SLACK`. The switch expression would return `1000` for `DISCORD`, not `500`.",
+        "`The chat app ZULIP is used by 1000 users.`": "Incorrect. `chatApp` is assigned `SLACK`, not `ZULIP`. Additionally, `getUserNumbers()` returns `250` for `ZULIP` and `1000` for `DISCORD` — neither matches this output.",
+        "`The chat app SLACK is used by 250 users.`": "Incorrect. While `chatApp` is correctly identified as `SLACK`, the switch expression returns `500` for that case, not `250`. The value `250` corresponds to `ZULIP`."
+      },
+      "source_reference": "W08 Functional Programming Essentials – Enum types, switch expressions (arrow syntax, no fall-through, exhaustiveness)",
+      "metadata": {
+        "topic": "enum_and_switch_expressions",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q3",
+      "question_type": "single_choice",
+      "question_text": "Students of a philosophy course are voting on a communication channel. The votes are saved in a `List<Integer>`. What is the output when the `main` method is executed?\n\n```java\npublic class Main {\n    public static void main(String[] args) {\n        List<Integer> channelVotes = new ArrayList<>();\n        // votes for Email\n        channelVotes.add(62);\n        // votes for Discord\n        channelVotes.add(96);\n        // votes for Zulip\n        channelVotes.add(58);\n        // votes for WhatsApp\n        channelVotes.add(43);\n\n        Collections.sort(channelVotes, new Comparator<Integer>() {\n            @Override\n            public int compare(Integer val1, Integer val2) {\n                return val2 - val1;\n            }\n        });\n        System.out.println(\"The communication channel with the most votes has received \"\n            + channelVotes.get(0) + \" votes.\");\n    }\n}\n```",
+      "options": [
+        "`The communication channel with the most votes has received 96 votes.`",
+        "`The communication channel with the most votes has received 58 votes.`",
+        "`The communication channel with the most votes has received 62 votes.`",
+        "`The communication channel with the most votes has received 43 votes.`"
+      ],
+      "correct_answer": "`The communication channel with the most votes has received 96 votes.`",
+      "explanation": {
+        "`The communication channel with the most votes has received 96 votes.`": "Correct. The anonymous inner class implements `Comparator<Integer>` with `compare(val1, val2)` returning `val2 - val1`. When `val2 > val1` the result is positive, so `val2` is placed before `val1` — this sorts the list in descending order. After sorting the list is `[96, 62, 58, 43]`, so `get(0)` returns `96`, the highest vote count.",
+        "`The communication channel with the most votes has received 58 votes.`": "Incorrect. The `Comparator` sorts the list in descending order (`val2 - val1`), placing the largest value at index 0. `58` ends up at index 2 after sorting, not at index 0.",
+        "`The communication channel with the most votes has received 62 votes.`": "Incorrect. After a descending sort the list is `[96, 62, 58, 43]`. `62` is at index 1, not index 0, so `get(0)` does not return it.",
+        "`The communication channel with the most votes has received 43 votes.`": "Incorrect. `43` would be at index 0 only if the comparator used `val1 - val2`, which sorts in ascending order. Because `val2 - val1` is used, the list is sorted in descending order and `43` ends up last."
+      },
+      "source_reference": "W08 Functional Programming Essentials – Collections.sort(), Comparator<T> (anonymous inner class, compare() return value semantics, ascending vs descending order)",
+      "metadata": {
+        "topic": "collections_sort_comparator_anonymous_inner_class",
+        "difficulty_level": "medium"
+      }
+    }
+  ],
+  "metadata": {
+    "target_audience": "undergraduate",
+    "estimated_time_minutes": 10,
+    "learning_objectives": [
+      "Trace the execution of a functional interface implemented via a method reference and a lambda expression, predicting the string output after chained manipulations",
+      "Read an enum with a switch expression method and determine the printed output for a specific enum constant",
+      "Interpret a Comparator implemented as an anonymous inner class, identifying whether val2 - val1 produces ascending or descending order and predicting the element at a given list index after sorting"
+    ]
+  },
+  "created_at": "2026-03-26T00:00:00"
+}

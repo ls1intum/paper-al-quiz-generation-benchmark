@@ -1,0 +1,278 @@
+{
+  "quiz_id": "quiz_core_data_structures_001",
+  "title": "W04 Core Data Structures - Comprehensive Review",
+  "source_material": "ITP",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "single_choice",
+      "question_text": "Which principle does the Stack data structure follow?",
+      "options": [
+        "FIFO – First In, First Out",
+        "LIFO – Last In, First Out",
+        "FILO – First In, Last Out",
+        "Random Access"
+      ],
+      "correct_answer": "LIFO – Last In, First Out",
+      "source_reference": "Stack section: 'Follows the LIFO principle: last in, first out'",
+      "metadata": {
+        "topic": "stack",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q2",
+      "question_type": "single_choice",
+      "question_text": "Which principle does the Queue data structure follow?",
+      "options": [
+        "LIFO – Last In, First Out",
+        "FIFO – First In, First Out",
+        "FILO – First In, Last Out",
+        "Random Access"
+      ],
+      "correct_answer": "FIFO – First In, First Out",
+      "source_reference": "Queue section: Queue follows the FIFO principle",
+      "metadata": {
+        "topic": "queue",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q3",
+      "question_type": "single_choice",
+      "question_text": "What does the `java.util.Set<E>` interface guarantee about its elements?",
+      "options": [
+        "Elements are stored in sorted order",
+        "Elements can be accessed by index",
+        "No duplicate elements are allowed",
+        "Elements are stored in insertion order"
+      ],
+      "correct_answer": "No duplicate elements are allowed",
+      "source_reference": "java.util.Set<E>: 'unordered collection of objects that contains no duplicate elements'",
+      "metadata": {
+        "topic": "set",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q4",
+      "question_type": "single_choice",
+      "question_text": "What is returned by `list.get(index)` in `java.util.List<E>`?",
+      "options": [
+        "A boolean indicating if the element exists",
+        "The element at the specified position",
+        "The index of the element",
+        "The size of the list"
+      ],
+      "correct_answer": "The element at the specified position",
+      "source_reference": "java.util.List<E>: 'get(index: int): E – Retrieves the element at the specified position in the list'",
+      "metadata": {
+        "topic": "list",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q5",
+      "question_type": "single_choice",
+      "question_text": "Which Stack operation places an element on top of the stack?",
+      "options": [
+        "enqueue(element)",
+        "add(element)",
+        "push(element)",
+        "insert(element)"
+      ],
+      "correct_answer": "push(element)",
+      "source_reference": "Stack section: 'void push(Object element) – puts element on top of the stack'",
+      "metadata": {
+        "topic": "stack",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q6",
+      "question_type": "single_choice",
+      "question_text": "When implementing a Queue using an array and it becomes full during `enqueue()`, what happens according to the lecture's implementation?",
+      "options": [
+        "An exception is thrown",
+        "The oldest element is overwritten",
+        "A new array with double the size is created",
+        "The enqueue operation is silently ignored"
+      ],
+      "correct_answer": "A new array with double the size is created",
+      "source_reference": "Implementation: Queue with an Array – enqueue(): 'we create a new array with double size'",
+      "metadata": {
+        "topic": "queue",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q7",
+      "question_type": "single_choice",
+      "question_text": "Which Java class is a concrete implementation of the `List` interface that is based on a dynamic array?",
+      "options": [
+        "LinkedList",
+        "HashSet",
+        "ArrayList",
+        "HashMap"
+      ],
+      "correct_answer": "ArrayList",
+      "source_reference": "java.util.List<E>: 'Offers different implementations – Example: ArrayList'",
+      "metadata": {
+        "topic": "list",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q8",
+      "question_type": "single_choice",
+      "question_text": "What is the correct term for the concept where a data type only exposes its operations while hiding its internal implementation details?",
+      "options": [
+        "Polymorphism",
+        "Information Hiding",
+        "Encapsulation Override",
+        "Type Safety"
+      ],
+      "correct_answer": "Information Hiding",
+      "source_reference": "Abstract data types: 'Specify only the operations, Hide details → Information Hiding'",
+      "metadata": {
+        "topic": "abstract_data_types",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q9",
+      "question_type": "single_choice",
+      "question_text": "In the circular array implementation of a Queue, how is the next index calculated to wrap around the array?",
+      "options": [
+        "(last + 1) / array.length",
+        "(last + 1) % array.length",
+        "(last + 1) * array.length",
+        "last + 1"
+      ],
+      "correct_answer": "(last + 1) % array.length",
+      "source_reference": "Implementation: Queue with an Array – enqueue(): 'last = (last + 1) % length'",
+      "metadata": {
+        "topic": "queue",
+        "difficulty_level": "hard"
+      }
+    },
+    {
+      "question_id": "q10",
+      "question_type": "single_choice",
+      "question_text": "What does the `java.util.List` method `remove(element: E)` return?",
+      "options": [
+        "The index where the element was found",
+        "void",
+        "true if the element was successfully removed",
+        "The removed element itself"
+      ],
+      "correct_answer": "true if the element was successfully removed",
+      "source_reference": "Explanations: 'remove(element: E): boolean – Removes the first occurrence of a specific element from the list, returning true if it was removed'",
+      "metadata": {
+        "topic": "list",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q11",
+      "question_type": "true_false",
+      "question_text": "The `java.util.Set` interface allows elements to be accessed by their index (e.g., `set.get(0)`).",
+      "options": [
+        "True",
+        "False"
+      ],
+      "correct_answer": "False",
+      "source_reference": "java.util.Set<E>: Set does not include a get(index) method in its interface, unlike List",
+      "metadata": {
+        "topic": "set",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q12",
+      "question_type": "true_false",
+      "question_text": "Both `ArrayList` and `LinkedList` implement the same `List` interface in Java.",
+      "options": [
+        "True",
+        "False"
+      ],
+      "correct_answer": "True",
+      "source_reference": "ArrayList vs LinkedList: 'Both implementations in java.util follow the same interface List'",
+      "metadata": {
+        "topic": "list",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q13",
+      "question_type": "true_false",
+      "question_text": "A `ConcurrentModificationException` can occur if a collection is modified while being iterated over with a for-each loop.",
+      "options": [
+        "True",
+        "False"
+      ],
+      "correct_answer": "True",
+      "source_reference": "Error handling and common pitfalls: 'Concurrent modification exceptions occur when a collection is modified while iterating over it'",
+      "metadata": {
+        "topic": "error_handling",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q14",
+      "question_type": "multiple_choice",
+      "question_text": "Which of the following are listed as the most used Java collection types in the lecture? (Select all that apply)",
+      "options": [
+        "List",
+        "Set",
+        "Queue",
+        "Map",
+        "Stack"
+      ],
+      "correct_answer": [
+        "List",
+        "Set",
+        "Queue",
+        "Map"
+      ],
+      "source_reference": "Java collection types: 'Most used types: List, Set, Queue, Map'",
+      "metadata": {
+        "topic": "collections",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q15",
+      "question_type": "multiple_choice",
+      "question_text": "Which of the following are stated disadvantages of using boxed Integers in generic collection types (e.g., `List<Integer>`) compared to primitive `int[]` arrays? (Select all that apply)",
+      "options": [
+        "They require more memory space (~twice as much)",
+        "They lead to many small objects distributed over memory, causing worse cache behavior",
+        "They cannot store negative numbers",
+        "You have to deal with null values"
+      ],
+      "correct_answer": [
+        "They require more memory space (~twice as much)",
+        "They lead to many small objects distributed over memory, causing worse cache behavior",
+        "You have to deal with null values"
+      ],
+      "source_reference": "int[] section: disadvantages of using boxed types in generic collections",
+      "metadata": {
+        "topic": "collections",
+        "difficulty_level": "hard"
+      }
+    }
+  ],
+  "metadata": {
+    "target_audience": "undergraduate",
+    "estimated_time_minutes": 20,
+    "learning_objectives": [
+      "Implement and use simple abstract data types such as List, Stack and Queue",
+      "Explain how stacks and queues work internally",
+      "Explain the differences between a List and an Array",
+      "Distinguish between List and Array based data types",
+      "Use simple built-in collection types such as List and Set"
+    ]
+  },
+  "created_at": "2026-03-23T00:00:00"
+}

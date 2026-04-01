@@ -38,12 +38,60 @@ def test_load_quiz_and_all_quizzes(tmp_path):
     quizzes = IOUtils.load_all_quizzes(str(quiz_dir))
     assert len(quizzes) == 1
 
+    quizzes_single = IOUtils.load_all_quizzes(str(quiz_path))
+    assert len(quizzes_single) == 1
+    assert quizzes_single[0].quiz_id == "quiz_1"
 
-def test_load_source_text(tmp_path):
+def test_load_all_quizzes_skips_invalid(tmp_path):
+    quiz_dir = tmp_path / "quizzes"
+    quiz_dir.mkdir()
+
+    # valid quiz
+    valid = {
+        "quiz_id": "quiz_valid",
+        "title": "Valid",
+        "source_material": "source.md",
+        "questions": [
+            {
+                "question_id": "q1",
+                "question_type": "single_choice",
+                "question_text": "Q?",
+                "options": ["A"],
+                "correct_answer": "A",
+            }
+        ],
+    }
+    (quiz_dir / "valid.json").write_text(json.dumps(valid))
+
+    # invalid quiz (missing required fields)
+    (quiz_dir / "invalid.json").write_text("{}")
+
+    quizzes = IOUtils.load_all_quizzes(str(quiz_dir))
+    assert len(quizzes) == 1
+    assert quizzes[0].quiz_id == "quiz_valid"
+
+def test_load_quiz_file_not_found(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        IOUtils.load_quiz(str(tmp_path / "nonexistent.json"))
+
+def test_load_all_quizzes_directory_not_found(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        IOUtils.load_all_quizzes(str(tmp_path / "nonexistent"))
+
+def test_load_source_text_markdown(tmp_path):
     source_path = tmp_path / "source.md"
     source_path.write_text("hello")
     assert IOUtils.load_source_text(str(source_path)) == "hello"
 
+def test_load_source_text_unsupported_format(tmp_path):
+    source_path = tmp_path / "source.txt"
+    source_path.write_text("hello")
+    with pytest.raises(ValueError, match="Unsupported file format"):
+        IOUtils.load_source_text(str(source_path))
+
+def test_load_source_text_file_not_found(tmp_path):
+    with pytest.raises(FileNotFoundError):
+        IOUtils.load_source_text(str(tmp_path / "nonexistent.md"))
 
 def test_save_results_and_aggregated_results(tmp_path):
     question = QuizQuestion(
@@ -84,6 +132,12 @@ def test_save_results_and_aggregated_results(tmp_path):
     IOUtils.save_results([result], str(output_path))
     assert output_path.exists()
 
+    # verify saved content is valid JSON with expected fields
+    saved = json.loads(output_path.read_text())
+    assert len(saved) == 1
+    assert saved[0]["quiz_id"] == "quiz_1"
+    assert saved[0]["metrics"][0]["metric_name"] == "difficulty"
+
     agg = AggregatedResults(
         benchmark_config_name="test",
         benchmark_version="1.0",
@@ -106,3 +160,7 @@ def test_save_results_and_aggregated_results(tmp_path):
     agg_path = tmp_path / "agg.json"
     IOUtils.save_aggregated_results(agg, str(agg_path))
     assert agg_path.exists()
+
+    saved_agg = json.loads(agg_path.read_text())
+    assert saved_agg["benchmark_config_name"] == "test"
+    assert "difficulty_mock" in saved_agg["aggregations"]
