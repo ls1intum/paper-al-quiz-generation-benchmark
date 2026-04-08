@@ -119,7 +119,7 @@ class BenchmarkRunner:
         supported_extensions = {".md", ".pdf"}
 
         # Sort files for consistent ordering
-        files = sorted(folder_path.iterdir())
+        files = sorted(folder_path.rglob("*"))
 
         for file_path in files:
             if file_path.suffix.lower() in supported_extensions and file_path.is_file():

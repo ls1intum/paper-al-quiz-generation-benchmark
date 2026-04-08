@@ -1,0 +1,86 @@
+{
+  "quiz_id": "W13E01",
+  "title": "Introduction to Programming – Recursion Quiz",
+  "source_material": "12_Recursion.pdf",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "single_choice",
+      "question_text": "Have a look at the following code snippet. How many times will the method `fibonacci(int n)` be called when the main method is executed?\n\n```java\npublic class Main {\n    public static int fibonacci(int n) {\n        if (n <= 1) {\n            return n;\n        }\n        return fibonacci(n - 1) + fibonacci(n - 2);\n    }\n\n    public static void main(String[] args) {\n        System.out.println(fibonacci(3));\n    }\n}\n```",
+      "options": [
+        "5",
+        "3",
+        "9",
+        "1"
+      ],
+      "correct_answer": "5",
+      "explanation": {
+        "5": "Correct. Tracing the call tree: fibonacci(3) calls fibonacci(2) and fibonacci(1). fibonacci(2) calls fibonacci(1) and fibonacci(0). Neither fibonacci(1) nor fibonacci(0) recurse further — they hit the base case `n <= 1`. That gives us five total calls: fibonacci(3), fibonacci(2), fibonacci(1), fibonacci(0), fibonacci(1). Each recursive call spawns a new method instance with its own local copy of `n`, as described in the lecture slides.",
+        "3": "Incorrect. Three calls would only occur if each invocation called itself at most once (e.g. decrementing n by 1 until n = 1). Because `fibonacci` makes two recursive calls per invocation for n > 1, the call tree fans out more broadly. The correct answer is 5.",
+        "9": "Incorrect. Nine calls is the correct count for `fibonacci(4)`, not `fibonacci(3)`. Each extra level of recursion roughly doubles the number of calls — this exponential growth (O(2^n) complexity) is exactly why the lecture recommends an iterative Fibonacci implementation for large n.",
+        "1": "Incorrect. Because `fibonacci` is recursive and n = 3 is greater than 1, the method does not return immediately — it calls itself. A single call only occurs when n <= 1 (the base case). The correct answer is 5."
+      },
+      "source_reference": "W12 Recursion – Recursive methods, direct recursion, terminating conditions",
+      "metadata": {
+        "topic": "recursive_call_counting_fibonacci",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q2",
+      "question_type": "single_choice",
+      "question_text": "Have a look at the following code snippet. How many times will the method `pow(double base, int exponent)` be called when the main method is executed?\n\n```java\npublic class Main {\n    public static void main(String[] args) {\n        int base = 2;\n        int exponent = 3;\n        pow(base, exponent);\n    }\n    public static double pow(double base, int exponent) {\n        if (exponent == 0) {\n            return 1;\n        }\n        return base * pow(base, exponent - 1);\n    }\n}\n```",
+      "options": [
+        "1",
+        "4",
+        "3",
+        "2"
+      ],
+      "correct_answer": "4",
+      "explanation": {
+        "4": "Correct. `pow` is a singly-recursive method — each call decrements `exponent` by 1 and makes exactly one further call, until the base case `exponent == 0` is reached. Starting from `pow(2, 3)`: call 1 with exponent = 3, call 2 with exponent = 2, call 3 with exponent = 1, call 4 with exponent = 0 (base case, returns 1). That is four calls in total.",
+        "1": "Incorrect. Because `exponent = 3` is not equal to 0, the base case is not triggered immediately. The method recurses with decreasing exponent values until it reaches 0 — producing four calls total, not one.",
+        "3": "Incorrect. Three calls would only cover pow(2,3), pow(2,2), and pow(2,1), omitting the base-case call pow(2,0). The base case still counts as a method invocation. The correct answer is 4.",
+        "2": "Incorrect. Only two calls would occur if the method stopped at exponent = 1 rather than continuing to exponent = 0. The terminating condition is `exponent == 0`, so the method is called one more time than the value of `exponent`. The correct answer is 4."
+      },
+      "source_reference": "W12 Recursion – Recursive methods, terminating conditions, call counting",
+      "metadata": {
+        "topic": "recursive_call_counting_pow",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q3",
+      "question_type": "single_choice",
+      "question_text": "Have a look at the following code snippet. What value does `factorB` have in each step when the `main()` method is executed?\n\n```java\npublic class Main {\n    public static int multiplyRecursive(int factorA, int factorB) {\n       if (factorB == 0) {\n          return 0;\n       }\n       return factorA + multiplyRecursive(factorA, factorB - 1);\n    }\n    public static void main(String[] args) {\n       System.out.println(multiplyRecursive(5, 3));\n    }\n}\n```",
+      "options": [
+        "3; 2; 1; 0;",
+        "2; 1; 0;",
+        "3; 2; 1;",
+        "The termination condition is never met, the method calls itself infinitely, and a StackOverflowException will be thrown"
+      ],
+      "correct_answer": "3; 2; 1; 0;",
+      "explanation": {
+        "3; 2; 1; 0;": "Correct. The initial call is `multiplyRecursive(5, 3)`, so `factorB` starts at 3. Each recursive call reduces `factorB` by 1: multiplyRecursive(5, 3) → multiplyRecursive(5, 2) → multiplyRecursive(5, 1) → multiplyRecursive(5, 0). At factorB = 0 the terminating condition is met and 0 is returned. As the lecture notes, a correct terminating condition is essential to prevent infinite recursion.",
+        "2; 1; 0;": "Incorrect. This sequence omits the very first call, in which `factorB = 3`. Every method invocation — including the initial one from `main()` — counts as a step. The complete sequence of `factorB` values is 3, 2, 1, 0.",
+        "3; 2; 1;": "Incorrect. `multiplyRecursive` calls itself over and over until `factorB == 0` and the terminating condition is satisfied. The call where `factorB = 0` is still a valid method invocation and must be included in the sequence. The correct answer is 3; 2; 1; 0;",
+        "The termination condition is never met, the method calls itself infinitely, and a StackOverflowException will be thrown": "Incorrect. The terminating condition `factorB == 0` is reachable because each call decrements `factorB` by 1 starting from 3. The method terminates correctly after four calls. A StackOverflowError (as shown in the lecture) only occurs when the terminating condition can never be reached, for example if the initial value already bypasses it."
+      },
+      "source_reference": "W12 Recursion – Recursive methods, terminating conditions, factorial and multiplyRecursive examples",
+      "metadata": {
+        "topic": "recursive_trace_factorB_values",
+        "difficulty_level": "easy"
+      }
+    }
+  ],
+  "metadata": {
+    "target_audience": "undergraduate",
+    "estimated_time_minutes": 10,
+    "learning_objectives": [
+      "Trace the full call tree of a doubly-recursive method (fibonacci) and count every invocation including the base cases",
+      "Count method calls in a singly-recursive method (pow) by following the decrement of a parameter to its base case",
+      "Track the value of a recursive parameter across all invocations and identify the correct sequence including the termination step"
+    ]
+  },
+  "created_at": "2026-03-26T00:00:00"
+}

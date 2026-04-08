@@ -1,0 +1,98 @@
+{
+  "quiz_id": "W14E01",
+  "title": "Introduction to Programming – Concurrency Quiz",
+  "source_material": "13_Concurrency.pdf",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "multiple_choice",
+      "question_text": "Consider the following Java code. Which complete output(s) can this program produce?\n\n```java\npublic class Main {\n    public static void main(String[] args) {\n        Thread thread1 = new Thread(() -> System.out.println(\"I am Thread 1\"));\n        Thread thread2 = new Thread(() -> System.out.println(\"I am Thread 2\"));\n        Thread thread3 = new Thread(() -> System.out.println(\"I am Thread 3\"));\n\n        thread1.start();\n        thread2.start();\n        thread3.start();\n\n        System.out.println(\"I am the main thread\");\n    }\n}```",
+      "options": [
+        "```\nI am the main thread\nI am Thread 3\nI am Thread 2\nI am Thread 1\n```",
+        "```\nI am the main thread\nI am Thread 1\nI am Thread 2\nI am Thread 3\n```",
+        "```\nI am Thread 1\nI am Thread 2\nI am Thread 3\nI am the main thread\n```",
+        "```\nI am Thread 1\nI am Thread 2\nI am the main thread\nI am Thread 3\n```",
+        "```\nI am Thread 1\nI am Thread 2\nI am Thread 3\n```"
+      ],
+      "correct_answer": [
+        "```\nI am the main thread\nI am Thread 3\nI am Thread 2\nI am Thread 1\n```",
+        "```\nI am the main thread\nI am Thread 1\nI am Thread 2\nI am Thread 3\n```",
+        "```\nI am Thread 1\nI am Thread 2\nI am Thread 3\nI am the main thread\n```",
+        "```\nI am Thread 1\nI am Thread 2\nI am the main thread\nI am Thread 3\n```"
+      ],
+      "explanation": {
+        "```\nI am the main thread\nI am Thread 3\nI am Thread 2\nI am Thread 1\n```": "Correct. Thread execution is non-deterministic — the JVM and OS scheduler may run threads in any order. An output is valid as long as all 4 lines appear exactly once.",
+        "```\nI am the main thread\nI am Thread 1\nI am Thread 2\nI am Thread 3\n```": "Correct. Thread execution is non-deterministic — the JVM and OS scheduler may run threads in any order. An output is valid as long as all 4 lines appear exactly once.",
+        "```\nI am Thread 1\nI am Thread 2\nI am Thread 3\nI am the main thread\n```": "Correct. Thread execution is non-deterministic — the JVM and OS scheduler may run threads in any order. An output is valid as long as all 4 lines appear exactly once.",
+        "```\nI am Thread 1\nI am Thread 2\nI am the main thread\nI am Thread 3\n```": "Correct. Thread execution is non-deterministic — the JVM and OS scheduler may run threads in any order. An output is valid as long as all 4 lines appear exactly once.",
+        "```\nI am Thread 1\nI am Thread 2\nI am Thread 3\n```": "Incorrect. The main thread also prints a statement. All 4 lines must appear exactly once in any order."
+      },
+      "source_reference": "W13 Concurrency – Threads, non-deterministic execution, thread scheduling",
+      "metadata": {
+        "topic": "thread_scheduling_nondeterminism",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q2",
+      "question_type": "single_choice",
+      "question_text": "Take a look at the following code and select the corresponding output of the console:\n\n```java\npublic class Main {\n    public static void main(String[] args) {\n        CompletableFuture<String> future = CompletableFuture.supplyAsync(() -> \"Hello\")\n                .thenApply(s -> s + \" World\")\n                .thenApply(String::toUpperCase)\n                .thenCompose(result -> CompletableFuture.supplyAsync(() -> result + \"!\"));\n\n        future.thenAccept(System.out::println);\n    }\n}```",
+      "options": [
+        "`HELLO WORLD!`",
+        "`Hello World!`",
+        "`Hello World`",
+        "The program will not compile.",
+        "The program will compile but not print anything."
+      ],
+      "correct_answer": "`HELLO WORLD!`",
+      "explanation": {
+        "`HELLO WORLD!`": "Correct. The pipeline concatenates \"Hello\" and \" World\", converts the result to uppercase via thenApply(String::toUpperCase) to produce \"HELLO WORLD\", then appends \"!\" in the final thenCompose step.",
+        "`Hello World!`": "Incorrect. The string is converted to uppercase before the exclamation mark is appended, so the result cannot be mixed-case.",
+        "`Hello World`": "Incorrect. The exclamation mark is added in the final thenCompose step, and the string is also converted to uppercase earlier in the chain.",
+        "The program will not compile.": "Incorrect. The program compiles successfully — there are no syntax errors in the code.",
+        "The program will compile but not print anything.": "Incorrect. The thenAccept(System.out::println) call registers a consumer that prints the final result."
+      },
+      "source_reference": "W13 Concurrency – CompletableFuture, thenApply(), thenCompose(), thenAccept()",
+      "metadata": {
+        "topic": "completable_future_chaining",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q3",
+      "question_type": "multiple_choice",
+      "question_text": "Which of the following statements are correct?\n\n```java\npublic class Main {\n    public static void main(String[] args) {\n        ExecutorService executor = Executors.newFixedThreadPool(2);\n\n        for (int i = 1; i <= 3; i++) {\n            int taskId = i;\n            executor.submit(() -> {\n                System.out.println(\"Executing Task #\" + taskId + \" on \" + Thread.currentThread().getName());\n            });\n        }\n\n        executor.shutdown();\n    }\n}```",
+      "options": [
+        "Three tasks will be executed, but only two threads will be used by the `executor`.",
+        "Only two tasks will be executed, as there are two threads in the pool.",
+        "The tasks may be executed in any order, depending on thread scheduling.",
+        "The program will wait indefinitely for a thread to become available, and the third task will never execute."
+      ],
+      "correct_answer": [
+        "Three tasks will be executed, but only two threads will be used by the `executor`.",
+        "The tasks may be executed in any order, depending on thread scheduling."
+      ],
+      "explanation": {
+        "Three tasks will be executed, but only two threads will be used by the `executor`.": "Correct. The fixed thread pool size is 2, so two tasks run immediately while the third waits in the queue for a thread to become free. All three tasks are eventually executed.",
+        "Only two tasks will be executed, as there are two threads in the pool.": "Incorrect. The pool size determines the number of concurrent threads, not the total number of tasks executed. All three submitted tasks will run.",
+        "The tasks may be executed in any order, depending on thread scheduling.": "Correct. The order in which tasks are picked up and executed by the two threads is non-deterministic and depends on the executor's internal scheduling.",
+        "The program will wait indefinitely for a thread to become available, and the third task will never execute.": "Incorrect. Once either of the two threads finishes its current task, it picks up the waiting third task. The executor does not block indefinitely."
+      },
+      "source_reference": "W13 Concurrency – ExecutorService, Executors.newFixedThreadPool(), thread pools, task scheduling",
+      "metadata": {
+        "topic": "executor_service_fixed_thread_pool",
+        "difficulty_level": "medium"
+      }
+    }
+  ],
+  "metadata": {
+    "target_audience": "undergraduate",
+    "estimated_time_minutes": 10,
+    "learning_objectives": [
+      "Understand that thread execution order is non-deterministic and predict all valid outputs of a multithreaded program",
+      "Trace a CompletableFuture pipeline through thenApply() and thenCompose() to determine the final output",
+      "Distinguish between thread pool size and total task count in a fixed-size ExecutorService, and understand non-deterministic task ordering"
+    ]
+  },
+  "created_at": "2026-03-26T00:00:00"
+}

@@ -1,0 +1,64 @@
+{
+  "quiz_id": "W07E01",
+  "title": "Introduction to Programming – Type Flexibility and Safety Quiz",
+  "source_material": "06_TypeFlexibilityAndSafety.pdf",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "single_choice",
+      "question_text": "Sammy the Seal is selling his fresh takeaway! He has created a `Fish` class and a `TakeawayBox` class to store any type of takeaway food. Here's the code:\n\n```java\nclass Food {\n}\nclass Meat extends Food {\n}\nclass Fish extends Food {\n}\nclass Salmon extends Fish {\n}\nclass TakeawayBox<T extends Food> {\n    private T fish;\n    public void setFish(T fish) {\n        this.fish = fish;\n    }\n    public T getFish() {\n        return fish;\n    }\n}\nclass Main {\n    public static void main(String[] args) {\n        TakeawayBox<???> box = new TakeawayBox<>();\n    }\n}\n```\n\nWhat should replace the `???` in the `TakeawayBox` declaration to ensure it only accepts objects of the `Fish` type or its `subclasses` (like `Salmon`)?",
+      "options": [
+        "`Fish`",
+        "`Fish<?>`",
+        "`? extends Fish`",
+        "`? super Fish`"
+      ],
+      "correct_answer": "`Fish`",
+      "explanation": {
+        "`Fish`": "Correct. This allows Sammy to only put `Fish` (or any of its subclasses) inside his `TakeawayBox`es. Since `TakeawayBox` is already declared with `<T extends Food>`, supplying `Fish` as the type argument constrains the box to `Fish` and its descendants — preventing `Meat` from being added.",
+        "`Fish<?>`": "Incorrect. `Fish` is not a generic class, so it cannot be paired with a wildcard type argument. Furthermore, when instantiating an object the type argument must be a concrete type, not a wildcard placeholder.",
+        "`? extends Fish`": "Incorrect. Using `? extends Fish` is a wildcard that allows retrieval of elements as `Fish` but prevents safely adding new elements, because the compiler cannot determine which specific subtype the box holds. For both safe addition and retrieval, the type argument must be declared explicitly (e.g. `TakeawayBox<Fish>` or `TakeawayBox<Salmon>`).",
+        "`? super Fish`": "Incorrect. The `super` keyword in a wildcard context denotes a lower-bounded wildcard (any supertype of `Fish`). This is the opposite of what is needed, and using it here would allow `Meat` or even `Food` objects to be accepted — which defeats the purpose."
+      },
+      "source_reference": "W06 Type Flexibility and Safety – Bounded generics (<T extends Bound>, wildcard types)",
+      "metadata": {
+        "topic": "bounded_generics_type_argument",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q2",
+      "question_type": "single_choice",
+      "question_text": "Take a look at the following code snippet:\n\n```java\nclass MarineAnimal {\n    public static void displaySpecies() throws NoSuchMethodException {\n        throw new NoSuchMethodException(\"MarineAnimal: displaySpecies\");\n    }\n}\n\nclass Seal extends MarineAnimal {\n    public static void displaySpecies() throws NoSuchMethodException {\n        throw new RuntimeException(\"Seal: displaySpecies\");\n    }\n}\n\npublic class Main {\n    public static void main(String[] args) {\n        Seal marine1 = new Seal();\n        try {\n            marine1.displaySpecies();\n        } catch (NoSuchMethodException e) {\n            System.out.println(\"MarineAnimal: no such method\");\n        }\n    }\n}\n```\n\nWhat will be the output of this code?",
+      "options": [
+        "The program throws a RuntimeException: `Seal: displaySpecies`.",
+        "The program prints: `MarineAnimal: no such method`.",
+        "The program throws a NoSuchMethodException: `MarineAnimal: displaySpecies`.",
+        "The code does not compile."
+      ],
+      "correct_answer": "The program throws a RuntimeException: `Seal: displaySpecies`.",
+      "explanation": {
+        "The program throws a RuntimeException: `Seal: displaySpecies`.": "Correct. The method `displaySpecies()` is `static` in both `MarineAnimal` and `Seal`. Static methods are hidden, not overridden — the method that is called is resolved by the static (compile-time) type of the variable. Because `marine1` is declared as type `Seal`, `Seal.displaySpecies()` is executed. That method throws a `RuntimeException`, which is unchecked and is not caught by the `catch (NoSuchMethodException e)` block, so the program terminates with the uncaught exception.",
+        "The program prints: `MarineAnimal: no such method`.": "Incorrect. This would happen if `displaySpecies()` were called on a variable of static type `MarineAnimal`, and the resulting `NoSuchMethodException` were caught. Here the variable is declared as `Seal`, so `Seal.displaySpecies()` runs instead and throws a `RuntimeException`, not a `NoSuchMethodException`.",
+        "The program throws a NoSuchMethodException: `MarineAnimal: displaySpecies`.": "Incorrect. `MarineAnimal.displaySpecies()` is never invoked. The static type of `marine1` is `Seal`, so the compiler resolves the call to `Seal.displaySpecies()`, which throws a `RuntimeException`, not a `NoSuchMethodException`.",
+        "The code does not compile.": "Incorrect. The code compiles successfully. A static method that declares `throws NoSuchMethodException` (a checked exception) is perfectly legal; the compiler does not require the caller to handle it when the overriding static method throws an unchecked exception instead."
+      },
+      "source_reference": "W06 Type Flexibility and Safety – Static vs. dynamic type, static method hiding, exception handling (try/catch, checked vs. unchecked exceptions)",
+      "metadata": {
+        "topic": "static_method_hiding_and_exception_handling",
+        "difficulty_level": "medium"
+      }
+    }
+  ],
+  "metadata": {
+    "target_audience": "undergraduate",
+    "estimated_time_minutes": 10,
+    "learning_objectives": [
+      "Apply bounded generics to restrict a generic type parameter to a specific class and its subclasses",
+      "Distinguish between static method hiding and dynamic dispatch, and predict runtime behaviour when a static method is called on a subclass variable",
+      "Recognise that RuntimeException is unchecked and will propagate past a catch block that targets only checked exceptions",
+      "Organise a class hierarchy correctly by mapping concrete subclasses to their appropriate parent classes based on shared attributes"
+    ]
+  },
+  "created_at": "2026-03-26T00:00:00"
+}

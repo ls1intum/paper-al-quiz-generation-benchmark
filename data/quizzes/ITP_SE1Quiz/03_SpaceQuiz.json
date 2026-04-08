@@ -1,0 +1,83 @@
+{
+  "quiz_id": "SE1_Space",
+  "title": "Introduction to Programming – Space Quiz",
+  "source_material": "ITP/ITP_SE1",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "single_choice",
+      "question_text": "What should be written instead of `/* GAP A */` and `/* GAP B */` to achieve the following output:\n\n```\nSeal 0 at planet 0\nSeal 0 at planet 1\nSeal 0 at planet 2\nSeal 1 at planet 0\nSeal 1 at planet 1\nSeal 1 at planet 2\n```\n\n```java\n1  public class SpaceVacation {\n2      public static void main(String[] args) {\n3          for (int m = 0; m < 5; m++) {\n4              for (int n = 0; n < 5; n++) {\n5                  System.out.println(\"Seal \" + m + \" at planet \" + n);\n6                  if (n == /* GAP A */) {\n7                      break;\n8                  }\n9              }\n10             if (m == /* GAP B */) {\n11                 return;\n12             }\n13         }\n14     }\n15 }\n```",
+      "options": [
+        "`A: 2`, `B: 1`",
+        "`A: 1`, `B: 2`",
+        "`A: 2 - m`, `B: 1`",
+        "`A: 2`, `B: m + n == 3`"
+      ],
+      "correct_answer": "`A: 2`, `B: 1`",
+      "explanation": {
+        "`A: 2`, `B: 1`": "Correct. Breaking at n == 2 prints planets 0 through 2 for each seal, and returning at m == 1 stops the program after the second seal (m = 0 and m = 1).",
+        "`A: 1`, `B: 2`": "Incorrect. Breaking at n == 1 would stop printing at planet 1 per seal, and waiting for m == 2 would incorrectly print a third seal.",
+        "`A: 2 - m`, `B: 1`": "Incorrect. Making the inner break condition dependent on m causes Seal 1 to stop moving prematurely at planet 1 instead of planet 2.",
+        "`A: 2`, `B: m + n == 3`": "Incorrect. The variable n is out of scope in the outer loop, so this code would fail to compile."
+      },
+      "metadata": {
+        "topic": "nested_loops_break_return",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q2",
+      "question_type": "single_choice",
+      "question_text": "Which single line of code must be put on line `5` to produce the following console output:\n\n```\nMoonRock StarFishSnack CometSticker \n```\n\n```java\n1  import java.util.*;\n2\n3  public class SpaceSouvenirs {\n4       public static void main(String[] args) {\n5          /* GAP */\n6\n7          souvenirTube.enqueue(\"MoonRock \");\n8          souvenirTube.enqueue(\"StarFishSnack \");\n9          souvenirTube.enqueue(\"CometSticker \");\n10\n11         System.out.print(souvenirTube.dequeue());\n12         System.out.print(souvenirTube.dequeue());\n13         System.out.print(souvenirTube.dequeue());\n14     }\n15 }\n```",
+      "options": [
+        "`Queue souvenirTube = new Queue(); // Custom Queue implementation as described in the workshop slides`",
+        "`Stack<String> souvenirTube = new Stack<>();`",
+        "`List<String> souvenirTube = new ArrayList<>();`",
+        "`Set<String> souvenirTube = new HashSet<>();`"
+      ],
+      "correct_answer": "`Queue souvenirTube = new Queue(); // Custom Queue implementation as described in the workshop slides`",
+      "explanation": {
+        "`Queue souvenirTube = new Queue(); // Custom Queue implementation as described in the workshop slides`": "Correct. A Queue operates on a FIFO (First In, First Out) basis, so elements are removed via dequeue() in the exact order they were added via enqueue(), matching the required output.",
+        "`Stack<String> souvenirTube = new Stack<>();`": "Incorrect. A Stack is LIFO and uses push()/pop() methods, not enqueue()/dequeue().",
+        "`List<String> souvenirTube = new ArrayList<>();`": "Incorrect. ArrayList uses add()/get() methods and does not support enqueue()/dequeue() operations.",
+        "`Set<String> souvenirTube = new HashSet<>();`": "Incorrect. A Set is an unordered collection that does not maintain insertion order and does not support enqueue()/dequeue() operations."
+      },
+      "metadata": {
+        "topic": "queue_fifo_enqueue_dequeue",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q3",
+      "question_type": "single_choice",
+      "question_text": "Which single line of code must be put on line `25` to produce the following console output:\n\n```\nFloats Generic-Mammal\n```\n\n```java\n1  class Seal {\n2      String go() {\n3          return \"Flops\";\n4      }\n5      String type() {\n6          return \"Generic-Mammal\";\n7      }\n8  }\n9  class SpaceSeal extends Seal {\n10     @Override\n11     String go() {\n12         return \"Floats\";\n13     }\n14     @Override\n15     String type() {\n16         return \"Brave-Floater\";\n17     }\n18     String details() {\n19         return super.type();\n20     }\n21 }\n22 public class PolySpace {\n23     public static void main(String[] args) {\n24         Seal mySeal = new SpaceSeal();\n25         /* GAP */\n26     }\n27 }\n```",
+      "options": [
+        "`System.out.print(mySeal.go() + \" \" + ((SpaceSeal) mySeal).details());`",
+        "`System.out.print(mySeal.go() + \" \" + mySeal.type());`",
+        "`System.out.print(mySeal.type() + \" \" + mySeal.go());`",
+        "`System.out.print(mySeal.type() + \" \" + super.go());`"
+      ],
+      "correct_answer": "`System.out.print(mySeal.go() + \" \" + ((SpaceSeal) mySeal).details());`",
+      "explanation": {
+        "`System.out.print(mySeal.go() + \" \" + ((SpaceSeal) mySeal).details());`": "Correct. Casting to SpaceSeal grants access to details(), which calls super.type() and returns \"Generic-Mammal\". Polymorphism ensures mySeal.go() dispatches to the overridden version, returning \"Floats\".",
+        "`System.out.print(mySeal.go() + \" \" + mySeal.type());`": "Incorrect. Due to polymorphism, mySeal.type() executes the overridden version in SpaceSeal and returns \"Brave-Floater\" instead of \"Generic-Mammal\".",
+        "`System.out.print(mySeal.type() + \" \" + mySeal.go());`": "Incorrect. This reverses the output order and also incorrectly calls the overridden type(), returning \"Brave-Floater\" rather than \"Generic-Mammal\".",
+        "`System.out.print(mySeal.type() + \" \" + super.go());`": "Incorrect. The super keyword is instance-specific and cannot be used inside a static main method to access parent class members."
+      },
+      "metadata": {
+        "topic": "polymorphism_override_super_casting",
+        "difficulty_level": "hard"
+      }
+    }
+  ],
+  "metadata": {
+    "target_audience": "undergraduate",
+    "estimated_time_minutes": 15,
+    "learning_objectives": [
+      "Apply nested loops with break and return to control program flow and predict the resulting output",
+      "Select the correct Java collection (Queue) based on FIFO behaviour required by enqueue() and dequeue() operations",
+      "Predict method dispatch under polymorphism and use super and downcasting to access parent-class behaviour"
+    ]
+  },
+  "created_at": "2026-03-26T00:00:00"
+}

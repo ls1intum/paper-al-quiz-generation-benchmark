@@ -1,0 +1,86 @@
+{
+  "quiz_id": "W03Quiz",
+  "title": "W03E01 – Classes, Objects, Operations & Methods",
+  "source_material": "02_ControlFlow.pdf",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "multiple_choice",
+      "question_text": "Suppose we have a class called \"Book\" that represents the blueprint for creating books in a library. You're managing a library's digital catalog system. Which of the following best describes the relationship between a class and an object in this context?",
+      "options": [
+        "A class is a specific book that can be checked out from the library, such as \"To Kill a Mockingbird\" by Harper Lee.",
+        "An object is a set of instructions that define how to print and bind a physical book.",
+        "A class is like the concept of a book, with common properties and behaviors shared by all books in the library's collection.",
+        "An object is a method which creates a book."
+      ],
+      "correct_answer": ["A class is like the concept of a book, with common properties and behaviors shared by all books in the library's collection."],
+      "explanation": {
+        "A class is a specific book that can be checked out from the library, such as \"To Kill a Mockingbird\" by Harper Lee.": "Incorrect. In object-oriented programming, a class is a blueprint for creating objects, not a specific instance. 'To Kill a Mockingbird' would be a specific object created from the Book blueprint.",
+        "An object is a set of instructions that define how to print and bind a physical book.": "Incorrect. An object is a concrete instance of a class containing data (attributes) and behaviors (methods), not a set of instructions for physical production.",
+        "A class is like the concept of a book, with common properties and behaviors shared by all books in the library's collection.": "Correct. A class serves as a blueprint or template defining common properties and behaviors — such as title, author, publication year, and check-in/check-out methods — that all objects of that class share.",
+        "An object is a method which creates a book.": "Incorrect. An object is a specific instance of the Book class with its own data such as title and author, not a method."
+      },
+      "source_reference": "W02 Control Flow in Programming – Object-Oriented Programming Context",
+      "metadata": {
+        "topic": "classes_and_objects",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q2",
+      "question_type": "single_choice",
+      "question_text": "Consider the following program and select the correct output in the console.\n\n```java\npublic class QuizScore {\n    private static int multiplier = 2;\n    public static void main(String[] args) {\n        int question1Score = 8;\n        int question2Score = 6;\n        int question3Score = 10;\n\n        int totalScore = (question1Score + question2Score + question3Score) * multiplier;\n        String resultMessage = \"Your total score is \" + totalScore + \" out of 48.\";\n\n        System.out.println(resultMessage);\n    }\n}\n```",
+      "options": [
+        "Your total score is 8 out of 48.",
+        "Your total score is 16 out of 48.",
+        "Your total score is 48 out of 48.",
+        "Your score is 48 out of 48."
+      ],
+      "correct_answer": "Your total score is 48 out of 48.",
+      "explanation": {
+        "Your total score is 8 out of 48.": "Incorrect. The total score is (8 + 6 + 10) * 2 = 48, not 8.",
+        "Your total score is 16 out of 48.": "Incorrect. The total score is (8 + 6 + 10) * 2 = 48, not 16.",
+        "Your total score is 48 out of 48.": "Correct. (8 + 6 + 10) = 24, multiplied by 2 equals 48. The string concatenation preserves the word 'total' and the rest of the message exactly.",
+        "Your score is 48 out of 48.": "Incorrect. The result message includes the word 'total', which this option is missing."
+      },
+      "source_reference": "W02 Control Flow in Programming – Expressions and Statements; Operator Precedence",
+      "metadata": {
+        "topic": "operations_and_strings",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q3",
+      "question_type": "single_choice",
+      "question_text": "You are tasked with completing a Java program to calculate the volume of a cylinder. The formula is:\n\n```\nV = π * r² * h\n```\n\nComplete the `calculateCylinderVolumeAndDisplay` method by filling in the TODO section below:\n\n```java\npublic class CylinderVolumeCalculator {\n    public static void main(String[] args) {\n        double radius = 5.0;\n        double height = 10.0;\n        calculateCylinderVolumeAndDisplay(radius, height);\n    }\n\n    public static void calculateCylinderVolumeAndDisplay(double radius, double height) {\n        //TODO: your code goes here\n        System.out.println(\"The volume of the cylinder is: \" + volume);\n    }\n}\n```\n\nWhich of the following correctly completes the method?",
+      "options": [
+        "```java\ndouble pi = 3.14159;\ndouble volume = pi * radius * radius * height;\n```",
+        "```java\nint pi = 3.14159;\nint volume = pi * radius * radius * height;\n```",
+        "```java\npi = 3.14159;\nvolume = pi * radius * radius * height;\n```",
+        "```java\nint volume = pi * radius * radius * height;\n```"
+      ],
+      "correct_answer": "```java\ndouble pi = 3.14159;\ndouble volume = pi * radius * radius * height;\n```",
+      "explanation": {
+        "```java\ndouble pi = 3.14159;\ndouble volume = pi * radius * radius * height;\n```": "Correct. Both `pi` and `volume` are declared as `double`, which matches the `double` parameters `radius` and `height`. The formula is correctly applied and the types are precise.",
+        "```java\nint pi = 3.14159;\nint volume = pi * radius * radius * height;\n```": "Incorrect. Declaring `pi` as `int` truncates its value to 3, losing precision. `int` cannot accurately store non-integer values needed for this calculation.",
+        "```java\npi = 3.14159;\nvolume = pi * radius * radius * height;\n```": "Incorrect. `pi` and `volume` are used without type declarations, causing a compilation error. Both must be declared as `double`.",
+        "```java\nint volume = pi * radius * radius * height;\n```": "Incorrect. `pi` is undefined, and declaring `volume` as `int` would lose precision. Both variables must be declared as `double`."
+      },
+      "source_reference": "W02 Control Flow in Programming – Basic Types and Their Operations; Methods",
+      "metadata": {
+        "topic": "methods_and_data_types",
+        "difficulty_level": "medium"
+      }
+    }
+  ],
+  "metadata": {
+    "target_audience": "undergraduate",
+    "estimated_time_minutes": 10,
+    "learning_objectives": [
+      "Distinguish between a class (blueprint) and an object (instance) in Java",
+      "Trace arithmetic expressions involving operator precedence and string concatenation",
+      "Select appropriate primitive data types (int vs double) for numeric calculations in Java"
+    ]
+  },
+  "created_at": "2026-03-26T00:00:00"
+}

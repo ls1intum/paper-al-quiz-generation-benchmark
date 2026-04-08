@@ -1,0 +1,86 @@
+{
+  "quiz_id": "W06E01",
+  "title": "Introduction to Programming – Code Reuse and Structure Quiz",
+  "source_material": "05_CodeReuseAndStructure.pdf",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "single_choice",
+      "question_text": "Have a look at the following code. What is the console output going to be?\n\n```java\nabstract class Musician {\n    @Override\n    public String toString() {\n        return \"Musician\";\n    }\n}\nclass Singer extends Musician {\n    @Override\n    public String toString() {\n        return \"Singer\";\n    }\n}\npublic class Main {\n    public static void main(String[] args) {\n        Musician scooter = new Singer();\n        System.out.println(\"What is your profession? \" + scooter);\n    }\n}\n```",
+      "options": [
+        "`What is your profession? Singer`",
+        "`What is your profession? Musician`",
+        "`What is your profession? Singer@2a84aee7` (the character string after the @ may differ)",
+        "`What is your profession? Musician@2a84aee7` (the character string after the @ may differ)"
+      ],
+      "correct_answer": "`What is your profession? Singer`",
+      "explanation": {
+        "`What is your profession? Singer`": "Correct. `scooter` is declared as static type `Musician`, but it actually refers to an instance of `Singer`. The right side of the object declaration is the dynamic type and Java uses the dynamic type at runtime to find the appropriate method. Therefore the overridden `toString()` of `Singer` is called and printed in the main.",
+        "`What is your profession? Musician`": "Incorrect. The `Musician` class is the static type and `Singer` the dynamic type. The program uses the dynamic type at runtime to find the appropriate method. This means the `toString()` of `Singer` is called.",
+        "`What is your profession? Singer@2a84aee7` (the character string after the @ may differ)": "Incorrect. In Java, when you concatenate a string with an object using the `+` operator in a `println` statement, Java automatically invokes the `toString()` method of the object. Therefore only `Singer` is printed and not the object id.",
+        "`What is your profession? Musician@2a84aee7` (the character string after the @ may differ)": "Incorrect. You don't need to explicitly call `toString()` in the print statement because Java automatically does it for you when you concatenate an object with a string. `scooter` is of type `Musician` but its dynamic type is `Singer`, so the overridden `toString()` of `Singer` is used, printing `Singer` without any object id."
+      },
+      "source_reference": "W05 Code Reuse and Structure – Dynamic polymorphism, overriding, static vs. dynamic type",
+      "metadata": {
+        "topic": "dynamic_polymorphism_toString_override",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q2",
+      "question_type": "single_choice",
+      "question_text": "What will be the output when you run the main method?\n\n```java\ninterface Tameable {\n    void tame();\n}\nclass Mammal implements Tameable {\n    @Override\n    public void tame() {\n        System.out.println(\"The mammal is being tamed.\");\n    }\n}\nclass Cow extends Mammal {\n    @Override\n    public void tame() {\n        System.out.println(\"The cow is being tamed.\");\n    }\n    public void tame(String owner) {\n        System.out.println(\"The cow is being tamed by \" + owner);\n    }\n}\nclass Main {\n    public static void main(String[] args) {\n        Tameable cow1 = new Cow();\n        cow1.tame();\n        Cow cow2 = new Cow();\n        cow2.tame();\n    }\n}\n```",
+      "options": [
+        "The code outputs: `\"The mammal is being tamed.\"` and `\"The cow is being tamed.\"`",
+        "The code outputs: `\"The cow is being tamed.\"` twice.",
+        "The code throws an exception at run time.",
+        "The code does not compile."
+      ],
+      "correct_answer": "The code outputs: `\"The cow is being tamed.\"` twice.",
+      "explanation": {
+        "The code outputs: `\"The mammal is being tamed.\"` and `\"The cow is being tamed.\"`.": "Incorrect. This would be the output if the `Cow` class did not override the `tame()` method. But it does override it, so both calls use the `Cow` version. Java uses the object's runtime type to decide which overridden method to call.",
+        "The code outputs: `\"The cow is being tamed.\"` twice.": "Correct. The `tame()` method in class `Cow` overrides `Mammal`'s `tame()`. For `cow1`, the reference type is `Tameable`, but the object is a `Cow`, so the overridden `Cow.tame()` method is executed. For `cow2`, both the reference type and the object type are `Cow`, so the same overridden method runs again. In both cases, the executed method depends on the object's runtime type — this is dynamic polymorphism.",
+        "The code throws an exception at run time.": "Incorrect. The code doesn't contain any operation that would cause a runtime exception. All method calls are valid and the object types match correctly.",
+        "The code does not compile.": "Incorrect. The code compiles without errors. The `Cow` class correctly overrides `tame()` and its overloaded method `tame(String)` is also valid."
+      },
+      "source_reference": "W05 Code Reuse and Structure – Dynamic polymorphism, interfaces, overriding, runtime type",
+      "metadata": {
+        "topic": "interface_dynamic_dispatch_overriding",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q3",
+      "question_type": "single_choice",
+      "question_text": "Take a look at the following code. Which of the statements is correct?\n\n```java\nabstract class Writer {\n    public static void write() {\n        System.out.println(\"Writing...\");\n    }\n}\nclass Author extends Writer {\n    public static void write() {\n        System.out.println(\"Writing book\");\n    }\n}\nclass Programmer extends Writer {\n    public static void write() {\n        System.out.println(\"Writing code\");\n    }\n}\npublic class Main {\n    public static void main(String[] args) {\n        Writer w = new Author();\n        w.write();\n    }\n}\n```",
+      "options": [
+        "When running the code, `Writing...` will be printed to the console.",
+        "When running the code, `Writing book` will be printed to the console.",
+        "When running the code, `Writing code` will be printed to the console.",
+        "The code does not compile."
+      ],
+      "correct_answer": "When running the code, `Writing...` will be printed to the console.",
+      "explanation": {
+        "When running the code, `Writing...` will be printed to the console.": "Correct. In Java, there is no dynamic polymorphism for static methods. The compiler decides during compile time which method is to be executed. At that point, the compiler neither knows nor cares what type an object will have during runtime — only the static type is considered. Since `w` is declared as type `Writer`, `Writer.write()` is called, printing `Writing...`.",
+        "When running the code, `Writing book` will be printed to the console.": "Incorrect. During compile time, only the static type of an object is taken into account. Since the decision about which static method to execute is made during compile time, the compiler neither knows nor considers the dynamic type an object will have at runtime. The static type here is `Writer`, not `Author`.",
+        "When running the code, `Writing code` will be printed to the console.": "Incorrect. During compile time, only the static type of an object is taken into consideration. The `Programmer` class is not referenced anywhere in `main`, and even if it were, static method dispatch is resolved at compile time using the static type.",
+        "The code does not compile.": "Incorrect. The code does compile. The compiler can differentiate between the different methods based on the classes they are implemented in. Since the methods are static, which method will be executed is decided during compile time."
+      },
+      "source_reference": "W05 Code Reuse and Structure – Static polymorphism, static methods, compile-time vs. runtime type",
+      "metadata": {
+        "topic": "static_method_dispatch_compile_time",
+        "difficulty_level": "hard"
+      }
+    }
+  ],
+  "metadata": {
+    "target_audience": "undergraduate",
+    "estimated_time_minutes": 10,
+    "learning_objectives": [
+      "Distinguish between static type (compile-time type) and dynamic type (runtime type) in Java",
+      "Explain how dynamic polymorphism (overriding) resolves method calls at runtime based on the object's actual type",
+      "Recognize that static methods are resolved at compile time using the static type and are not subject to dynamic dispatch"
+    ]
+  },
+  "created_at": "2026-03-26T00:00:00"
+}

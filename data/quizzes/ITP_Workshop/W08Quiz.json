@@ -1,0 +1,89 @@
+{
+  "quiz_id": "W08E01",
+  "title": "Introduction to Programming – In-Depth Object Orientation Quiz",
+  "source_material": "07_InDepthObjectOrientation.pdf",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "multiple_choice",
+      "question_text": "Take a look at the following piece of code. Objects of what types can be added to the `animalList` in the `main` method?\n\n```java\npublic class Main {\n    public static void main(String[] args) {\n        List<Mammal> animalList = new ArrayList<>();\n        animalList.add(new Animal());\n        animalList.add(new Mammal());\n        animalList.add(new Bird());\n        animalList.add(new Bear());\n    }\n}\n\nclass Animal {}\n\nclass Mammal extends Animal {}\n\nclass Bird extends Animal {}\n\nclass Bear extends Mammal {}\n```",
+      "options": [
+        "`Mammal`",
+        "`Bear`",
+        "`Animal`",
+        "`Bird`"
+      ],
+      "correct_answer": [
+        "`Mammal`",
+        "`Bear`"
+      ],
+      "explanation": {
+        "`Mammal`": "Correct. The generic type of `animalList` is set to `Mammal`, so only objects of type `Mammal` and its subclasses can be added to it.",
+        "`Bear`": "Correct. The generic type of `animalList` is set to `Mammal`, so only objects of type `Mammal` and its subclasses can be added to it. `Bear` is a subclass of `Mammal`.",
+        "`Animal`": "Incorrect. The generic type of `animalList` is set to `Mammal`, so only objects of type `Mammal` and its subclasses can be added to it. `Animal` is a superclass of `Mammal`.",
+        "`Bird`": "Incorrect. The generic type of `animalList` is set to `Mammal`, so only objects of type `Mammal` and its subclasses can be added to it. `Bird` is not a subclass of `Mammal`."
+      },
+      "source_reference": "W07 In-Depth Object Orientation – Generics (List<T>, generic type bounds, subclass compatibility)",
+      "metadata": {
+        "topic": "generic_data_structures_type_bounds",
+        "difficulty_level": "medium"
+      }
+    },
+    {
+      "question_id": "q2",
+      "question_type": "single_choice",
+      "question_text": "Take a look at the following code. Which statement is correct?\n\n```java\npublic class Main {\n    public static void main(String[] args) {\n        Map<String, Integer> disneyPrincessesAge = new HashMap<>();\n        disneyPrincessesAge.put(\"Aurora\", 14);\n        disneyPrincessesAge.put(\"Aurora\", 16);\n        disneyPrincessesAge.put(\"Ariel\", 16);\n        disneyPrincessesAge.put(\"Rapunzel\", 18);\n        System.out.println(\"Aurora is \" + disneyPrincessesAge.get(\"Aurora\") + \" years old!\");\n    }\n}\n```",
+      "options": [
+        "`Aurora is 16 years old!` will be printed to the console.",
+        "At the end of the `main()` method, there are 4 entries in the Map `disneyPrincessesAge`.",
+        "`Aurora is 14 years old!` will be printed to the console.",
+        "`Aurora is 30 years old!` will be printed to the console."
+      ],
+      "correct_answer": "`Aurora is 16 years old!` will be printed to the console.",
+      "explanation": {
+        "`Aurora is 16 years old!` will be printed to the console.": "Correct. When `map.put(key, value)` is called on a Map and the key already exists, the new value overwrites the existing one. The value associated with `\"Aurora\"` is overwritten with `16` the second time it is added.",
+        "At the end of the `main()` method, there are 4 entries in the Map `disneyPrincessesAge`.": "Incorrect. When `map.put(key, value)` is called and the key already exists, the existing value is overwritten — no second entry with the same key is added. The map ends up with 3 entries (`Aurora → 16`, `Ariel → 16`, `Rapunzel → 18`), not 4.",
+        "`Aurora is 14 years old!` will be printed to the console.": "Incorrect. When the same key is added to a Map twice, the second value overwrites the first. The original entry `14` is replaced by `16`.",
+        "`Aurora is 30 years old!` will be printed to the console.": "Incorrect. When `map.put(key, value)` is called and the key already exists, the new value replaces the old one — the values are not summed. `Aurora`'s age is `16`, not `14 + 16 = 30`."
+      },
+      "source_reference": "W07 In-Depth Object Orientation – Generics (Map<K,V>, HashMap, put() overwrite behaviour, get())",
+      "metadata": {
+        "topic": "map_put_overwrite_behaviour",
+        "difficulty_level": "easy"
+      }
+    },
+    {
+      "question_id": "q3",
+      "question_type": "single_choice",
+      "question_text": "Have a look at the code below. What will happen when the `main` method is executed?\n\n```java\nclass EmptyException extends RuntimeException {\n    public EmptyException(String message) {\n        super(message);\n    }\n}\n\npublic class Main {\n    public static Map<Integer, Integer> removePositives(int[] numbers) {\n        Map<Integer, Integer> res = new HashMap<>();\n        for (int i = 0; i < numbers.length; i++) {\n            if (numbers[i] < 0) {\n                res.put(i, numbers[i]);\n            }\n        }\n        if (res.isEmpty()) {\n            throw new EmptyException(\"No elements left!\");\n        } else {\n            return res;\n        }\n    }\n\n    public static void main(String[] args) {\n        removePositives(new int[] {2, 4, 95, 100}); // The array contains only positive numbers\n    }\n}\n```",
+      "options": [
+        "There is a compile error because `throws EmptyException` is missing at the definition of the method `removePositives()`.",
+        "There is a compile error because `removePositives()` is not called in a `try-catch` block.",
+        "`EmptyException` is thrown.",
+        "There is a compile error because the `HashMap` accepts `<Integer, Integer>`, but receives a pair of `<int, int>`."
+      ],
+      "correct_answer": "`EmptyException` is thrown.",
+      "explanation": {
+        "There is a compile error because `throws EmptyException` is missing at the definition of the method `removePositives()`.": "Incorrect. `EmptyException` is an unchecked exception because it extends `RuntimeException`, the superclass of all exceptions that can be thrown during normal program execution. Unchecked exceptions do not need to be declared with `throws`.",
+        "There is a compile error because `removePositives()` is not called in a `try-catch` block.": "Incorrect. `EmptyException` is an unchecked exception because it extends `RuntimeException`. Unchecked exceptions do not need to be caught, so calling the method outside of a `try-catch` block is perfectly legal.",
+        "`EmptyException` is thrown.": "Correct. The array passed to `removePositives()` contains only positive integers, so no element is ever added to the `HashMap`. When the method checks `res.isEmpty()`, the condition is `true` and `EmptyException` is thrown.",
+        "There is a compile error because the `HashMap` accepts `<Integer, Integer>`, but receives a pair of `<int, int>`.": "Incorrect. `Integer` is the wrapper class of `int`. Java automatically converts between `int` and `Integer` through a mechanism called autoboxing, so passing `int` values where `Integer` is expected compiles without error."
+      },
+      "source_reference": "W07 In-Depth Object Orientation – Generics (Map<K,V>, HashMap); Exceptions (unchecked exceptions, RuntimeException, autoboxing)",
+      "metadata": {
+        "topic": "unchecked_exceptions_and_autoboxing",
+        "difficulty_level": "medium"
+      }
+    }
+  ],
+  "metadata": {
+    "target_audience": "undergraduate",
+    "estimated_time_minutes": 10,
+    "learning_objectives": [
+      "Apply generic type bounds to determine which object types are compatible with a parameterised collection",
+      "Understand Map.put() overwrite behaviour and correctly predict the state of a HashMap after duplicate key insertions",
+      "Distinguish checked from unchecked exceptions, and understand that RuntimeException subclasses require neither a throws declaration nor a try-catch block; recognise autoboxing between int and Integer"
+    ]
+  },
+  "created_at": "2026-03-26T00:00:00"
+}
