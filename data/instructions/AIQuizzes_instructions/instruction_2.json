@@ -1,0 +1,7 @@
+{
+  "language": "English",
+  "num_questions": 5,
+  "question_types": ["single_choice"],
+  "difficulty": "easy",
+  "custom_prompt": "I want this quiz to focus mainly on streams and concurrency."
+}

@@ -1,0 +1,88 @@
+{
+  "quiz_id": "quiz_1",
+  "title": "Java Quiz Collections & Inheritance",
+  "source_material": "ITP",
+  "instructions": "instruction_1.json",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "single_choice",
+      "question_text": "Which statement correctly describes typical performance characteristics of **ArrayList** and **LinkedList** in Java?",
+      "options": [
+        "Random access (`get`) is O(1) for `ArrayList` and O(n) for `LinkedList`; insertion/removal at an arbitrary index is O(n) for `ArrayList` and O(1) for `LinkedList` if you already have the node.",
+        "`ArrayList` always uses O(n) time for append (`add`) because it needs contiguous memory.",
+        "`LinkedList` provides O(1) random access to elements by index.",
+        "Both `ArrayList` and `LinkedList` guarantee O(1) time for removal at an arbitrary index."
+      ],
+      "correct_answer": "Random access (`get`) is O(1) for `ArrayList` and O(n) for `LinkedList`; insertion/removal at an arbitrary index is O(n) for `ArrayList` and O(1) for `LinkedList` if you already have the node."
+    },
+    {
+      "question_id": "q2",
+      "question_type": "single_choice",
+      "question_text": "When overriding `equals(Object)` in a class that will be used as a key in a `HashMap`, which statement is correct?",
+      "options": [
+        "You must also override `hashCode()` to maintain the general contract between `equals` and `hashCode`.",
+        "Overriding `equals` alone is sufficient because `HashMap` ignores `hashCode`.",
+        "You should override `hashCode` but never `equals` to change key behavior.",
+        "`HashMap` always uses object identity so neither method needs to be overridden."
+      ],
+      "correct_answer": "You must also override `hashCode()` to maintain the general contract between `equals` and `hashCode`."
+    },
+    {
+      "question_id": "q3",
+      "question_type": "multiple_choice",
+      "question_text": "Select all correct statements about Java `Map` implementations.",
+      "options": [
+        "`HashMap` allows one `null` key and multiple `null` values.",
+        "`Hashtable` is synchronized and permits `null` keys and values.",
+        "`TreeMap` orders entries by key (natural order or provided `Comparator`) and does not allow `null` keys.",
+        "`LinkedHashMap` preserves insertion order and allows a `null` key."
+      ],
+      "correct_answer": [
+        "`HashMap` allows one `null` key and multiple `null` values.",
+        "`TreeMap` orders entries by key (natural order or provided `Comparator`) and does not allow `null` keys.",
+        "`LinkedHashMap` preserves insertion order and allows a `null` key."
+      ]
+    },
+    {
+      "question_id": "q4",
+      "question_type": "true_false",
+      "question_text": "A subclass can override a private method declared in its superclass.",
+      "options": [
+        "True",
+        "False"
+      ],
+      "correct_answer": "False"
+    },
+    {
+      "question_id": "q5",
+      "question_type": "multiple_choice",
+      "question_text": "Which of the following are true about covariant return types in Java? Select all that apply.",
+      "options": [
+        "They allow an overriding method to return a subtype of the original method's return type.",
+        "They allow changing method parameter types when overriding.",
+        "They were introduced in Java 5 (JDK 1.5).",
+        "They permit returning a narrower primitive type when overriding.",
+        "They apply to constructors."
+      ],
+      "correct_answer": [
+        "They allow an overriding method to return a subtype of the original method's return type.",
+        "They were introduced in Java 5 (JDK 1.5)."
+      ]
+    },
+    {
+      "question_id": "q6",
+      "question_type": "single_choice",
+      "question_text": "Which action most likely causes a `ConcurrentModificationException` when iterating over an `ArrayList` using a for-each loop?",
+      "options": [
+        "Calling `list.add(element)` directly on the list during iteration.",
+        "Using the iterator's `remove()` method obtained from the loop's iterator.",
+        "Iterating with an index-based `for (int i = 0; i < list.size(); i++)` and removing via `list.remove(i)` while adjusting indices.",
+        "Only reading elements with `get()` while another thread also only reads the list concurrently."
+      ],
+      "correct_answer": "Calling `list.add(element)` directly on the list during iteration."
+    }
+  ],
+  "metadata": {},
+  "created_at": "2026-04-08T10:29:00"
+}
