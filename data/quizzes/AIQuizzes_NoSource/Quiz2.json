@@ -1,0 +1,129 @@
+{
+  "quiz_id": "quiz_2",
+  "title": "Java Quiz Streams & Concurrency",
+  "source_material": "ITP",
+  "instructions": "instruction_2.json",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "single_choice",
+      "question_text": "Which of the following is a **terminal operation** on a Java `Stream`?",
+      "options": [
+        "map",
+        "filter",
+        "forEach",
+        "peek"
+      ],
+      "correct_answer": "forEach"
+    },
+    {
+      "question_id": "q2",
+      "question_type": "single_choice",
+      "question_text": "What does calling `parallelStream()` on a Java `Collection` do?",
+      "options": [
+        "Creates a stream that may perform operations in parallel using multiple threads",
+        "Converts the collection into a single-threaded stream that queues tasks",
+        "Automatically sorts elements before processing",
+        "Returns a `Future` representing asynchronous stream computation"
+      ],
+      "correct_answer": "Creates a stream that may perform operations in parallel using multiple threads"
+    },
+    {
+      "question_id": "q3",
+      "question_type": "single_choice",
+      "question_text": "Which Java collection class is designed for safe concurrent access by multiple threads without requiring external synchronization?",
+      "options": [
+        "ArrayList",
+        "Vector",
+        "ConcurrentHashMap",
+        "LinkedList"
+      ],
+      "correct_answer": "ConcurrentHashMap"
+    },
+    {
+      "question_id": "q4",
+      "question_type": "single_choice",
+      "question_text": "Which `ExecutorService` method initiates an orderly shutdown in which previously submitted tasks are executed but new tasks are not accepted?",
+      "options": [
+        "shutdown()",
+        "shutdownNow()",
+        "awaitTermination()",
+        "terminate()"
+      ],
+      "correct_answer": "shutdown()"
+    },
+    {
+      "question_id": "q5",
+      "question_type": "single_choice",
+      "question_text": "Which statement about Java Stream **intermediate operations** is correct?",
+      "options": [
+        "They are executed immediately when called",
+        "They are lazy and not executed until a terminal operation is invoked",
+        "They always run in parallel",
+        "They modify the source collection directly"
+      ],
+      "correct_answer": "They are lazy and not executed until a terminal operation is invoked"
+    },
+    {
+      "question_id": "q6",
+      "question_type": "single_choice",
+      "question_text": "Which of the following is a **terminal operation** on a Java `Stream`?",
+      "options": [
+        "map",
+        "filter",
+        "forEach",
+        "peek"
+      ],
+      "correct_answer": "forEach"
+    },
+    {
+      "question_id": "q7",
+      "question_type": "single_choice",
+      "question_text": "What does calling `parallelStream()` on a Java `Collection` do?",
+      "options": [
+        "Creates a stream that may perform operations in parallel using multiple threads",
+        "Converts the collection into a single-threaded stream that queues tasks",
+        "Automatically sorts elements before processing",
+        "Returns a `Future` representing asynchronous stream computation"
+      ],
+      "correct_answer": "Creates a stream that may perform operations in parallel using multiple threads"
+    },
+    {
+      "question_id": "q8",
+      "question_type": "single_choice",
+      "question_text": "Which Java collection class is designed for safe concurrent access by multiple threads without requiring external synchronization?",
+      "options": [
+        "ArrayList",
+        "Vector",
+        "ConcurrentHashMap",
+        "LinkedList"
+      ],
+      "correct_answer": "ConcurrentHashMap"
+    },
+    {
+      "question_id": "q9",
+      "question_type": "single_choice",
+      "question_text": "Which `ExecutorService` method initiates an orderly shutdown in which previously submitted tasks are executed but new tasks are not accepted?",
+      "options": [
+        "shutdown()",
+        "shutdownNow()",
+        "awaitTermination()",
+        "terminate()"
+      ],
+      "correct_answer": "shutdown()"
+    },
+    {
+      "question_id": "q10",
+      "question_type": "single_choice",
+      "question_text": "Which statement about Java Stream **intermediate operations** is correct?",
+      "options": [
+        "They are executed immediately when called",
+        "They are lazy and not executed until a terminal operation is invoked",
+        "They always run in parallel",
+        "They modify the source collection directly"
+      ],
+      "correct_answer": "They are lazy and not executed until a terminal operation is invoked"
+    }
+  ],
+  "created_at": null
+}
