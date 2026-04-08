@@ -303,29 +303,67 @@ Quizzes must be in JSON format with this schema:
 
 #### Source Material Format
 
-Source materials should be Markdown files in `data/inputs/`:
+Source materials can be in Markdown (`.md`) or PDF (`.pdf`) format, stored in `data/inputs/`.
 
-```markdown
-# Main Topic
+**Single File Example:**
 
-## Section 1: Introduction
+Reference a single file in your quiz JSON:
 
-Content about the topic...
-
-### Subsection 1.1
-
-More detailed content...
-
-## Section 2: Advanced Topics
-
-Advanced content...
+```json
+{
+  "quiz_id": "python101",
+  "title": "Introduction to Python",
+  "source_material": "python_intro.md",
+  "questions": [...]
+}
 ```
 
-**Tips:**
+**Multiple Files (Folder) Example:**
+
+For complex topics, you can organize multiple lecture materials in a folder and reference the folder name:
+
+```json
+{
+  "quiz_id": "advanced_python",
+  "title": "Advanced Python Concepts",
+  "source_material": "advanced_python",
+  "questions": [...]
+}
+```
+
+The folder structure would be:
+```
+data/inputs/
+├── advanced_python/
+│   ├── decorators.md
+│   ├── async_programming.pdf
+│   ├── metaclasses.md
+│   └── type_hints.pdf
+```
+
+The system will automatically:
+1. Load all `.md` and `.pdf` files from the folder
+2. Extract text from PDFs using OCR-aware techniques
+3. Combine all content with clear file headers
+4. Pass the complete material to evaluators
+
+**Markdown Format Tips:**
 - Use clear section headers
 - Include all content that questions might reference
 - Keep formatting simple (avoid complex tables/diagrams)
 - Use the same structure as your educational materials
+
+**PDF Format Notes:**
+- PDFs are processed using text extraction
+- Works best with text-based PDFs (not scanned images)
+- Multi-page PDFs are automatically combined
+- Page numbers are preserved in extraction for reference
+
+**File Organization Best Practices:**
+- Group related lectures in folders (e.g., `module_1/`, `module_2/`)
+- Use descriptive file names that reflect content
+- Name files consistently (e.g., `01_intro.md`, `02_main.md`, etc.) for predictable ordering
+- Test with a small folder first before adding many files
 
 ### Running Benchmarks
 
