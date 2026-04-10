@@ -19,7 +19,11 @@ const config: Config = {
   projectName: 'paper-al-quiz-generation-benchmark',
 
   onBrokenLinks: 'throw',
-  onBrokenMarkdownLinks: 'warn',
+  markdown: {
+    hooks: {
+      onBrokenMarkdownLinks: 'warn',
+    },
+  },
 
   i18n: {
     defaultLocale: 'en',
