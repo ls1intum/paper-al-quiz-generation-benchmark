@@ -1,0 +1,65 @@
+{
+  "quiz_id": "quiz_4",
+  "title": "Java Quiz Loops & Conditional Statements",
+  "source_material": "ITP",
+  "instructions": "instruction_4.json",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "single_choice",
+      "question_text": "Consider the Java code:\n\n```java\nfor (int i = 0; i < 5; i++) {\n    if (i == 2) break;\n    System.out.println(i);\n}\n```\nHow many lines are printed by this code?",
+      "options": [
+        "1 line",
+        "2 lines",
+        "3 lines",
+        "5 lines"
+      ],
+      "correct_answer": "2 lines"
+    },
+    {
+      "question_id": "q2",
+      "question_type": "multiple_choice",
+      "question_text": "Examine the Java code:\n\n```java\nfor (int i = 0; i < 3; i++) {\n    for (int j = 0; j < 3; j++) {\n        if (j == 1) continue;\n        System.out.print(i + \"\" + j + \" \");\n    }\n    System.out.println();\n}\n```\nWhich of the following statements are true? Select all that apply.",
+      "options": [
+        "`continue` causes the inner loop to skip printing when `j == 1`.",
+        "Each outer iteration prints two pairs.",
+        "The output includes the pair `11`.",
+        "There are six printed pairs in total."
+      ],
+      "correct_answer": [
+        "`continue` causes the inner loop to skip printing when `j == 1`.",
+        "Each outer iteration prints two pairs.",
+        "There are six printed pairs in total."
+      ]
+    },
+    {
+      "question_id": "q3",
+      "question_type": "single_choice",
+      "question_text": "Given the Java switch:\n\n```java\nint x = 2;\nswitch (x) {\n  case 1: System.out.println(\"A\"); break;\n  case 2: System.out.println(\"B\");\n  case 3: System.out.println(\"C\"); break;\n  default: System.out.println(\"D\");\n}\n```\nWhat is printed to the console?",
+      "options": [
+        "A",
+        "B",
+        "B and C",
+        "D"
+      ],
+      "correct_answer": "B and C"
+    },
+    {
+      "question_id": "q4",
+      "question_type": "multiple_choice",
+      "question_text": "Consider this code snippet:\n\n```java\nint i = 0;\ndo {\n  i++;\n} while (i < 0);\n```\nWhich statements are correct? Select all that apply.",
+      "options": [
+        "The loop body executes exactly once.",
+        "The loop body never executes.",
+        "After the loop, `i` equals 1.",
+        "This behaves the same as `while (i < 0) { i++; }` for initial `i = 0`."
+      ],
+      "correct_answer": [
+        "The loop body executes exactly once.",
+        "After the loop, `i` equals 1."
+      ]
+    }
+  ],
+  "metadata": {},
+  "created_at": "2026-04-13T00:00:00"
+}

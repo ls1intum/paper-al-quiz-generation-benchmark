@@ -1,0 +1,7 @@
+{
+  "language": "English",
+  "num_questions": 7,
+  "question_types": ["multiple_choice", "true_false"],
+  "difficulty": "hard",
+  "custom_prompt": "I want this quiz to focus on basic Java fundamentals."
+}

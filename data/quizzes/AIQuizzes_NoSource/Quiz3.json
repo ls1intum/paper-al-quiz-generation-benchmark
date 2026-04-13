@@ -1,0 +1,90 @@
+{
+  "quiz_id": "quiz_3",
+  "title": "Java Quiz Basics",
+  "source_material": "ITP",
+  "instructions": "instruction_3.json",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "true_false",
+      "question_text": "In Java, calling `s.replace('a', 'b')` modifies the original `String s` in place.",
+      "options": ["True", "False"],
+      "correct_answer": "False"
+    },
+    {
+      "question_id": "q2",
+      "question_type": "single_choice",
+      "question_text": "Which of the following `Integer` caching ranges is guaranteed by the Java Language Specification for autoboxing?",
+      "options": [
+        "`-128` to `127`",
+        "`0` to `255`",
+        "`-32768` to `32767`",
+        "Caching range is entirely unspecified and the JVM may choose any range"
+      ],
+      "correct_answer": "`-128` to `127`"
+    },
+    {
+      "question_id": "q3",
+      "question_type": "true_false",
+      "question_text": "Autounboxing a `null` reference of type `Integer` to `int` at runtime causes a `NullPointerException`.",
+      "options": ["True", "False"],
+      "correct_answer": "True"
+    },
+    {
+      "question_id": "q4",
+      "question_type": "multiple_choice",
+      "question_text": "Which statements about Java method overriding and return types are correct? Select all that apply.",
+      "options": [
+        "A subclass may override a superclass method and change the return type to a covariant subtype.",
+        "An overriding method may declare a less accessible visibility than the overridden method.",
+        "An overriding method can change a primitive return type to its corresponding wrapper type.",
+        "Two methods in the same class may coexist if they differ only by return type.",
+        "An overriding method must not declare broader checked exceptions than the overridden method."
+      ],
+      "correct_answer": [
+        "A subclass may override a superclass method and change the return type to a covariant subtype.",
+        "An overriding method must not declare broader checked exceptions than the overridden method."
+      ]
+    },
+    {
+      "question_id": "q5",
+      "question_type": "true_false",
+      "question_text": "Static methods in Java are dynamically dispatched based on the runtime type of the object.",
+      "options": ["True", "False"],
+      "correct_answer": "False"
+    },
+    {
+      "question_id": "q6",
+      "question_type": "multiple_choice",
+      "question_text": "Which of the following are consequences of Java's generics type erasure? Select all that apply.",
+      "options": [
+        "The JVM cannot distinguish `List<String>` from `List<Integer>` at runtime.",
+        "Separate bytecode classes are generated for each generic instantiation such as `List<String>` and `List<Integer>`.",
+        "Generic type parameters are generally not available at runtime via reflection due to erasure.",
+        "You can overload two methods that differ only in generic type parameters (e.g., `m(List<String>)` and `m(List<Integer>)`)."
+      ],
+      "correct_answer": [
+        "The JVM cannot distinguish `List<String>` from `List<Integer>` at runtime.",
+        "Generic type parameters are generally not available at runtime via reflection due to erasure."
+      ]
+    },
+    {
+      "question_id": "q7",
+      "question_type": "multiple_choice",
+      "question_text": "Which of the following statements about checked exceptions in Java are true? Select all that apply.",
+      "options": [
+        "A method must declare any checked exception it can throw unless the exception is caught within the method.",
+        "`RuntimeException` subclasses are checked exceptions that must be declared.",
+        "A constructor can declare checked exceptions in its `throws` clause.",
+        "An overriding method cannot declare broader checked exceptions than the method it overrides."
+      ],
+      "correct_answer": [
+        "A method must declare any checked exception it can throw unless the exception is caught within the method.",
+        "A constructor can declare checked exceptions in its `throws` clause.",
+        "An overriding method cannot declare broader checked exceptions than the method it overrides."
+      ]
+    }
+  ],
+  "metadata": {},
+  "created_at": "2026-04-13T00:00:00"
+}
