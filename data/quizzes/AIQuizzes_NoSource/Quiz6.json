@@ -1,0 +1,81 @@
+{
+  "quiz_id": "quiz_6",
+  "title": "Java Quiz — Lambdas",
+  "source_material": "ITP",
+  "instructions": "instruction_6.json",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "single_choice",
+      "question_text": "Which statement correctly describes the *type* required for assigning a Java lambda expression?",
+      "options": [
+        "A lambda can be assigned to any interface type.",
+        "A lambda must be assigned to a functional interface (single abstract method).",
+        "A lambda requires assignment to an abstract class.",
+        "A lambda must implement a concrete class directly."
+      ],
+      "correct_answer": "A lambda must be assigned to a functional interface (single abstract method)."
+    },
+    {
+      "question_id": "q2",
+      "question_type": "multiple_choice",
+      "question_text": "Select all statements that are true about what Java lambdas can capture or access:",
+      "options": [
+        "A lambda can capture local variables that are *effectively final*.",
+        "A lambda can modify a local variable declared outside the lambda.",
+        "A lambda can access `final` or instance fields of the enclosing class.",
+        "A lambda's `this` refers to the lambda object, not the enclosing instance.",
+        "A lambda may throw checked exceptions only if the target functional interface method declares them."
+      ],
+      "correct_answer": [
+        "A lambda can capture local variables that are *effectively final*.",
+        "A lambda can access `final` or instance fields of the enclosing class.",
+        "A lambda may throw checked exceptions only if the target functional interface method declares them."
+      ]
+    },
+    {
+      "question_id": "q3",
+      "question_type": "single_choice",
+      "question_text": "At compile time, what determines the *target type* of a lambda expression in Java?",
+      "options": [
+        "The runtime class of the lambda object.",
+        "The surrounding context (expected type), such as the variable or parameter type.",
+        "The return type of the enclosing method.",
+        "A special lambda keyword type inferred by the JVM at runtime."
+      ],
+      "correct_answer": "The surrounding context (expected type), such as the variable or parameter type."
+    },
+    {
+      "question_id": "q4",
+      "question_type": "multiple_choice",
+      "question_text": "Which of the following are valid Java method reference forms?",
+      "options": [
+        "`ClassName::staticMethod` (reference to a static method)",
+        "`instance::instanceMethod` (reference to a specific instance method)",
+        "`ClassName::instanceMethod` (reference to an instance method of an arbitrary object of a particular type)",
+        "`ClassName::new` (constructor reference)",
+        "`super::method` (reference to a superclass method from outside its class)"
+      ],
+      "correct_answer": [
+        "`ClassName::staticMethod` (reference to a static method)",
+        "`instance::instanceMethod` (reference to a specific instance method)",
+        "`ClassName::instanceMethod` (reference to an instance method of an arbitrary object of a particular type)",
+        "`ClassName::new` (constructor reference)"
+      ]
+    },
+    {
+      "question_id": "q5",
+      "question_type": "single_choice",
+      "question_text": "Which statement correctly describes modifying local variables from inside a Java lambda?",
+      "options": [
+        "A lambda can freely modify any local variable declared outside it.",
+        "A lambda can modify a local variable only if using a `volatile` modifier.",
+        "A lambda cannot modify local variables unless they are `final` or *effectively final*.",
+        "A lambda can modify local variables if the enclosing method is synchronized."
+      ],
+      "correct_answer": "A lambda cannot modify local variables unless they are `final` or *effectively final*."
+    }
+  ],
+  "metadata": {},
+  "created_at": "2026-04-15T00:00:00"
+}

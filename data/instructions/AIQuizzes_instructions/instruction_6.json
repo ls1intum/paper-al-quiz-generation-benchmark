@@ -1,0 +1,7 @@
+{
+  "language": "English",
+  "num_questions": 5,
+  "question_types": ["multiple_choice", "single_choice"],
+  "difficulty": "medium",
+  "custom_prompt": "I want this quiz to be about lambda expressions."
+}

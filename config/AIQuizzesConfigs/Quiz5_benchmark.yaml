@@ -1,0 +1,28 @@
+benchmark:
+  name: "quiz5_benchmark"
+  version: "1.0.0"
+  runs: 1
+  metadata:
+    description: "Example benchmark using multiple lecture files as source material"
+
+evaluators:
+  gpt4:
+    provider: "azure_openai"
+    model: "gpt-4o"
+    temperature: 0.0
+    max_tokens: 2000
+
+metrics:
+  - name: "coverage"
+    version: "1.1"
+    evaluators: ["gpt4"]
+    enabled: true
+
+inputs:
+  quiz_directory: "data/quizzes/AIQuizzes_NoSource/Quiz5.json"
+  source_directory: "data/inputs"
+  instructions_directory: "data/instructions/AIQuizzes_instructions"
+
+outputs:
+  results_directory: "data/results"
+  aggregate: true
