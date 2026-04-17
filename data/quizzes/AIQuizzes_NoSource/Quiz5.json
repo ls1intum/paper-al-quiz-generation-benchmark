@@ -1,0 +1,85 @@
+{
+  "quiz_id": "quiz_5",
+  "title": "Java Quiz — Arrays, Lists & Exceptions",
+  "source_material": "ITP",
+  "instructions": "instruction_5.json",
+  "questions": [
+    {
+      "question_id": "q1",
+      "question_type": "single_choice",
+      "question_text": "True or False: In Java, an array such as `int[] arr` is an object and its length is accessed via `arr.length`.",
+      "options": [
+        "True",
+        "False"
+      ],
+      "correct_answer": "True"
+    },
+    {
+      "question_id": "q2",
+      "question_type": "single_choice",
+      "question_text": "True or False: For `List<Integer> list`, the expression `list.get(0)` returns a primitive `int`.",
+      "options": [
+        "True",
+        "False"
+      ],
+      "correct_answer": "False"
+    },
+    {
+      "question_id": "q3",
+      "question_type": "single_choice",
+      "question_text": "What exception is thrown when evaluating `arr.length` if `arr` is `null`?",
+      "options": [
+        "NullPointerException",
+        "ArrayIndexOutOfBoundsException",
+        "IllegalArgumentException",
+        "NoSuchElementException"
+      ],
+      "correct_answer": "NullPointerException"
+    },
+    {
+      "question_id": "q4",
+      "question_type": "single_choice",
+      "question_text": "Which statement accurately describes the list returned by `Arrays.asList(...)` in Java?",
+      "options": [
+        "It is a fixed-size list backed by the original array.",
+        "It returns an instance of `java.util.LinkedList`.",
+        "Elements can be added or removed without restrictions.",
+        "It is synchronized (thread-safe) by default."
+      ],
+      "correct_answer": "It is a fixed-size list backed by the original array."
+    },
+    {
+      "question_id": "q5",
+      "question_type": "multiple_choice",
+      "question_text": "Select all exceptions that are checked exceptions in Java.",
+      "options": [
+        "IOException",
+        "NullPointerException",
+        "FileNotFoundException",
+        "RuntimeException"
+      ],
+      "correct_answer": [
+        "IOException",
+        "FileNotFoundException"
+      ]
+    },
+    {
+      "question_id": "q6",
+      "question_type": "multiple_choice",
+      "question_text": "Which of the following create a new array object containing copied elements?",
+      "options": [
+        "System.arraycopy(source, 0, dest, 0, len)",
+        "Arrays.copyOf(original, newLength)",
+        "`original.clone()`",
+        "Arrays.copyOfRange(original, from, to)"
+      ],
+      "correct_answer": [
+        "Arrays.copyOf(original, newLength)",
+        "`original.clone()`",
+        "Arrays.copyOfRange(original, from, to)"
+      ]
+    }
+  ],
+  "metadata": {},
+  "created_at": "2026-04-15T00:00:00"
+}
