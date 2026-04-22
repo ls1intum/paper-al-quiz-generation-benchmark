@@ -14,8 +14,10 @@ class GrammaticalCorrectnessMetric(BaseMetric):
        across all questions in the quiz.
 
     Instructions integration:
-    - language: if instructions.language is set, it overrides the metric's
-      language parameter. The LLM evaluates grammar in that language.
+    - language: The raw score is always computed based on the quiz's actual
+      language. Any language mismatch with instructions.language is handled
+      exclusively in the post-score instruction adjustment phase to avoid
+      double-penalization.
     - custom_prompt: handled entirely in BaseMetric.evaluate().
     """
 
@@ -25,7 +27,7 @@ class GrammaticalCorrectnessMetric(BaseMetric):
 
     @property
     def version(self) -> str:
-        return "1.2"
+        return "1.3"
 
     @property
     def scope(self) -> MetricScope:
@@ -64,20 +66,17 @@ class GrammaticalCorrectnessMetric(BaseMetric):
 
         error_weights: Dict = self.get_param_value("error_weights", **inp.params)
 
-        # Instructions language takes precedence over metric parameter
-        if inp.instructions and inp.instructions.language:
-            language = inp.instructions.language
-            language_note = f"**Note**: This quiz was intended to be written in {language}. Evaluate grammar strictly according to {language} conventions."
-        else:
-            language = self.get_param_value("language", **inp.params)
-            language_note = ""
+        # Always evaluate grammar in the quiz's actual language, not the requested
+        # language from instructions. Language mismatch is handled exclusively in
+        # the post-score instruction adjustment phase (BaseMetric.adjust_score_for_custom_prompt)
+        # to prevent double-penalization.
+        language = self.get_param_value("language", **inp.params)
 
         quiz_content = self._format_quiz_for_prompt(inp.quiz)
 
         return f"""You are evaluating the grammatical correctness of quiz content.
 
 Language: {language}
-{language_note}
 
 Error Severity Levels (for your reference):
 - Critical (weight {error_weights['critical']}): Errors that make the text incomprehensible or change meaning
