@@ -19,21 +19,44 @@ class ResultsReporter:
             Formatted summary string
         """
         lines = []
-        lines.append("=" * 70)
+        lines.append("=" * 80)
         lines.append("BENCHMARK RESULTS SUMMARY")
-        lines.append("=" * 70)
+        lines.append("=" * 80)
         lines.append(f"Configuration: {aggregated.benchmark_config_name}")
         lines.append(f"Version: {aggregated.benchmark_version}")
         lines.append(f"Total Runs: {aggregated.total_runs}")
         lines.append(f"Quizzes Evaluated: {len(aggregated.quiz_ids)}")
         lines.append("")
 
+        # Display inter-rater reliability metrics if available
+        if aggregated.inter_rater_reliability:
+            lines.append("INTER-RATER RELIABILITY")
+            lines.append("-" * 80)
+            for metric_name, reliability_metrics in aggregated.inter_rater_reliability.items():
+                lines.append(f"\n{metric_name}:")
+                if reliability_metrics.get("krippendorff_alpha") is not None:
+                    lines.append(
+                        f"  Krippendorff's Alpha: {reliability_metrics['krippendorff_alpha']:.4f}"
+                    )
+                if reliability_metrics.get("icc") is not None:
+                    icc_val = reliability_metrics["icc"]
+                    ci_lower = reliability_metrics.get("icc_ci_lower")
+                    ci_upper = reliability_metrics.get("icc_ci_upper")
+                    if ci_lower is not None and ci_upper is not None:
+                        lines.append(
+                            f"  ICC(2,1): {icc_val:.4f} [95% CI: {ci_lower:.4f}, {ci_upper:.4f}]"
+                        )
+                    else:
+                        lines.append(f"  ICC(2,1): {icc_val:.4f}")
+                lines.append(f"  Number of Raters: {reliability_metrics.get('num_raters', 'N/A')}")
+            lines.append("")
+
         # Group by metric
         metrics = aggregated.get_all_metrics()
 
         for metric_name in sorted(metrics):
             lines.append(f"\n{metric_name.upper()}")
-            lines.append("-" * 70)
+            lines.append("-" * 80)
 
             # Get all evaluators for this metric
             for agg_key, agg in sorted(aggregated.aggregations.items()):
@@ -42,11 +65,12 @@ class ResultsReporter:
                     lines.append(f"    Mean:   {agg.mean:.2f}")
                     lines.append(f"    Median: {agg.median:.2f}")
                     lines.append(f"    Std Dev: {agg.std_dev:.2f}")
+                    lines.append(f"    95% CI: [{agg.ci_lower:.2f}, {agg.ci_upper:.2f}]")
                     lines.append(f"    Min:    {agg.min:.2f}")
                     lines.append(f"    Max:    {agg.max:.2f}")
                     lines.append(f"    N:      {agg.num_runs}")
 
-        lines.append("\n" + "=" * 70)
+        lines.append("\n" + "=" * 80)
 
         return "\n".join(lines)
 
@@ -172,6 +196,7 @@ class ResultsReporter:
             "total_runs": aggregated.total_runs,
             "num_quizzes": len(aggregated.quiz_ids),
             "metrics": {},
+            "inter_rater_reliability": aggregated.inter_rater_reliability,
         }
 
         for metric_name in aggregated.get_all_metrics():
@@ -183,6 +208,8 @@ class ResultsReporter:
                         "mean": round(agg.mean, 2),
                         "median": round(agg.median, 2),
                         "std_dev": round(agg.std_dev, 2),
+                        "ci_lower": round(agg.ci_lower, 2),
+                        "ci_upper": round(agg.ci_upper, 2),
                         "min": round(agg.min, 2),
                         "max": round(agg.max, 2),
                     }

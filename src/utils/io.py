@@ -268,6 +268,8 @@ class IOUtils:
                 "std_dev": agg.std_dev,
                 "min": agg.min,
                 "max": agg.max,
+                "ci_lower": agg.ci_lower,
+                "ci_upper": agg.ci_upper,
                 "per_run_scores": agg.per_run_scores,
                 "num_runs": agg.num_runs,
             }
@@ -278,6 +280,7 @@ class IOUtils:
             "quiz_ids": aggregated.quiz_ids,
             "total_runs": aggregated.total_runs,
             "aggregations": aggregations_dict,
+            "inter_rater_reliability": aggregated.inter_rater_reliability,
             "created_at": aggregated.created_at.isoformat(),
             "metadata": aggregated.metadata,
         }

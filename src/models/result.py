@@ -112,6 +112,8 @@ class MetricAggregation:
         min: Minimum score
         max: Maximum score
         per_run_scores: Scores from each individual run
+        ci_lower: Lower bound of bootstrap confidence interval (95%)
+        ci_upper: Upper bound of bootstrap confidence interval (95%)
         num_runs: Number of runs aggregated
     """
 
@@ -123,6 +125,8 @@ class MetricAggregation:
     min: float
     max: float
     per_run_scores: List[float]
+    ci_lower: float = 0.0
+    ci_upper: float = 0.0
     num_runs: int = field(init=False)
 
     def __post_init__(self) -> None:
@@ -140,6 +144,7 @@ class AggregatedResults:
         quiz_ids: List of quiz IDs evaluated
         total_runs: Total number of runs performed
         aggregations: Dictionary mapping (metric_name, evaluator) to aggregation
+        inter_rater_reliability: Dict with inter-rater agreement metrics (Krippendorff's alpha, ICC)
         created_at: When the aggregation was created
         metadata: Additional metadata
     """
@@ -149,6 +154,7 @@ class AggregatedResults:
     quiz_ids: List[str]
     total_runs: int
     aggregations: Dict[str, MetricAggregation]  # key: f"{metric_name}_{evaluator_model}"
+    inter_rater_reliability: Dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.now)
     metadata: Dict[str, Any] = field(default_factory=dict)
 

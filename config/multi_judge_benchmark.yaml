@@ -1,0 +1,67 @@
+benchmark:
+  name: "multi-judge-benchmark"
+  version: "1.0.0"
+  runs: 2  # Multiple runs for robust inter-rater reliability analysis
+  metadata:
+    description: "Multi-judge evaluation benchmark with GPT-4o and GPT-4o-mini to measure inter-rater agreement"
+
+evaluators:
+  # Primary judge: GPT-4o via Azure OpenAI
+  gpt4o_azure:
+    provider: "azure_openai"
+    model: "gpt-4o"
+    temperature: 0.0
+    max_tokens: 2000
+
+  # Secondary judge: GPT-4o-mini via OpenAI
+  gpt4o_mini:
+    provider: "openai"
+    model: "gpt-4o-mini"
+    temperature: 0.0
+    max_tokens: 1500
+
+metrics:
+  # All metrics evaluated by both judges for inter-rater reliability
+  - name: "accuracy"
+    version: "1.1"
+    evaluators: ["gpt4o_azure", "gpt4o_mini"]
+    enabled: true
+
+  - name: "coverage"
+    version: "1.1"
+    evaluators: ["gpt4o_azure", "gpt4o_mini"]
+    parameters:
+      granularity: "balanced"
+    enabled: true
+
+  - name: "clarity"
+    version: "1.0"
+    evaluators: ["gpt4o_azure", "gpt4o_mini"]
+    enabled: true
+
+  - name: "difficulty"
+    version: "1.0"
+    evaluators: ["gpt4o_azure", "gpt4o_mini"]
+    parameters:
+      rubric: "bloom_taxonomy"
+    enabled: true
+
+  - name: "distractor_quality"
+    version: "1.0"
+    evaluators: ["gpt4o_azure", "gpt4o_mini"]
+    enabled: true
+
+  - name: "grammatical_correctness"
+    version: "1.0"
+    evaluators: ["gpt4o_azure", "gpt4o_mini"]
+    enabled: true
+
+inputs:
+  # Use variety of quiz types for comprehensive evaluation
+  quiz_directory: "data/quizzes"
+  source_directory: "data/inputs"
+  instructions_directory: "data/instructions"
+
+outputs:
+  results_directory: "data/results"
+  aggregate: true
