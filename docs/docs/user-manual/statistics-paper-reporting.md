@@ -124,11 +124,14 @@ When multiple evaluators (e.g., different LLM models) assess the same content, m
 **Type**: Ordinal (interval/ratio) scale agreement coefficient
 
 **Formula**:
-$$\alpha = 1 - \frac{D_o}{D_e}$$
+
+```
+α = 1 - (D_o / D_e)
+```
 
 where:
-- $D_o$ = observed disagreement
-- $D_e$ = expected disagreement by chance
+- `D_o` = observed disagreement
+- `D_e` = expected disagreement by chance
 
 **Scale & Interpretation**:
 | α Value | Interpretation | Action |
