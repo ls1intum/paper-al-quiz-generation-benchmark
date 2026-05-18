@@ -43,7 +43,7 @@ evaluators:
     provider: "openai_compatible"
     model: "openai/gpt-oss-20b"
     base_url: "https://api.groq.com/openai/v1"
-    api_key: 'YOUR_API_KEY' #to override the env file
+    api_key: 'YOUR_API_KEY' #to override the .env file
     temperature: 0.0
     max_tokens: 1500
 
