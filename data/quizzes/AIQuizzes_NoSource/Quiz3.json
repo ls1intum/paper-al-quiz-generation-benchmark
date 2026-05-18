@@ -2,7 +2,7 @@
   "quiz_id": "quiz_3",
   "title": "Java Quiz Basics",
   "source_material": "ITP",
-  "instructions": "instruction_3.json",
+  "instructions": "AIQuizzes_instructions/instruction_3.json",
   "questions": [
     {
       "question_id": "q1",

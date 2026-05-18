@@ -32,23 +32,49 @@ class ResultsReporter:
         if aggregated.inter_rater_reliability:
             lines.append("INTER-RATER RELIABILITY")
             lines.append("-" * 80)
-            for metric_name, reliability_metrics in aggregated.inter_rater_reliability.items():
+            for metric_name, irr_metrics in aggregated.inter_rater_reliability.items():
                 lines.append(f"\n{metric_name}:")
-                if reliability_metrics.get("krippendorff_alpha") is not None:
-                    lines.append(
-                        f"  Krippendorff's Alpha: {reliability_metrics['krippendorff_alpha']:.4f}"
-                    )
-                if reliability_metrics.get("icc") is not None:
-                    icc_val = reliability_metrics["icc"]
-                    ci_lower = reliability_metrics.get("icc_ci_lower")
-                    ci_upper = reliability_metrics.get("icc_ci_upper")
+                status = irr_metrics.get("reliability_status", "unknown").upper()
+                lines.append(f"  Status: {status}")
+
+                # Primary metrics
+                if irr_metrics.get("icc") is not None:
+                    icc_val = irr_metrics["icc"]
+                    ci_lower = irr_metrics.get("icc_ci_lower")
+                    ci_upper = irr_metrics.get("icc_ci_upper")
                     if ci_lower is not None and ci_upper is not None:
                         lines.append(
                             f"  ICC(2,1): {icc_val:.4f} [95% CI: {ci_lower:.4f}, {ci_upper:.4f}]"
                         )
                     else:
                         lines.append(f"  ICC(2,1): {icc_val:.4f}")
-                lines.append(f"  Number of Raters: {reliability_metrics.get('num_raters', 'N/A')}")
+                else:
+                    lines.append(f"  ICC(2,1): Not enough data (requires ≥5 observations)")
+
+                if irr_metrics.get("mad") is not None:
+                    mad_val = irr_metrics["mad"]
+                    lines.append(f"  MAD (Mean Absolute Deviation): {mad_val:.2f} points")
+                else:
+                    lines.append(f"  MAD: Insufficient data")
+
+                if irr_metrics.get("spearman_rho") is not None:
+                    rho = irr_metrics["spearman_rho"]
+                    pval = irr_metrics.get("spearman_pvalue")
+                    if pval is not None:
+                        lines.append(f"  Spearman ρ: {rho:.4f} (p-value: {pval:.4f})")
+                    else:
+                        lines.append(f"  Spearman ρ: {rho:.4f}")
+                else:
+                    lines.append(f"  Spearman ρ: Insufficient data")
+
+                # Raters and warnings
+                raters = irr_metrics.get("raters", [])
+                num_raters = irr_metrics.get("num_raters", 0)
+                lines.append(f"  Raters ({num_raters}): {', '.join(raters)}")
+
+                if irr_metrics.get("reliability_warning"):
+                    lines.append(f"\n  ⚠️  {irr_metrics['reliability_warning']}")
+
             lines.append("")
 
         # Group by metric
