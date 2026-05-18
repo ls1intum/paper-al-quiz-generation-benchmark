@@ -49,13 +49,13 @@ class ResultsReporter:
                     else:
                         lines.append(f"  ICC(2,1): {icc_val:.4f}")
                 else:
-                    lines.append(f"  ICC(2,1): Not enough data (requires ≥5 observations)")
+                    lines.append("  ICC(2,1): Not enough data (requires ≥5 observations)")
 
                 if irr_metrics.get("mad") is not None:
                     mad_val = irr_metrics["mad"]
                     lines.append(f"  MAD (Mean Absolute Deviation): {mad_val:.2f} points")
                 else:
-                    lines.append(f"  MAD: Insufficient data")
+                    lines.append("  MAD: Insufficient data")
 
                 if irr_metrics.get("spearman_rho") is not None:
                     rho = irr_metrics["spearman_rho"]
@@ -65,7 +65,7 @@ class ResultsReporter:
                     else:
                         lines.append(f"  Spearman ρ: {rho:.4f}")
                 else:
-                    lines.append(f"  Spearman ρ: Insufficient data")
+                    lines.append("  Spearman ρ: Insufficient data")
 
                 # Raters and warnings
                 raters = irr_metrics.get("raters", [])
