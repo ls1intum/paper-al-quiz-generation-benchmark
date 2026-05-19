@@ -1,7 +1,7 @@
 {
   "quiz_id": "W10E01",
   "title": "Introduction to Programming – Algorithms and Data Handling Quiz",
-  "source_material": "09_AlgorithmsAndDataHandling.pdf",
+  "source_material": "ITP/ITP_SE2/09_AlgorithmsAndDataHandling.pdf",
   "questions": [
     {
       "question_id": "q1",

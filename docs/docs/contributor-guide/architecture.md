@@ -624,8 +624,9 @@ The **ResultsAggregator** class transforms raw evaluation results into statistic
 2. **Descriptive Statistics**: Compute mean, median, std dev, min, max across runs
 3. **Bootstrap Confidence Intervals**: Estimate 95% CI for robust uncertainty quantification
 4. **Inter-Rater Reliability**: Measure agreement between evaluators using:
-   - **Krippendorff's Alpha**: Handles any scale type (nominal, ordinal, interval, ratio)
-   - **ICC(2,1)**: Intraclass correlation coefficient (two-way mixed, absolute agreement)
+   - **ICC(2,1)**: Intraclass correlation coefficient (two-way mixed, absolute agreement, single measurement)
+   - **MAD**: Mean Absolute Deviation (interpretable on original score scale)
+   - **Spearman ρ**: Rank-based correlation (insensitive to systematic bias)
 5. **Per-Quiz Breakdowns**: Optional separate aggregation for each quiz
 
 #### Bootstrap Confidence Interval Calculation
@@ -671,25 +672,37 @@ def bootstrap_confidence_interval(
 
 #### Inter-Rater Reliability Calculation
 
-When multiple evaluators assess the same questions, the framework computes:
+When multiple evaluators assess the same questions, the framework computes three robust reliability metrics:
 
 ```python
-# Krippendorff's Alpha
-from krippendorff import alpha
-scores_by_rater = [[75, 78, 76], [77, 79, 74]]
-alpha_value = alpha(scores_by_rater)  # Returns correlation coefficient
-
-# ICC(2,1) 
+# ICC(2,1) - two-way mixed effects, absolute agreement
 from pingouin import intraclass_corr
 icc_result = intraclass_corr(
     data=rating_data,
-    targets='question_id',
-    raters='evaluator_model',
+    targets='item',
+    raters='rater',
     ratings='score',
     icc_type='ICC2'
 )
 # Returns: icc value and 95% confidence interval
+# Scale: 0-1, higher indicates better agreement
+
+# MAD - Mean Absolute Deviation (pairwise)
+mad_value = np.mean([np.abs(rater_i - rater_j) for each pair])
+# Scale: 0-100 (same as original scores), interpretable as average disagreement
+
+# Spearman rho - Rank correlation
+from scipy.stats import spearmanr
+rhos = [spearmanr(rater_i, rater_j)[0] for each pair]
+rho_avg = np.mean(rhos)
+# Scale: -1 to 1, answers: do raters rank items the same way?
+# Insensitive to systematic bias (one rater consistently higher)
 ```
+
+**Advantages of this three-metric approach:**
+- **ICC**: Measures absolute agreement (two-way, mixed-effects)
+- **MAD**: Interpretable on original scale (0-100); directly shows average disagreement in points
+- **Spearman rho**: Insensitive to systematic bias; focuses on rank agreement across items
 
 #### Output Format
 
@@ -745,8 +758,9 @@ INTER-RATER RELIABILITY
 --------------------------------------------------------------------------------
 
 clarity:
-  Krippendorff's Alpha: 0.7420
   ICC(2,1): 0.8510 [95% CI: 0.7230, 0.9310]
+  MAD (Mean Absolute Deviation): 3.45 points
+  Spearman rho: 0.8760
   Number of Raters: 2
 
 CLARITY
@@ -803,7 +817,7 @@ BenchmarkRunner Output (Multiple Runs)
          └─ Inter-Rater Reliability:
               Scores_GPT = [75.5, 78.2, 76.8, ...]
               Scores_Claude = [77.2, 76.9, 77.8, ...]
-              → ICC = 0.85, Alpha = 0.74
+              → ICC = 0.85, MAD = 3.45, Spearman = 0.87
               │
               ▼
          AggregatedResults (JSON)

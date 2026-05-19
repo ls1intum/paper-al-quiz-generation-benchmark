@@ -1,7 +1,7 @@
 {
   "quiz_id": "W04E01",
   "title": "Introduction to Programming – Loops and Control Flow Quiz",
-  "source_material": "03_InDepthCoreConcepts.pdf",
+  "source_material": "ITP/ITP_SE1/03_InDepthCoreConcepts.pdf",
   "questions": [
     {
       "question_id": "q1",

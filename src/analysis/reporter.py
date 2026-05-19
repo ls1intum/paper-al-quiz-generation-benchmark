@@ -59,11 +59,7 @@ class ResultsReporter:
 
                 if irr_metrics.get("spearman_rho") is not None:
                     rho = irr_metrics["spearman_rho"]
-                    pval = irr_metrics.get("spearman_pvalue")
-                    if pval is not None:
-                        lines.append(f"  Spearman ρ: {rho:.4f} (p-value: {pval:.4f})")
-                    else:
-                        lines.append(f"  Spearman ρ: {rho:.4f}")
+                    lines.append(f"  Spearman ρ: {rho:.4f}")
                 else:
                     lines.append("  Spearman ρ: Insufficient data")
 

@@ -1,7 +1,7 @@
 {
   "quiz_id": "W14E01",
   "title": "Introduction to Programming – Concurrency Quiz",
-  "source_material": "13_Concurrency.pdf",
+  "source_material": "ITP/ITP_SE2/13_Concurrency.pdf",
   "questions": [
     {
       "question_id": "q1",

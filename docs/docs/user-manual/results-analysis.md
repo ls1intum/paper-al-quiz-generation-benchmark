@@ -129,10 +129,11 @@ Contains **summarized statistics** across all runs:
   },
   "inter_rater_reliability": {
     "clarity": {
-      "krippendorff_alpha": 0.742,
       "icc": 0.851,
       "icc_ci_lower": 0.723,
       "icc_ci_upper": 0.931,
+      "mad": 3.45,
+      "spearman_rho": 0.876,
       "num_raters": 2
     }
   }
@@ -156,13 +157,15 @@ INTER-RATER RELIABILITY
 --------------------------------------------------------------------------------
 
 clarity:
-  Krippendorff's Alpha: 0.7420
   ICC(2,1): 0.8510 [95% CI: 0.7230, 0.9310]
+  MAD (Mean Absolute Deviation): 3.45 points
+  Spearman rho: 0.8760
   Number of Raters: 2
 
 distractor_quality:
-  Krippendorff's Alpha: 0.6890
   ICC(2,1): 0.7940 [95% CI: 0.5820, 0.9060]
+  MAD (Mean Absolute Deviation): 5.12 points
+  Spearman rho: 0.7290
   Number of Raters: 2
 
 CLARITY
@@ -223,28 +226,13 @@ Clarity (GPT-4): Mean=77.8, 95% CI=[76.2, 79.4]
 
 ## Inter-Rater Reliability
 
-When you use **multiple evaluators** (e.g., GPT-4 and Claude), the framework automatically measures **agreement** between them.
-
-### Krippendorff's Alpha (α)
-
-**What it measures**: Degree of agreement between multiple raters, accounting for chance agreement.
-
-**Scale**: −1 to 1
-- **α < 0**: No agreement (worse than random)
-- **0 ≤ α ≤ 0.67**: Poor to fair agreement
-- **0.67 < α ≤ 0.8**: Substantial agreement
-- **α > 0.8**: Excellent agreement
-
-**Example**:
-```
-Clarity metric across GPT-4 and Claude:
-Krippendorff's α = 0.742
-→ Substantial agreement between models
-```
+When you use **multiple evaluators** (e.g., GPT-4 and Claude), the framework automatically measures **agreement** between them using three complementary metrics.
 
 ### Intraclass Correlation Coefficient (ICC)
 
-**Type**: ICC(2,1) — two-way mixed, absolute agreement, single measurement
+**Type**: ICC(2,1) — two-way mixed effects, absolute agreement, single measurement
+
+**What it measures**: Overall consistency in absolute scores across raters
 
 **Scale**: 0 to 1 (higher is better)
 - **ICC < 0.5**: Poor
@@ -260,6 +248,44 @@ Distractor Quality across GPT-4 and Claude:
 ICC = 0.794 [95% CI: 0.582, 0.906]
 → Good agreement; CI is wide, suggesting moderate precision
 ```
+
+### Mean Absolute Deviation (MAD)
+
+**What it measures**: Average disagreement between raters, expressed on the original score scale (0–100)
+
+**Scale**: 0–100 points
+- **MAD < 3**: Excellent agreement (very close ratings)
+- **3 ≤ MAD < 5**: Good agreement (minor differences)
+- **5 ≤ MAD < 10**: Moderate agreement (some systematic differences)
+- **MAD ≥ 10**: Poor agreement (large systematic differences)
+
+**Example**:
+```
+Clarity metric across GPT-4 and Claude:
+MAD = 3.45 points
+→ On average, raters differ by 3.45 points (on 0–100 scale)
+```
+
+**Advantages**: Directly interpretable — a MAD of 5 means raters disagree by 5 points on average.
+
+### Spearman Rank Correlation (ρ)
+
+**What it measures**: Whether raters rank quiz items in the same order (rank agreement)
+
+**Scale**: −1 to 1
+- **ρ < 0**: Negative correlation (opposite ranking)
+- **0 ≤ ρ ≤ 0.5**: Weak rank agreement
+- **0.5 < ρ ≤ 0.8**: Moderate to good rank agreement
+- **ρ > 0.8**: Excellent rank agreement
+
+**Example**:
+```
+Clarity metric across GPT-4 and Claude:
+Spearman ρ = 0.876
+→ Strong rank agreement: both raters agree on which questions are clear/unclear
+```
+
+**Advantages**: Insensitive to systematic bias (e.g., one rater always scoring 10 points higher). Focuses on *relative* rather than absolute agreement.
 
 ---
 
@@ -312,15 +338,17 @@ ICC = 0.794 [95% CI: 0.582, 0.906]
 ```json
 "inter_rater_reliability": {
   "clarity": {
-    "krippendorff_alpha": 0.42,
     "icc": 0.51,
+    "mad": 7.2,
+    "spearman_rho": 0.42,
     "num_raters": 2
   }
 }
 ```
 
 **Interpretation**:
-- GPT-4 and Claude disagree (α = 0.42, ICC = 0.51)
+- GPT-4 and Claude show weak agreement (ICC = 0.51, rho = 0.42)
+- Average disagreement is significant (MAD = 7.2 points)
 - **Possible causes**:
   - Different evaluation styles/priorities
   - One model more lenient than other
@@ -358,11 +386,10 @@ for agg_key, metric_stats in agg['aggregations'].items():
 # Check inter-rater reliability
 print("\nInter-Rater Reliability:")
 for metric_name, irr_metrics in agg['inter_rater_reliability'].items():
-    alpha = irr_metrics.get('krippendorff_alpha')
     icc = irr_metrics.get('icc')
+    mad = irr_metrics.get('mad')
+    rho = irr_metrics.get('spearman_rho')
     print(f"\n{metric_name}:")
-    if alpha is not None:
-        print(f"  Krippendorff's α: {alpha:.4f}")
     if icc is not None:
         ci_lower = irr_metrics.get('icc_ci_lower')
         ci_upper = irr_metrics.get('icc_ci_upper')
@@ -370,6 +397,10 @@ for metric_name, irr_metrics in agg['inter_rater_reliability'].items():
             print(f"  ICC(2,1): {icc:.4f} [95% CI: {ci_lower:.4f}, {ci_upper:.4f}]")
         else:
             print(f"  ICC(2,1): {icc:.4f}")
+    if mad is not None:
+        print(f"  MAD: {mad:.2f} points")
+    if rho is not None:
+        print(f"  Spearman rho: {rho:.4f}")
 ```
 
 ### Compare Evaluators
@@ -543,11 +574,11 @@ def bootstrap_confidence_interval(data, ci=0.95, n_bootstrap=10000):
 
 ## Summary
 
-|         Aspect          |                           Key Takeaway                           |
+|         Aspect          | Key Takeaway                                                     |
 |-------------------------|------------------------------------------------------------------|
 |   **Why aggregate?**    | Reduce noise, estimate confidence, detect agreement/disagreement |
-|   **Key statistics**    |          Mean, median, std dev, confidence intervals             |
-| **Reliability metrics** |      Krippendorff's α and ICC(2,1) measure evaluator agreement   |
-|   **Interpretation**    |      Report with confidence intervals; watch for high variance   |
-|     **For papers**      |    Export JSON for analysis, create visualizations from CI data  |
+|   **Key statistics**    | Mean, median, std dev, confidence intervals                      |
+| **Reliability metrics** | ICC, MAD, and Spearman ρ measure evaluator agreement             |                                                     |
+|   **Interpretation**    | Report with confidence intervals; watch for high variance        |
+|     **For papers**      | Export JSON for analysis, create visualizations from CI data     |
 

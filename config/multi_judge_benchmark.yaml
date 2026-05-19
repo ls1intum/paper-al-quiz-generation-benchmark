@@ -78,7 +78,7 @@ metrics:
 
 inputs:
   # Use variety of quiz types for comprehensive evaluation
-  quiz_directory: "data/quizzes/ITP_Workshop/W02Quiz.json"
+  quiz_directory: "data/quizzes/ITP_Workshop/W05Quiz.json"
   source_directory: "data/inputs"
   instructions_directory: "data/instructions"
 

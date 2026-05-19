@@ -144,7 +144,7 @@ class AggregatedResults:
         quiz_ids: List of quiz IDs evaluated
         total_runs: Total number of runs performed
         aggregations: Dictionary mapping (metric_name, evaluator) to aggregation
-        inter_rater_reliability: Dict with inter-rater agreement metrics (Krippendorff's alpha, ICC)
+        inter_rater_reliability: Dict with inter-rater agreement metrics (ICC, MAD, Spearman ρ)
         created_at: When the aggregation was created
         metadata: Additional metadata
     """

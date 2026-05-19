@@ -117,54 +117,21 @@ Compare:
 
 ### 3. Inter-Rater Reliability
 
-When multiple evaluators (e.g., different LLM models) assess the same content, measure their **agreement**.
-
-#### Krippendorff's Alpha (α)
-
-**Type**: Ordinal (interval/ratio) scale agreement coefficient
-
-**Formula**:
-
-```
-α = 1 - (D_o / D_e)
-```
-
-where:
-- `D_o` = observed disagreement
-- `D_e` = expected disagreement by chance
-
-**Scale & Interpretation**:
-| α Value | Interpretation | Action |
-|---------|----------------|--------|
-| α < 0 | Worse than random | Models actively disagree |
-| 0 ≤ α ≤ 0.40 | Poor | Cannot rely on models alone |
-| 0.40 < α ≤ 0.60 | Fair | Use with caution; consider ensemble |
-| 0.60 < α ≤ 0.75 | Moderate | Acceptable; note differences |
-| 0.75 < α ≤ 0.85 | Substantial | Good agreement; reliable |
-| α > 0.85 | Near-perfect | Excellent agreement |
-
-**Example**:
-```
-Model A scores: [75, 78, 76, 79, 77]
-Model B scores: [76, 79, 75, 80, 78]
-
-Krippendorff's α = 0.82
-→ Substantial agreement between models
-```
+When multiple evaluators (e.g., different LLM models) assess the same content, measure their **agreement**. The framework computes three complementary metrics for robust agreement assessment:
 
 #### Intraclass Correlation Coefficient (ICC)
 
-**Type**: ICC(2,1) — two-way mixed, absolute agreement, single measurement
+**Type**: ICC(2,1) — two-way mixed effects, absolute agreement, single measurement
 
-**Interpretation**: Correlation between raters' absolute scores
+**What it measures**: How consistently raters assign absolute scores to items
 
 **Scale & Interpretation**:
-| ICC | Interpretation |
-|-----|----------------|
-| < 0.50 | Poor agreement |
-| 0.50–0.75 | Moderate agreement |
-| 0.75–0.90 | Good agreement |
-| > 0.90 | Excellent agreement |
+|    ICC    |   Interpretation    |
+|-----------|---------------------|
+|   <0.50   |   Poor agreement    |
+| 0.50–0.75 | Moderate agreement  |
+| 0.75–0.90 |   Good agreement    |
+|   >0.90   | Excellent agreement |
 
 **With Confidence Intervals**:
 ```
@@ -176,14 +143,59 @@ Interpretation:
 - Meaning: We're 95% confident true ICC is between 0.71 and 0.91
 ```
 
-#### Which to Use?
+#### Mean Absolute Deviation (MAD)
 
-- **Krippendorff's α**: General-purpose, handles any scale type
-- **ICC**: When you want correlation interpretation, symmetric case
+**What it measures**: Average disagreement between raters on the original score scale (0–100)
 
-Both are reported in aggregated results.
+**Scale & Interpretation**:
+|  MAD |                 Interpretation                  |
+|------|-------------------------------------------------|
+|  <3  |     Excellent agreement (very close ratings)    |
+| 3–5  |        Good agreement (minor differences)       |
+| 5–10 | Moderate agreement (some systematic differences)|
+|  >10 |   Poor agreement (large systematic differences) |
 
----
+**Example**:
+```
+Model A scores: [75, 78, 76, 79, 77]
+Model B scores: [76, 79, 75, 80, 78]
+
+MAD = 1.0 points
+→ On average, models differ by 1 point on the 0–100 scale
+```
+
+**Advantage**: Directly interpretable on the original measurement scale.
+
+#### Spearman Rank Correlation (ρ)
+
+**What it measures**: Whether raters rank items in the same order (rank agreement)
+
+**Scale & Interpretation**:
+|    ρ Value    |            Interpretation               |
+|---------------|-----------------------------------------|
+|     ρ < 0     | Negative correlation (opposite ranking) |
+|  0 ≤ ρ ≤ 0.5  |           Weak rank agreement           |
+| 0.5 < ρ ≤ 0.8 |       Moderate to good rank agreement   |
+|     ρ > 0.8   |         Excellent rank agreement        |
+
+**Example**:
+```
+Model A scores: [75, 78, 76, 79, 77]
+Model B scores: [76, 79, 75, 80, 78]
+
+Spearman ρ = 0.90
+→ Models rank items nearly identically (which model scored each item highest/lowest)
+```
+
+**Advantage**: Insensitive to systematic bias (e.g., one model always scoring 10 points higher). Focuses on relative rather than absolute agreement.
+
+#### Three-Metric Approach
+
+The framework reports all three metrics for robust agreement assessment:
+- **ICC**: Measures absolute agreement (how close the actual scores are)
+- **MAD**: Interpretable on original scale (how many points raters typically differ)
+- **Spearman ρ**: Measures rank agreement (are the relative orderings similar?)
+
 
 ## Reporting in Academic Papers
 
@@ -227,12 +239,13 @@ To ensure reliable and reproducible results, we:
    robust uncertainty estimates without assuming normal distribution.
 
 3. **Inter-Rater Reliability**: When multiple evaluators assessed the 
-   same questions, we measured agreement using:
-   - Krippendorff's alpha (α): General-purpose agreement coefficient
-   - ICC(2,1): Intraclass correlation coefficient for symmetric agreement
+   same questions, we measured agreement using three complementary metrics:
+   - **ICC(2,1)**: Intraclass correlation coefficient (measures absolute agreement)
+   - **MAD**: Mean Absolute Deviation on the 0–100 scale (interpretable disagreement)
+   - **Spearman ρ**: Rank correlation (measures whether raters rank items identically)
    
    These metrics quantify whether different LLM evaluators converge on 
-   similar assessments (α, ICC > 0.75 indicates substantial agreement).
+   similar assessments (ICC, MAD < 10, Spearman ρ > 0.75 indicate good agreement).
 
 4. **Descriptive Statistics**: For each metric-evaluator combination, 
    we report mean, median, standard deviation, min, and max across runs.
@@ -250,30 +263,31 @@ and runs. GPT-4 rated clarity highest (M=82.5, SD=1.2), followed by
 Claude (M=81.2, SD=2.1). The narrow confidence intervals [81.8, 83.2] 
 and [79.1, 83.3] suggest consistent and reproducible assessments.
 
-| Metric | Evaluator | Mean | SD | 95% CI |
-|--------|-----------|------|----|----|
-| Clarity | GPT-4 | 82.5 | 1.2 | [81.8, 83.2] |
-| Clarity | Claude | 81.2 | 2.1 | [79.1, 83.3] |
-| Accuracy | GPT-4 | 78.3 | 3.4 | [75.2, 81.4] |
-| ... | ... | ... | ... | ... |
+|  Metric  | Evaluator | Mean | SD  |    95% CI    |
+|----------|-----------|------|-----|--------------|
+| Clarity  |   GPT-4   | 82.5 | 1.2 | [81.8, 83.2] |
+| Clarity  |   Claude  | 81.2 | 2.1 | [79.1, 83.3] |
+| Accuracy |   GPT-4   | 78.3 | 3.4 | [75.2, 81.4] |
+|    ...   |    ...    |  ... | ... |      ...     |
 
 ### Inter-Rater Reliability
 
 To assess evaluator agreement, we computed inter-rater reliability 
-metrics (Table 2). For clarity, Krippendorff's α = 0.74 and ICC = 0.82, 
-both indicating substantial agreement. This suggests GPT-4 and Claude 
+metrics (Table 2). For clarity, ICC = 0.82, MAD = 1.2, and Spearman ρ = 0.85, 
+all indicating good to excellent agreement. This suggests GPT-4 and Claude 
 converge on similar clarity assessments, strengthening confidence in 
 the underlying construct.
 
-| Metric | Krippendorff's α | ICC(2,1) | 95% CI |
-|--------|---------|----------|--------|
-| Clarity | 0.74 | 0.82 | [0.71, 0.91] |
-| Accuracy | 0.68 | 0.75 | [0.61, 0.87] |
-| ... | ... | ... | ... |
+|  Metric  | ICC(2,1) |    95% CI    | MAD | Spearman ρ |
+|----------|----------|--------------|-----|------------|
+| Clarity  |   0.82   | [0.71, 0.91] | 1.2 |    0.85    |
+| Accuracy |   0.75   | [0.61, 0.87] | 2.1 |    0.80    |
+|    ...   |    ...   |      ...     | ... |     ...    |
 
-Higher α and ICC values indicate stronger consensus between evaluators. 
-All metrics exceeded α > 0.60 (moderate agreement), suggesting the 
-metrics reliably capture their intended constructs.
+Higher ICC and Spearman ρ values, combined with lower MAD values, 
+indicates stronger consensus between evaluators. All metrics indicated 
+moderate to good agreement, suggesting the metrics reliably capture 
+their intended constructs.
 
 ### Variance & Consistency
 
@@ -293,15 +307,15 @@ or ambiguity in the metric prompt. We discuss implications in Section X.
 Our multi-run evaluation with bootstrap confidence intervals 
 demonstrates that [Framework] provides reproducible, reliable assessment 
 of quiz quality. The narrow confidence intervals (mean width: X) and 
-high inter-rater agreement (mean α = Y) indicate both within-model 
-consistency and cross-model agreement.
+high inter-rater agreement (mean ICC = Y, MAD < 5, Spearman ρ > 0.75) 
+indicate both within-model consistency and cross-model agreement.
 
 ### Differences Between Evaluators
 
-While GPT-4 and Claude showed substantial agreement overall (α = 0.74), 
-we observed notable differences on [specific metrics]. This may reflect 
-different training data, evaluation heuristics, or sensitivity to 
-particular linguistic features. We recommend [assessment approach] 
+While GPT-4 and Claude showed good agreement overall (ICC = 0.82, MAD = 1.2, 
+Spearman ρ = 0.85), we observed notable differences on [specific metrics]. 
+This may reflect different training data, evaluation heuristics, or sensitivity 
+to particular linguistic features. We recommend [assessment approach] 
 when using multiple evaluators.
 
 ### Limitations
@@ -329,11 +343,11 @@ when using multiple evaluators.
          Clarity Scores with 95% Confidence Intervals
 
 100  │
-  85  │     ┌─────┐         ┌──────┐
-  80  │ ═══██════xx═══     ═███════xx════
-  75  │     └─────┘         └──────┘
-  70  │
-  65  │
+  85 │     ┌─────┐         ┌──────┐
+  80 │ ═══██════xx═══     ═███════xx════
+  75 │     └─────┘         └──────┘
+  70 │
+  65 │
      └─────────────────────────────────────
        GPT-4        Claude      LLaMA
 ```
@@ -392,9 +406,9 @@ For full reproducibility, include:
 
 ### Inter-Rater Reliability
 
-- "Substantial agreement between evaluators (α=0.74, ICC=0.82)"
-- "Evaluator agreement ranged from poor (α=0.42) to excellent (α=0.89)"
-- "Inter-rater reliability exceeded the 0.75 threshold for [metric]"
+- "Substantial agreement between evaluators (ICC=0.82, MAD=1.2, Spearman ρ=0.85)"
+- "Evaluator agreement ranged from poor (ICC=0.42, MAD=15) to excellent (ICC=0.89, MAD<2)"
+- "Inter-rater reliability exceeded the 0.75 threshold for [metric] (ICC and Spearman ρ)"
 
 ### Confidence & Precision
 
@@ -412,7 +426,7 @@ For full reproducibility, include:
 
 ## References & Further Reading
 
-- Krippendorff, K. (2004). *Reliability in content analysis*. Human Communication Research.
+- Spearman, C. (1904). The proof and measurement of association between two things. *The American Journal of Psychology*, 15(1), 72–101.
 - Efron, B., & Tibshirani, R. (1993). *An introduction to the bootstrap*. Chapman and Hall.
 - Koo, T. K., & Li, M. Y. (2016). A guideline of selecting and reporting intraclass correlation coefficients for reliability research. *Journal of Chiropractic Medicine*, 15(2), 155–163.
 

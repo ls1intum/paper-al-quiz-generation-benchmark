@@ -232,10 +232,6 @@ class ResultsAggregator:
 
         return comparison
 
-    # -------------------------------------------------------------------------
-    # Reliability metrics helpers
-    # -------------------------------------------------------------------------
-
     @staticmethod
     def _paired_columns(
         reliability_array: np.ndarray,
@@ -286,26 +282,23 @@ class ResultsAggregator:
 
         Returns a dict with:
             - spearman_rho: average ρ across all pairs
-            - spearman_pvalue: average p-value (treat as indicative only)
             - num_pairs: number of rater pairs used
         """
         pairs = ResultsAggregator._paired_columns(reliability_array)
         if not pairs:
             return None
 
-        rhos, pvals = [], []
+        rhos = []
         for a, b in pairs:
             result = spearmanr(a, b)
             if not np.isnan(result.statistic):
                 rhos.append(result.statistic)
-                pvals.append(result.pvalue)
 
         if not rhos:
             return None
 
         return {
             "spearman_rho": float(np.mean(rhos)),
-            "spearman_pvalue": float(np.mean(pvals)),
             "num_pairs": len(rhos),
         }
 
@@ -407,7 +400,6 @@ class ResultsAggregator:
                 "icc_ci_upper": None,
                 "mad": None,
                 "spearman_rho": None,
-                "spearman_pvalue": None,
                 "num_raters": len(evaluators_list),
                 "raters": evaluators_list,
                 "reliability_status": "low",
@@ -456,7 +448,6 @@ class ResultsAggregator:
             "icc_ci_upper": icc_result.get("ci_upper") if icc_result else None,
             "mad": mad_value,
             "spearman_rho": spearman_rho,
-            "spearman_pvalue": spearman_result.get("spearman_pvalue") if spearman_result else None,
             # Metadata
             "num_raters": len(evaluators_list),
             "raters": evaluators_list,

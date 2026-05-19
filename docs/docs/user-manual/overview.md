@@ -33,7 +33,7 @@ Systematically evaluate the quality of quizzes using research-backed metrics:
 ✅ **Research-Based Metrics** — Implements quality criteria from assessment literature  
 ✅ **Flexible Configuration** — YAML-based configs for easy experimentation  
 ✅ **Statistical Rigor** — Multiple runs with aggregation (mean, median, standard deviation, confidence intervals)  
-✅ **Inter-Rater Reliability** — Measure agreement between evaluators using Krippendorff's Alpha and ICC  
+✅ **Inter-Rater Reliability** — Measure agreement between evaluators using ICC, MAD, and Spearman rank correlation  
 ✅ **Bootstrap Confidence Intervals** — Non-parametric uncertainty quantification without distribution assumptions  
 ✅ **Reproducible Results** — Versioned configs, deterministic evaluation (temperature=0.0), seeded random sampling  
 ✅ **Clean Architecture** — Type-safe Python with clear interfaces  
