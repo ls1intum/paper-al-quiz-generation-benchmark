@@ -203,7 +203,7 @@ DISTRACTOR_QUALITY
 |-------------|-------------------------------|----------------------------------------------------------------------|
 |  **Mean**   | Average score across all runs |           The "typical" score. Use for comparing evaluators.         |
 | **Median**  |    Middle value when sorted   |       Robust to outliers. If median ≠ mean, check for outliers.      |
-| **Std Dev** |      Standard deviation       | Spread of scores. Lower = more consistent. High (>5) = high variance.|
+| **Std Dev** |      Standard deviation       | Spread of scores. Lower = more consistent. High (&gt;5) = high variance.|
 | **Min/Max** |  Minimum and maximum scores   |         Range of observed values. Watch for extreme outliers.        |
 
 ### 95% Confidence Interval (CI)
@@ -235,9 +235,9 @@ When you use **multiple evaluators** (e.g., GPT-4 and Claude), the framework aut
 **What it measures**: Overall consistency in absolute scores across raters
 
 **Scale**: 0 to 1 (higher is better)
-- **ICC < 0.5**: Poor
-- **0.5 ≤ ICC < 0.75**: Moderate
-- **0.75 ≤ ICC < 0.9**: Good
+- **ICC &lt; 0.5**: Poor
+- **0.5 ≤ ICC &lt; 0.75**: Moderate
+- **0.75 ≤ ICC &lt; 0.9**: Good
 - **ICC ≥ 0.9**: Excellent
 
 **With 95% CI**: [CI_lower, CI_upper] indicates confidence in the ICC estimate
@@ -254,9 +254,9 @@ ICC = 0.794 [95% CI: 0.582, 0.906]
 **What it measures**: Average disagreement between raters, expressed on the original score scale (0–100)
 
 **Scale**: 0–100 points
-- **MAD < 3**: Excellent agreement (very close ratings)
-- **3 ≤ MAD < 5**: Good agreement (minor differences)
-- **5 ≤ MAD < 10**: Moderate agreement (some systematic differences)
+- **MAD &lt; 3**: Excellent agreement (very close ratings)
+- **3 ≤ MAD &lt; 5**: Good agreement (minor differences)
+- **5 ≤ MAD &lt; 10**: Moderate agreement (some systematic differences)
 - **MAD ≥ 10**: Poor agreement (large systematic differences)
 
 **Example**:
@@ -273,10 +273,10 @@ MAD = 3.45 points
 **What it measures**: Whether raters rank quiz items in the same order (rank agreement)
 
 **Scale**: −1 to 1
-- **ρ < 0**: Negative correlation (opposite ranking)
+- **ρ &lt; 0**: Negative correlation (opposite ranking)
 - **0 ≤ ρ ≤ 0.5**: Weak rank agreement
-- **0.5 < ρ ≤ 0.8**: Moderate to good rank agreement
-- **ρ > 0.8**: Excellent rank agreement
+- **0.5 &lt; ρ ≤ 0.8**: Moderate to good rank agreement
+- **ρ &gt; 0.8**: Excellent rank agreement
 
 **Example**:
 ```
@@ -578,7 +578,6 @@ def bootstrap_confidence_interval(data, ci=0.95, n_bootstrap=10000):
 |-------------------------|------------------------------------------------------------------|
 |   **Why aggregate?**    | Reduce noise, estimate confidence, detect agreement/disagreement |
 |   **Key statistics**    | Mean, median, std dev, confidence intervals                      |
-| **Reliability metrics** | ICC, MAD, and Spearman ρ measure evaluator agreement             |                                                     |
+| **Reliability metrics** | ICC, MAD, and Spearman ρ measure evaluator agreement             |
 |   **Interpretation**    | Report with confidence intervals; watch for high variance        |
 |     **For papers**      | Export JSON for analysis, create visualizations from CI data     |
-

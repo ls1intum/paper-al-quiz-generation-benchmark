@@ -126,14 +126,16 @@ When multiple evaluators (e.g., different LLM models) assess the same content, m
 **What it measures**: How consistently raters assign absolute scores to items
 
 **Scale & Interpretation**:
-|    ICC    |   Interpretation    |
-|-----------|---------------------|
-|   <0.50   |   Poor agreement    |
-| 0.50–0.75 | Moderate agreement  |
-| 0.75–0.90 |   Good agreement    |
-|   >0.90   | Excellent agreement |
+
+|      ICC      |   Interpretation    |
+|---------------|---------------------|
+| &lt;0.50      |   Poor agreement    |
+| 0.50–0.75     | Moderate agreement  |
+| 0.75–0.90     |   Good agreement    |
+| &gt;0.90      | Excellent agreement |
 
 **With Confidence Intervals**:
+
 ```
 ICC = 0.82, 95% CI = [0.71, 0.91]
 
@@ -148,14 +150,16 @@ Interpretation:
 **What it measures**: Average disagreement between raters on the original score scale (0–100)
 
 **Scale & Interpretation**:
-|  MAD |                 Interpretation                  |
-|------|-------------------------------------------------|
-|  <3  |     Excellent agreement (very close ratings)    |
-| 3–5  |        Good agreement (minor differences)       |
-| 5–10 | Moderate agreement (some systematic differences)|
-|  >10 |   Poor agreement (large systematic differences) |
+
+|    MAD    |                  Interpretation                  |
+|-----------|--------------------------------------------------|
+| &lt;3     |     Excellent agreement (very close ratings)     |
+| 3–5       |        Good agreement (minor differences)        |
+| 5–10      | Moderate agreement (some systematic differences) |
+| &gt;10    |   Poor agreement (large systematic differences)  |
 
 **Example**:
+
 ```
 Model A scores: [75, 78, 76, 79, 77]
 Model B scores: [76, 79, 75, 80, 78]
@@ -171,14 +175,16 @@ MAD = 1.0 points
 **What it measures**: Whether raters rank items in the same order (rank agreement)
 
 **Scale & Interpretation**:
-|    ρ Value    |            Interpretation               |
-|---------------|-----------------------------------------|
-|     ρ < 0     | Negative correlation (opposite ranking) |
-|  0 ≤ ρ ≤ 0.5  |           Weak rank agreement           |
-| 0.5 < ρ ≤ 0.8 |       Moderate to good rank agreement   |
-|     ρ > 0.8   |         Excellent rank agreement        |
+
+|       ρ Value      |            Interpretation               |
+|--------------------|-----------------------------------------|
+| ρ &lt; 0           | Negative correlation (opposite ranking) |
+| 0 ≤ ρ ≤ 0.5        |           Weak rank agreement           |
+| 0.5 &lt; ρ ≤ 0.8   |       Moderate to good rank agreement   |
+| ρ &gt; 0.8         |         Excellent rank agreement        |
 
 **Example**:
+
 ```
 Model A scores: [75, 78, 76, 79, 77]
 Model B scores: [76, 79, 75, 80, 78]
@@ -201,7 +207,7 @@ The framework reports all three metrics for robust agreement assessment:
 
 ### Section: Methods
 
-```markdown
+```
 ## Evaluation Methodology
 
 ### Quiz Evaluation Framework
@@ -216,7 +222,7 @@ We evaluated quizzes across [N] quality metrics:
 - Distractor Quality (pedagogical effectiveness of incorrect options)
 [... list others ...]
 
-Each metric produces a score on a 0–100 scale, with detailed rubrics 
+Each metric produces a score on a 0-100 scale, with detailed rubrics 
 provided in [supplementary materials / appendix].
 
 ### Evaluators
@@ -231,29 +237,29 @@ we prompted each evaluator with identical prompts (see Appendix A).
 ### Statistical Aggregation
 To ensure reliable and reproducible results, we:
 
-1. **Multiple Runs**: Each quiz was evaluated in [N] independent runs, 
+1. Multiple Runs: Each quiz was evaluated in [N] independent runs, 
    allowing us to estimate score stability and variance.
 
-2. **Confidence Intervals**: We computed 95% confidence intervals using 
+2. Confidence Intervals: We computed 95% confidence intervals using 
    bootstrap resampling (10,000 iterations, seed=42), which provides 
    robust uncertainty estimates without assuming normal distribution.
 
-3. **Inter-Rater Reliability**: When multiple evaluators assessed the 
+3. Inter-Rater Reliability: When multiple evaluators assessed the 
    same questions, we measured agreement using three complementary metrics:
-   - **ICC(2,1)**: Intraclass correlation coefficient (measures absolute agreement)
-   - **MAD**: Mean Absolute Deviation on the 0–100 scale (interpretable disagreement)
-   - **Spearman ρ**: Rank correlation (measures whether raters rank items identically)
+   - ICC(2,1): Intraclass correlation coefficient (measures absolute agreement)
+   - MAD: Mean Absolute Deviation on the 0-100 scale (interpretable disagreement)
+   - Spearman rho: Rank correlation (measures whether raters rank items identically)
    
    These metrics quantify whether different LLM evaluators converge on 
-   similar assessments (ICC, MAD < 10, Spearman ρ > 0.75 indicate good agreement).
+   similar assessments (ICC, MAD < 10, Spearman rho > 0.75 indicate good agreement).
 
-4. **Descriptive Statistics**: For each metric-evaluator combination, 
+4. Descriptive Statistics: For each metric-evaluator combination, 
    we report mean, median, standard deviation, min, and max across runs.
 ```
 
 ### Section: Results
 
-```markdown
+```
 ## Results
 
 ### Overall Evaluation Summary
@@ -273,18 +279,18 @@ and [79.1, 83.3] suggest consistent and reproducible assessments.
 ### Inter-Rater Reliability
 
 To assess evaluator agreement, we computed inter-rater reliability 
-metrics (Table 2). For clarity, ICC = 0.82, MAD = 1.2, and Spearman ρ = 0.85, 
+metrics (Table 2). For clarity, ICC = 0.82, MAD = 1.2, and Spearman rho = 0.85, 
 all indicating good to excellent agreement. This suggests GPT-4 and Claude 
 converge on similar clarity assessments, strengthening confidence in 
 the underlying construct.
 
-|  Metric  | ICC(2,1) |    95% CI    | MAD | Spearman ρ |
-|----------|----------|--------------|-----|------------|
-| Clarity  |   0.82   | [0.71, 0.91] | 1.2 |    0.85    |
-| Accuracy |   0.75   | [0.61, 0.87] | 2.1 |    0.80    |
-|    ...   |    ...   |      ...     | ... |     ...    |
+|  Metric  | ICC(2,1) |    95% CI    | MAD | Spearman rho |
+|----------|----------|--------------|-----|--------------|
+| Clarity  |   0.82   | [0.71, 0.91] | 1.2 |     0.85     |
+| Accuracy |   0.75   | [0.61, 0.87] | 2.1 |     0.80     |
+|    ...   |    ...   |      ...     | ... |      ...     |
 
-Higher ICC and Spearman ρ values, combined with lower MAD values, 
+Higher ICC and Spearman rho values, combined with lower MAD values, 
 indicates stronger consensus between evaluators. All metrics indicated 
 moderate to good agreement, suggesting the metrics reliably capture 
 their intended constructs.
@@ -299,7 +305,7 @@ or ambiguity in the metric prompt. We discuss implications in Section X.
 
 ### Section: Discussion
 
-```markdown
+```
 ## Discussion
 
 ### Reliability of Automated Assessment
@@ -307,29 +313,29 @@ or ambiguity in the metric prompt. We discuss implications in Section X.
 Our multi-run evaluation with bootstrap confidence intervals 
 demonstrates that [Framework] provides reproducible, reliable assessment 
 of quiz quality. The narrow confidence intervals (mean width: X) and 
-high inter-rater agreement (mean ICC = Y, MAD < 5, Spearman ρ > 0.75) 
+high inter-rater agreement (mean ICC = Y, MAD < 5, Spearman rho > 0.75) 
 indicate both within-model consistency and cross-model agreement.
 
 ### Differences Between Evaluators
 
 While GPT-4 and Claude showed good agreement overall (ICC = 0.82, MAD = 1.2, 
-Spearman ρ = 0.85), we observed notable differences on [specific metrics]. 
+Spearman rho = 0.85), we observed notable differences on [specific metrics]. 
 This may reflect different training data, evaluation heuristics, or sensitivity 
 to particular linguistic features. We recommend [assessment approach] 
 when using multiple evaluators.
 
 ### Limitations
 
-1. **LLM-Based Assessment**: Our metrics rely on LLM evaluations, 
+1. LLM-Based Assessment: Our metrics rely on LLM evaluations, 
    which may not perfectly align with expert human judgment. However, 
    high inter-rater agreement (ICC = 0.82) suggests the metrics capture 
    consistent, reproducible quality dimensions.
 
-2. **Score Distribution**: Some metrics showed higher variance 
+2. Score Distribution: Some metrics showed higher variance 
    (SD = 5.8 for [metric]). This may indicate genuine quiz variability 
    or metric prompt ambiguity. Future work should refine these prompts.
 
-3. **Generalization**: This study used [N] quizzes on [topic]. 
+3. Generalization: This study used [N] quizzes on [topic]. 
    Generalization to other domains requires replication.
 ```
 
@@ -368,13 +374,13 @@ Claude: 79.3   80.1   81.5   82.1   80.8  → Mean = 80.76, SD = 1.20
 
 ### Table 3: Comprehensive Results Template
 
-```markdown
-| Metric | Evaluator | Mean | SD | Min | Max | 95% CI | N |
-|--------|-----------|------|----|----|-------|--------|---|
-| Clarity | GPT-4 | 82.5 | 1.2 | 80.1 | 84.3 | [81.8, 83.2] | 50 |
-| Clarity | Claude | 81.2 | 2.1 | 77.5 | 85.2 | [79.1, 83.3] | 50 |
-| Accuracy | GPT-4 | 78.3 | 3.4 | 71.0 | 86.5 | [75.2, 81.4] | 50 |
-| Accuracy | Claude | 76.8 | 4.2 | 68.3 | 87.1 | [73.1, 80.5] | 50 |
+```
+| Metric   | Evaluator | Mean | SD  | Min  | Max  | 95% CI       | N  |
+|----------|-----------|------|-----|------|------|--------------|----|
+| Clarity  | GPT-4     | 82.5 | 1.2 | 80.1 | 84.3 | [81.8, 83.2] | 50 |
+| Clarity  | Claude    | 81.2 | 2.1 | 77.5 | 85.2 | [79.1, 83.3] | 50 |
+| Accuracy | GPT-4     | 78.3 | 3.4 | 71.0 | 86.5 | [75.2, 81.4] | 50 |
+| Accuracy | Claude    | 76.8 | 4.2 | 68.3 | 87.1 | [73.1, 80.5] | 50 |
 ```
 
 ---
@@ -384,7 +390,7 @@ Claude: 79.3   80.1   81.5   82.1   80.8  → Mean = 80.76, SD = 1.20
 For full reproducibility, include:
 
 - [ ] **Configuration Files**: All YAML configs used (benchmark_*.yaml)
-- [ ] **Environment Details**: Python version, package versions (from requirements.txt or piproject.toml)
+- [ ] **Environment Details**: Python version, package versions (from requirements.txt or pyproject.toml)
 - [ ] **Raw Results**: aggregated.json (or summary statistics if space-limited)
 - [ ] **Prompts**: LLM prompts used for each metric (in appendix or supplementary)
 - [ ] **Data Description**: Number of quizzes, source materials, question types
@@ -407,7 +413,7 @@ For full reproducibility, include:
 ### Inter-Rater Reliability
 
 - "Substantial agreement between evaluators (ICC=0.82, MAD=1.2, Spearman ρ=0.85)"
-- "Evaluator agreement ranged from poor (ICC=0.42, MAD=15) to excellent (ICC=0.89, MAD<2)"
+- "Evaluator agreement ranged from poor (ICC=0.42, MAD=15) to excellent (ICC=0.89, MAD &lt; 2)"
 - "Inter-rater reliability exceeded the 0.75 threshold for [metric] (ICC and Spearman ρ)"
 
 ### Confidence & Precision
@@ -429,4 +435,3 @@ For full reproducibility, include:
 - Spearman, C. (1904). The proof and measurement of association between two things. *The American Journal of Psychology*, 15(1), 72–101.
 - Efron, B., & Tibshirani, R. (1993). *An introduction to the bootstrap*. Chapman and Hall.
 - Koo, T. K., & Li, M. Y. (2016). A guideline of selecting and reporting intraclass correlation coefficients for reliability research. *Journal of Chiropractic Medicine*, 15(2), 155–163.
-
