@@ -2,7 +2,7 @@
   "quiz_id": "quiz_4",
   "title": "Java Quiz Loops & Conditional Statements",
   "source_material": "ITP",
-  "instructions": "instruction_4.json",
+  "instructions": "AIQuizzes_instructions/instruction_4.json",
   "questions": [
     {
       "question_id": "q1",

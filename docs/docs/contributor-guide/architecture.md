@@ -612,6 +612,225 @@ paper-al-quiz-generation-benchmark/
 └──────────────┘
 ```
 
+## Analysis & Aggregation Layer
+
+### Results Aggregator (`src/analysis/aggregator.py`)
+
+The **ResultsAggregator** class transforms raw evaluation results into statistically rigorous aggregations.
+
+#### Responsibilities
+
+1. **Grouping Results**: Organize scores by (metric_name, evaluator_model, quiz_id, question_id)
+2. **Descriptive Statistics**: Compute mean, median, std dev, min, max across runs
+3. **Bootstrap Confidence Intervals**: Estimate 95% CI for robust uncertainty quantification
+4. **Inter-Rater Reliability**: Measure agreement between evaluators using:
+   - **ICC(2,1)**: Intraclass correlation coefficient (two-way mixed, absolute agreement, single measurement)
+   - **MAD**: Mean Absolute Deviation (interpretable on original score scale)
+   - **Spearman ρ**: Rank-based correlation (insensitive to systematic bias)
+5. **Per-Quiz Breakdowns**: Optional separate aggregation for each quiz
+
+#### Bootstrap Confidence Interval Calculation
+
+```python
+def bootstrap_confidence_interval(
+    data: List[float], 
+    ci: float = 0.95, 
+    n_bootstrap: int = 10000
+) -> Tuple[float, float]:
+    """
+    Algorithm:
+    1. Resample from data with replacement n_bootstrap times (e.g., 10,000)
+    2. Calculate mean for each bootstrap sample
+    3. Extract percentiles: lower = α/2, upper = 1 - α/2
+    4. Return [lower_percentile, upper_percentile]
+    
+    Example:
+    data = [75, 78, 76, 79, 77]
+    - Bootstrap sample 1: mean([77, 78, 75, 76, 76]) = 76.4
+    - Bootstrap sample 2: mean([78, 79, 77, 78, 79]) = 78.2
+    - ... 9,998 more ...
+    - 2.5th percentile of all means = 76.1
+    - 97.5th percentile of all means = 79.2
+    - Result: CI = [76.1, 79.2]
+    """
+    rng = np.random.default_rng(seed=42)  # Reproducible
+    bootstrap_samples = rng.choice(data, size=(n_bootstrap, len(data)), replace=True)
+    bootstrap_means = np.mean(bootstrap_samples, axis=1)
+    
+    alpha = 1 - ci
+    lower = np.percentile(bootstrap_means, (alpha/2) * 100)
+    upper = np.percentile(bootstrap_means, (1 - alpha/2) * 100)
+    
+    return (lower, upper)
+```
+
+**Why Bootstrap?**
+- No parametric assumptions (works for any distribution)
+- Robust to outliers and skewed data
+- Reproducible (seeded RNG)
+- Intuitive: measures actual variability in resampled means
+
+#### Inter-Rater Reliability Calculation
+
+When multiple evaluators assess the same questions, the framework computes three robust reliability metrics:
+
+```python
+# ICC(2,1) - two-way mixed effects, absolute agreement
+from pingouin import intraclass_corr
+icc_result = intraclass_corr(
+    data=rating_data,
+    targets='item',
+    raters='rater',
+    ratings='score',
+    icc_type='ICC2'
+)
+# Returns: icc value and 95% confidence interval
+# Scale: 0-1, higher indicates better agreement
+
+# MAD - Mean Absolute Deviation (pairwise)
+mad_value = np.mean([np.abs(rater_i - rater_j) for each pair])
+# Scale: 0-100 (same as original scores), interpretable as average disagreement
+
+# Spearman rho - Rank correlation
+from scipy.stats import spearmanr
+rhos = [spearmanr(rater_i, rater_j)[0] for each pair]
+rho_avg = np.mean(rhos)
+# Scale: -1 to 1, answers: do raters rank items the same way?
+# Insensitive to systematic bias (one rater consistently higher)
+```
+
+**Advantages of this three-metric approach:**
+- **ICC**: Measures absolute agreement (two-way, mixed-effects)
+- **MAD**: Interpretable on original scale (0-100); directly shows average disagreement in points
+- **Spearman rho**: Insensitive to systematic bias; focuses on rank agreement across items
+
+#### Output Format
+
+```python
+@dataclass
+class MetricAggregation:
+    metric_name: str
+    evaluator_model: str
+    mean: float
+    median: float
+    std_dev: float
+    min: float
+    max: float
+    per_run_scores: List[float]
+    ci_lower: float  # 95% CI lower bound
+    ci_upper: float  # 95% CI upper bound
+    num_runs: int
+
+@dataclass
+class AggregatedResults:
+    benchmark_config_name: str
+    benchmark_version: str
+    quiz_ids: List[str]
+    total_runs: int
+    aggregations: Dict[str, MetricAggregation]
+    inter_rater_reliability: Dict[str, Dict[str, float]]
+```
+
+### Results Reporter (`src/analysis/reporter.py`)
+
+Generates human-readable reports from aggregated results.
+
+#### Features
+
+- **Summary Generation**: Overview of all metrics with statistics
+- **Comparison Reports**: Per-metric comparison across evaluators
+- **Inter-Rater Analysis**: Display reliability metrics with interpretation
+- **JSON Export**: Machine-readable aggregated results
+- **Markdown Tables**: Easy integration into documentation/papers
+
+#### Example Output
+
+```
+================================================================================
+BENCHMARK RESULTS SUMMARY
+================================================================================
+Configuration: comprehensive_eval
+Version: 1.0.0
+Total Runs: 5
+Quizzes Evaluated: 3
+
+INTER-RATER RELIABILITY
+--------------------------------------------------------------------------------
+
+clarity:
+  ICC(2,1): 0.8510 [95% CI: 0.7230, 0.9310]
+  MAD (Mean Absolute Deviation): 3.45 points
+  Spearman rho: 0.8760
+  Number of Raters: 2
+
+CLARITY
+--------------------------------------------------------------------------------
+
+  Evaluator: gpt-4
+    Mean:   77.80
+    Median: 78.50
+    Std Dev: 2.34
+    95% CI: [76.20, 79.40]
+    Min:    74.10
+    Max:    82.30
+    N:      5
+
+  Evaluator: claude-3-opus
+    Mean:   79.20
+    Median: 79.80
+    Std Dev: 1.89
+    95% CI: [77.80, 80.60]
+    Min:    76.90
+    Max:    81.50
+    N:      5
+```
+
+### Data Flow
+
+```
+BenchmarkRunner Output (Multiple Runs)
+    │
+    ├─ Run 1 → BenchmarkResult
+    │    ├─ Quiz 1, Q1, Clarity, GPT-4: 75.5
+    │    ├─ Quiz 1, Q1, Clarity, Claude: 77.2
+    │    └─ ...
+    │
+    ├─ Run 2 → BenchmarkResult
+    │    ├─ Quiz 1, Q1, Clarity, GPT-4: 78.2
+    │    ├─ Quiz 1, Q1, Clarity, Claude: 76.9
+    │    └─ ...
+    │
+    └─ Run 3 → BenchmarkResult
+         └─ ...
+         │
+         ▼
+    ResultsAggregator.aggregate()
+         │
+         ├─ Group by (clarity, gpt-4):
+         │    Scores = [75.5, 78.2, 76.8]
+         │    → Mean = 76.8, CI = [75.1, 78.5]
+         │
+         ├─ Group by (clarity, claude):
+         │    Scores = [77.2, 76.9, 77.8]
+         │    → Mean = 77.3, CI = [76.2, 78.4]
+         │
+         └─ Inter-Rater Reliability:
+              Scores_GPT = [75.5, 78.2, 76.8, ...]
+              Scores_Claude = [77.2, 76.9, 77.8, ...]
+              → ICC = 0.85, MAD = 3.45, Spearman = 0.87
+              │
+              ▼
+         AggregatedResults (JSON)
+              │
+              ▼
+         ResultsReporter.generate_summary()
+              │
+              ▼
+         summary.txt + aggregated.json
+```
+
+---
+
 ### Key Design Decisions
 
 1. **Stateless Design**: No persistent state between runs; all context provided in configuration
@@ -622,5 +841,7 @@ paper-al-quiz-generation-benchmark/
 6. **Reproducibility**: Config hashing, version tracking, complete result metadata
 7. **Separation of Concerns**: Distinct layers for data, metrics, evaluation, and analysis
 8. **Research-Based**: Metrics grounded in educational assessment literature
+9. **Statistical Rigor**: Bootstrap CIs + inter-rater reliability for robust aggregation
+10. **Multi-Run Support**: Automatic aggregation across N runs for variance reduction
 
 ---

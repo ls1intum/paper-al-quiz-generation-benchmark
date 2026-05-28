@@ -1,0 +1,87 @@
+benchmark:
+  name: "multi-judge-benchmark"
+  version: "1.0.0"
+  runs: 2  # Multiple runs for robust inter-rater reliability analysis
+  metadata:
+    description: "Multi-judge evaluation benchmark with GPT-4o and GPT-4o-mini to measure inter-rater agreement"
+
+evaluators:
+  # Primary judge: GPT-4o via Azure OpenAI
+  openai-gpt:
+    provider: "openai_compatible"
+    model: "openai/gpt-oss-120b"
+    temperature: 0.0
+    max_tokens: 1500
+
+  gpt41:
+    provider: "openai_compatible"
+    model: "gpt-4.1"
+    temperature: 0.0
+    max_tokens: 1500
+
+  llama3:
+    provider: "openai_compatible"
+    model: "meta-llama/Llama-3.3-70B-Instruct"
+    temperature: 0.0
+    max_tokens: 1500
+
+  qwen35:
+    provider: "openai_compatible"
+    model: "Qwen/Qwen3.5-35B-A3B"
+    temperature: 0.0
+    max_tokens: 1500
+
+  qwen:
+    provider: "openai_compatible"
+    model: "Qwen/Qwen3.5-122B-A10B"
+    base_url: "https://gpu.aet.cit.tum.de/api/v1"
+    api_key: 'YOUR_API_KEY'
+    temperature: 0.0
+    max_tokens: 1500
+
+  groq:
+    provider: "openai_compatible"
+    model: "openai/gpt-oss-20b"
+    base_url: "https://api.groq.com/openai/v1"
+    api_key: 'YOUR_API_KEY' #to override the .env file
+    temperature: 0.0
+    max_tokens: 1500
+
+metrics:
+  # All metrics evaluated by both judges for inter-rater reliability
+  - name: "accuracy"
+    version: "1.1"
+    evaluators: ["qwen", "openai-gpt"]
+    enabled: true
+
+  - name: "clarity"
+    version: "1.0"
+    evaluators: ["qwen", "openai-gpt"]
+    enabled: true
+
+  - name: "difficulty"
+    version: "1.0"
+    evaluators: ["qwen", "openai-gpt"]
+    parameters:
+      rubric: "bloom_taxonomy"
+    enabled: true
+
+  - name: "distractor_quality"
+    version: "1.0"
+    evaluators: ["qwen", "openai-gpt"]
+    enabled: true
+
+  - name: "grammatical_correctness"
+    version: "1.0"
+    evaluators: ["qwen", "openai-gpt"]
+    enabled: true
+
+inputs:
+  # Use variety of quiz types for comprehensive evaluation
+  quiz_directory: "data/quizzes/ITP_Workshop/W05Quiz.json"
+  source_directory: "data/inputs"
+  instructions_directory: "data/instructions"
+
+outputs:
+  results_directory: "data/results"
+  aggregate: true

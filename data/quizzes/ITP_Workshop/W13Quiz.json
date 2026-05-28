@@ -1,7 +1,7 @@
 {
   "quiz_id": "W13E01",
   "title": "Introduction to Programming – Recursion Quiz",
-  "source_material": "12_Recursion.pdf",
+  "source_material": "ITP/ITP_SE2/12_Recursion.pdf",
   "questions": [
     {
       "question_id": "q1",

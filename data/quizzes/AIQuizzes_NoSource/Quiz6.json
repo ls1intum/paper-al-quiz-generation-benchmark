@@ -2,7 +2,7 @@
   "quiz_id": "quiz_6",
   "title": "Java Quiz — Lambdas",
   "source_material": "ITP",
-  "instructions": "instruction_6.json",
+  "instructions": "AIQuizzes_instructions/instruction_6.json",
   "questions": [
     {
       "question_id": "q1",

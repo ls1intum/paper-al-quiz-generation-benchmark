@@ -2,7 +2,7 @@
   "quiz_id": "quiz_1",
   "title": "Java Quiz Collections & Inheritance",
   "source_material": "ITP",
-  "instructions": "instruction_1.json",
+  "instructions": "AIQuizzes_instructions/instruction_1.json",
   "questions": [
     {
       "question_id": "q1",

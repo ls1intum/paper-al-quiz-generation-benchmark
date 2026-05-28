@@ -1,7 +1,7 @@
 {
   "quiz_id": "W07E01",
   "title": "Introduction to Programming – Type Flexibility and Safety Quiz",
-  "source_material": "06_TypeFlexibilityAndSafety.pdf",
+  "source_material": "ITP/ITP_SE1/06_TypeFlexibilityAndSafety.pdf",
   "questions": [
     {
       "question_id": "q1",

@@ -1,7 +1,7 @@
 {
   "quiz_id": "W02Quiz",
   "title": "Introduction to Programming – Java Basics Quiz",
-  "source_material": "01_Introduction.pdf",
+  "source_material": "ITP/ITP_SE1/01_Introduction.pdf",
   "questions": [
     {
       "question_id": "q1",

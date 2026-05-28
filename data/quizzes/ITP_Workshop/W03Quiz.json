@@ -1,7 +1,7 @@
 {
   "quiz_id": "W03Quiz",
   "title": "W03E01 – Classes, Objects, Operations & Methods",
-  "source_material": "02_ControlFlow.pdf",
+  "source_material": "ITP/ITP_SE1/02_ControlFlow.pdf",
   "questions": [
     {
       "question_id": "q1",

@@ -1,7 +1,7 @@
 {
   "quiz_id": "W08E01",
   "title": "Introduction to Programming – In-Depth Object Orientation Quiz",
-  "source_material": "07_InDepthObjectOrientation.pdf",
+  "source_material": "ITP/ITP_SE1/07_InDepthObjectOrientation.pdf",
   "questions": [
     {
       "question_id": "q1",

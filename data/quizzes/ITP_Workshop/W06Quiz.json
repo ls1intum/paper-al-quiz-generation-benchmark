@@ -1,7 +1,7 @@
 {
   "quiz_id": "W06E01",
   "title": "Introduction to Programming – Code Reuse and Structure Quiz",
-  "source_material": "05_CodeReuseAndStructure.pdf",
+  "source_material": "ITP/ITP_SE1/05_CodeReuseAndStructure.pdf",
   "questions": [
     {
       "question_id": "q1",

@@ -1,7 +1,7 @@
 {
   "quiz_id": "W05E01",
   "title": "Introduction to Programming – Core Data Structures Quiz",
-  "source_material": "04_CoreDataStructures.pdf",
+  "source_material": "ITP/ITP_SE1/04_CoreDataStructures.pdf",
   "questions": [
     {
       "question_id": "q1",

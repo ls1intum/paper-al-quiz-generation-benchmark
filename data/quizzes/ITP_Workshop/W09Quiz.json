@@ -1,7 +1,7 @@
 {
   "quiz_id": "W09E01",
   "title": "Introduction to Programming – Functional Programming Essentials Quiz",
-  "source_material": "08_FunctionalProgrammingEssentials.pdf",
+  "source_material": "ITP/ITP_SE2/08_FunctionalProgrammingEssentials.pdf",
   "questions": [
     {
       "question_id": "q1",
