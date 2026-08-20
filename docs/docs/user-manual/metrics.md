@@ -318,31 +318,62 @@ every true/false item counts as perfectly homogeneous.
 
 ### 7. Absence of Cueing
 
-**Purpose**: Detect grammatical, semantic, or structural clues that inadvertently reveal the correct answer.
+**Metric name**: `absence_of_cueing`
+
+**Purpose**: Detect clues in how an item is written that let a respondent pick the key without
+knowing the subject. Factual correctness is explicitly out of scope — an item can be perfectly
+accurate and still hand over its answer.
 
 **References**: Downing [8], Haladyna et al. [10]
 
-**Scope**: Question-level
+**Scope**: Question-level — one result per question, with `question_id` populated.
 
-**Common Cues to Detect**:
-- Grammatical inconsistencies (e.g., "an" before consonant)
-- Length differences (correct answer often longest)
-- Specificity differences (correct answer more detailed)
-- Absolute terms ("always", "never") in distractors
-- Verbal associations between stem and correct answer
-- Convergence cues (correct answer includes elements of all options)
+**Scoring**: **Binary** — `100.0` when no cue is present, `0.0` when one is. This is a detection
+measure, not a matter of degree: either the item gives the answer away or it does not. `severity`
+(`none` / `minor` / `strong`) is reported alongside as a descriptive field, so a three-level
+analysis stays possible later without re-running the judge.
+
+**Cue types** (reported in `raw_response`, empty when no cue is found):
+
+| Type | Meaning |
+|---|---|
+| `grammatical` | Article, number, or tense agreement with the stem fits only the key. |
+| `semantic` | Stem wording or a distinctive term is echoed only in the key. |
+| `length` | The key is conspicuously longer, shorter, or more qualified than the distractors. |
+| `convergence` | The key combines elements repeated across distractors, or option overlap logically implies it. |
+| `other` | Any other construction clue — a uniquely detailed or hedged key, distractors weakened by absolute terms. Specifics go in `rationale`. |
+
+**Deterministic length signal**: option lengths are measured in Python before the model is
+called and passed into the prompt. The key is reported as an outlier only when it is both at
+least 1.5× the median distractor length **and** at least 20 characters longer — both thresholds
+must trip. The signal is **advisory**: a key can be legitimately longer without giving anything
+away, so the judge weighs it rather than deferring to it. True/false items are skipped, since
+their options are fixed.
+
+**Consistency rules** (applied after the judge, so they hold regardless of the model):
+- A cue reported with severity `none` is raised to `minor` — the two cannot both be true.
+- A no-cue verdict carries no cue types and no `key_revealed_by` entries, whatever the judge listed.
+- Cue types outside the five above are dropped, keeping the vocabulary safe to aggregate over.
+
+**Boundary with Homogeneous Options**: non-parallel options are not automatically cueing. A
+homogeneity break that does not point at the key belongs to `homogeneous_options`; this metric
+reports a cue only when something singles the key out. Grammatical cues necessarily break
+homogeneity too and are reported by both.
+
+**Source material**: not required. Cueing is judged from the item's construction alone.
+
+**Output** (`raw_response`):
+- `cue_present`, `severity`, `score`
+- `cue_types` — which of the five apply
+- `key_revealed_by` — the specific wording or feature that gives it away
+- `length_signal` — the deterministic measurement, including `keyed_option_is_outlier`
+- `rationale`
 
 **Example Configuration**:
 ```yaml
-- name: "cueing_absence"
+- name: "absence_of_cueing"
   version: "1.0"
   evaluators: ["gpt4"]
-  parameters:
-    check_grammar: true
-    check_length: true
-    check_specificity: true
-    check_absolutes: true
-    check_associations: true
 ```
 
 ---

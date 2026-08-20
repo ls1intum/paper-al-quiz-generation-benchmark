@@ -8,10 +8,10 @@ documents divergences from the definition, and lists actionable improvements.
 
 ## Summary
 
-The benchmark registers **9 metrics** (`src/metrics/__init__.py`):
+The benchmark registers **10 metrics** (`src/metrics/__init__.py`):
 `coverage`, `difficulty`, `accuracy`, `clarity`, `distractor_quality`,
 `homogeneous_options`, `grammatical_correctness`, `answer_key_correctness`,
-`objective_alignment`.
+`objective_alignment`, `absence_of_cueing`.
 
 | # | Criterion (paper) | Metric | Status |
 |---|---|---|---|
@@ -22,11 +22,11 @@ The benchmark registers **9 metrics** (`src/metrics/__init__.py`):
 | 5 | Answer Key Correctness | `answer_key_correctness` | ✅ Covered |
 | 6 | Distractor Quality | `distractor_quality` | ✅ Covered |
 | 7 | Homogeneous Options | `homogeneous_options` | ✅ Covered — now reported per item |
-| 8 | Absence of Cueing | (partial in `distractor_quality`) | ❌ Largely missing — no dedicated metric |
+| 8 | Absence of Cueing | `absence_of_cueing` | ✅ Covered |
 | 9 | Grammatical Correctness | `grammatical_correctness` | ✅ Covered |
 
-**Headline gaps:** Criterion 8 (Absence of Cueing) has no dedicated metric, and
-Criterion 4 omits the explicit negative-phrasing check named in its definition.
+**Headline gaps:** Criterion 4 omits the explicit negative-phrasing check named
+in its definition. Every other criterion now has a dedicated metric.
 
 ---
 
@@ -234,25 +234,39 @@ the data already existed and was being discarded at the boundary.
 
 **Definition:** *Items do not contain grammatical, semantic, or structural clues that reveal the correct answer.*
 
-**Status: ❌ Largely missing.**
+**Status: ✅ Covered** by `absence_of_cueing` (`src/metrics/absence_of_cueing.py`),
+question-level, one result per item with `question_id` populated.
 
-The only related signal is one deduction trigger inside `distractor_quality`
-("Any distractor inadvertently hints at the correct answer", `distractor.py:182`)
-and the collective "cannibalization" check. There is **no dedicated cueing
-metric**, and the classic cueing flaws named in the literature are not
-systematically detected:
-- **Grammatical cueing** — stem agreeing (a/an, singular/plural) with only the keyed option.
-- **Length cueing** — the correct option being conspicuously longer/more qualified.
-- **Word-repetition / clang cueing** — terms from the stem echoed only in the key.
-- **Convergence / logical cueing** across the option set.
+- **Binary detection.** `100.0` when no cue is present, `0.0` when one is. Cueing is a detection
+  construct rather than a matter of degree, and the primary analysis unit is present/absent.
+  `severity` (`none` / `minor` / `strong`) is retained as a descriptive field so a three-level
+  analysis remains possible later, without re-running any judge and without baking that decision
+  into the score now.
+- **Five cue types**, matching the human rating vocabulary exactly: `grammatical`, `semantic`,
+  `length`, `convergence`, `other`. A judge label outside this set is dropped. The six seeded
+  cueing items (2 grammatical · 2 length · 2 convergence) are all covered by named types, so
+  per-type recall is computable.
+- **All three cue directions** are checked explicitly: stem→key, key→distractors, and across the
+  option set. This closes the gap noted previously — the incidental signal in
+  `distractor_quality` (`distractor.py:182`) looks only at distractor→key hints, never at
+  stem→key, which is the more common failure.
+- **Deterministic length measurement** feeds the prompt: the key is flagged as an outlier only
+  when it is both ≥1.5× the median distractor length and ≥20 characters longer. It is
+  **advisory** — a key can be legitimately longer without cueing, so the judge weighs it rather
+  than deferring to it. True/false items are skipped, and an item with no marked answer is
+  handled without error.
+- **Coherence is enforced after the judge**: a cue reported with severity `none` is raised to
+  `minor`, and a no-cue verdict carries no cue types.
 
-Critically, the existing signal looks at distractor→key hints, not at
-**stem→key** cues, which is the more common cueing failure.
+**Boundary with Criterion 7.** Non-parallel options are not automatically cueing: a homogeneity
+break that does not point at the key belongs to `homogeneous_options`, while this metric reports
+a cue only when something singles the key out. Grammatical cues necessarily break homogeneity
+too and are reported by both — a known and expected overlap, not double-counting.
 
-**Actionable improvements (high priority):**
-1. Add a dedicated `cueing` (or `absence_of_cueing`) metric covering grammatical, length, word-repetition, and convergence cues between stem and key. References: Haladyna 2002, Downing 2005, Moore 2024.
-2. Length cueing can be partly deterministic (compare key length vs. mean distractor length) to reduce LLM variance.
-3. Surface a per-quiz cueing-violation rate.
+**Actionable improvements:**
+1. ~~Add a dedicated `cueing` (or `absence_of_cueing`) metric…~~ **Done.**
+2. ~~Length cueing can be partly deterministic…~~ **Done** — deterministic measurement feeding the prompt, advisory rather than decisive.
+3. Surface a per-quiz cueing-violation rate. *(Still open — computable from the per-item rows, since each carries `cue_present`, `severity` and `cue_types`.)*
 
 ---
 
@@ -278,7 +292,7 @@ definition.
 Ordered by impact on faithfulness to the literature-derived criteria.
 
 1. ~~**[P0] Add an Answer Key Correctness metric (Criterion 5).**~~ **Done** — `answer_key_correctness`, binary per Form A §3.2, with a deterministic "none/all of the above" detector. Directly addresses the AI-specific failure mode (multiple defensible answers) emphasized in the related work.
-2. **[P0] Add an Absence-of-Cueing metric (Criterion 8).** Currently only an incidental distractor sub-check; add stem→key grammatical/length/word-repetition/convergence cue detection.
+2. ~~**[P0] Add an Absence-of-Cueing metric (Criterion 8).**~~ **Done** — `absence_of_cueing`, binary detection over five cue types, checking stem→key, key→distractors and option-set convergence, with a deterministic length signal feeding the prompt.
 3. **[P1] Score against stated learning objectives (Criterion 1).** Add a `learning_objectives` input and an alignment sub-score; stop equating source-topic coverage with objective alignment, or document the proxy explicitly.
 4. **[P1] Add negative-phrasing detection to `clarity` (Criterion 4).** Named in the definition but absent from the prompt.
 5. **[P2] Reconcile cognitive-level handling (Criterion 2).** Unify the Bloom taxonomy between `coverage` (3-level) and `difficulty` (6-level); separate Bloom level from the easy/medium/hard band; score appropriateness against a target when available.
@@ -294,10 +308,11 @@ Ordered by impact on faithfulness to the literature-derived criteria.
 `paper-al-quiz-generation` and is **generated**, so it must be regenerated rather than
 hand-edited:
 
-- `tools/corpus/build_pools.py` — add `("answer_key_correctness", "1.0")` and
-  `("objective_alignment", "1.0")` to `METRICS`.
-- `data-format-spec.md` §10 (the ❌ lines for C2 and C3) and §11 (the resolved metric-subset bullet).
-- `roadmap-to-datacollection.md` task 2.3 (C2 and C3 both land here), and the 5.4 check.
+- `tools/corpus/build_pools.py` — add `("answer_key_correctness", "1.0")`,
+  `("objective_alignment", "1.0")` and `("absence_of_cueing", "1.0")` to `METRICS`.
+- `data-format-spec.md` §10 (the ❌ lines for C2, C3 and C8) and §11 (the resolved metric-subset bullet).
+- `roadmap-to-datacollection.md` task 2.3 (C2, C3 and C8 all land here), and the 5.4 check
+  "Confirm C2/C8 metrics landed" — both now have metrics, so RQ2 reaches all 30 seeds.
 - Re-run `build_pools.py` to regenerate `tools/corpus/out/pool-run.yaml`.
 - `paper-benchmark/sections/threats-to-validity.tex` — the source-asymmetry threat above.
 - `tools/corpus/build_pools.py` — the 15-item pool cap rests on a stale assumption. Its comment

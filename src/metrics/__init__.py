@@ -11,6 +11,7 @@ from .homogeneous_options import HomogeneousOptionsMetric
 from .accuracy import FactualAccuracyMetric
 from .answer_key_correctness import AnswerKeyCorrectnessMetric
 from .objective_alignment import ObjectiveAlignmentMetric
+from .absence_of_cueing import AbsenceOfCueingMetric
 
 __all__ = [
     "BaseMetric",
@@ -26,4 +27,5 @@ __all__ = [
     "FactualAccuracyMetric",
     "AnswerKeyCorrectnessMetric",
     "ObjectiveAlignmentMetric",
+    "AbsenceOfCueingMetric",
 ]

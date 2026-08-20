@@ -20,6 +20,7 @@ from src.metrics.homogeneous_options import HomogeneousOptionsMetric
 from src.metrics.accuracy import FactualAccuracyMetric
 from src.metrics.answer_key_correctness import AnswerKeyCorrectnessMetric
 from src.metrics.objective_alignment import ObjectiveAlignmentMetric
+from src.metrics.absence_of_cueing import AbsenceOfCueingMetric
 from src.models.config import BenchmarkConfig, EvaluatorConfig, InputOutputConfig, MetricConfig
 from src.models.quiz import Quiz, QuizQuestion, QuestionType
 
@@ -32,7 +33,8 @@ class MockLLMProvider(LLMProvider):
       - map:     prompt contains '"cognitive_level_score"'
       - score:   prompt contains '"final_score"'
     The answer_key_correctness judge phase is detected by '"key_correct"',
-    and the objective_alignment judge phase by '"alignment_level"'. The two
+    the objective_alignment judge phase by '"alignment_level"', and the
+    absence_of_cueing judge phase by '"cue_present"'. The two
     homogeneous_options fan-out phases echo back the prompt's question id.
     All other calls fall back to a deterministic hash-based score.
     """
@@ -104,6 +106,16 @@ class MockLLMProvider(LLMProvider):
         }
 
     @staticmethod
+    def _cueing_response() -> Dict[str, Any]:
+        return {
+            "cue_present": False,
+            "severity": "none",
+            "cue_types": [],
+            "key_revealed_by": [],
+            "rationale": "Mock cueing verdict",
+        }
+
+    @staticmethod
     def _question_id_from_prompt(prompt: str) -> str:
         """Echo back the question id the prompt asked about, so fan-out phases align."""
         match = re.search(r"Question ID: (\S+)", prompt)
@@ -166,6 +178,9 @@ class MockLLMProvider(LLMProvider):
         if '"alignment_level"' in prompt:
             return json.dumps(self._objective_alignment_response())
 
+        if '"cue_present"' in prompt:
+            return json.dumps(self._cueing_response())
+
         if '"dominant_grammatical_pattern"' in prompt:
             return json.dumps(self._homogeneous_analyze_response(prompt))
 
@@ -202,6 +217,9 @@ class MockLLMProvider(LLMProvider):
         if '"alignment_level"' in prompt:
             return self._objective_alignment_response()
 
+        if '"cue_present"' in prompt:
+            return self._cueing_response()
+
         if '"dominant_grammatical_pattern"' in prompt:
             return self._homogeneous_analyze_response(prompt)
 
@@ -230,6 +248,7 @@ def registered_metrics() -> Iterable[str]:
     MetricRegistry.register(FactualAccuracyMetric)
     MetricRegistry.register(AnswerKeyCorrectnessMetric)
     MetricRegistry.register(ObjectiveAlignmentMetric)
+    MetricRegistry.register(AbsenceOfCueingMetric)
     yield MetricRegistry.list_metrics()
     MetricRegistry.clear()
 

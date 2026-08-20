@@ -71,6 +71,11 @@ metrics:
       rubric: "bloom_taxonomy"
     enabled: true
 
+  - name: "absence_of_cueing"
+    version: "1.0"
+    evaluators: ["qwen", "openai-gpt"]
+    enabled: true
+
   - name: "distractor_quality"
     version: "1.0"
     evaluators: ["qwen", "openai-gpt"]

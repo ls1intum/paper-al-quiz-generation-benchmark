@@ -20,6 +20,10 @@ from src.metrics.objective_alignment import (
     ObjectiveAlignmentMetric,
     get_learning_objective,
 )
+from src.metrics.absence_of_cueing import (
+    AbsenceOfCueingMetric,
+    analyze_length_signal,
+)
 from src.models.quiz import QuizQuestion, QuestionType, Quiz
 from src.models.result import EvaluationResult
 from tests.conftest import MockLLMProvider
@@ -939,3 +943,165 @@ def test_homogeneous_options_expansion_skips_entries_without_question_id():
     rows = metric.expand_question_results(_homogeneity_result(entry, _question_score("q2")))
 
     assert [qid for qid, _, _ in rows] == ["q2"]
+
+
+# ── absence_of_cueing ────────────────────────────────────────────────────── #
+
+LONG_KEY = "Because the compiler performs escape analysis and elides the allocation entirely"
+
+
+def make_cueing_question(options=None, correct_answer=None, question_type=None) -> QuizQuestion:
+    return QuizQuestion(
+        question_id="q_cue",
+        question_type=question_type or QuestionType.SINGLE_CHOICE,
+        question_text="Why is the object not heap-allocated?",
+        options=options if options is not None else ["It is", "Unclear", LONG_KEY, "No reason"],
+        correct_answer=LONG_KEY if correct_answer is None else correct_answer,
+    )
+
+
+def _judge_cueing(cue_present, severity, **overrides) -> dict:
+    return {
+        "cue_present": cue_present,
+        "severity": severity,
+        "cue_types": overrides.get("cue_types", []),
+        "key_revealed_by": overrides.get("key_revealed_by", []),
+        "rationale": overrides.get("rationale", "mock rationale"),
+    }
+
+
+def _evaluate_cueing(question, judge_response) -> tuple:
+    metric = AbsenceOfCueingMetric()
+    mock_llm = MockLLMProvider(model="mock-model", responses=[judge_response])
+    result = metric.evaluate(question=question, llm_client=mock_llm)
+    return result, json.loads(result.raw_response)
+
+
+def test_cueing_prompt_requires_question():
+    metric = AbsenceOfCueingMetric()
+    inp = make_phase_input(metric, "judge")
+    with pytest.raises(ValueError, match="requires a question"):
+        inp.prompt_builder(inp)
+
+
+def test_cueing_prompt_includes_options_key_and_length_signal():
+    metric = AbsenceOfCueingMetric()
+    question = make_cueing_question()
+    inp = make_phase_input(metric, "judge", question=question)
+    prompt = inp.prompt_builder(inp)
+
+    for option in question.options:
+        assert option in prompt
+    assert f"Marked Correct Answer (key): {LONG_KEY}" in prompt
+    assert '"keyed_option_is_outlier": true' in prompt
+
+
+def test_length_signal_flags_a_clear_keyed_outlier():
+    signal = analyze_length_signal(make_cueing_question())
+    assert signal["keyed_option_is_outlier"] is True
+
+
+@pytest.mark.parametrize(
+    "options,correct_answer",
+    [
+        # Ordinary variation between similarly sized options.
+        (["alpha", "bravo", "charlie", "delta"], "charlie"),
+        # Proportionally longer but well under the absolute character floor.
+        (["red", "orange yellow", "blue", "green"], "orange yellow"),
+    ],
+)
+def test_length_signal_ignores_normal_differences(options, correct_answer):
+    """The heuristic stays conservative: both thresholds must trip together."""
+    question = make_cueing_question(options=options, correct_answer=correct_answer)
+    assert analyze_length_signal(question)["keyed_option_is_outlier"] is False
+
+
+def test_length_signal_skips_true_false():
+    question = make_cueing_question(
+        options=["True", "False"], correct_answer="True", question_type=QuestionType.TRUE_FALSE
+    )
+    signal = analyze_length_signal(question)
+
+    assert signal["keyed_option_is_outlier"] is False
+    assert "true/false" in signal["note"]
+
+
+def test_length_signal_handles_empty_key():
+    """An item with no marked answer must not blow up the length comparison."""
+    question = make_cueing_question(
+        options=["a", "b"], correct_answer=[], question_type=QuestionType.MULTIPLE_CHOICE
+    )
+    signal = analyze_length_signal(question)
+
+    assert signal["keyed_option_is_outlier"] is False
+    assert signal["keyed_lengths"] == []
+
+
+def test_cueing_absent_scores_100():
+    result, data = _evaluate_cueing(make_cueing_question(), _judge_cueing(False, "none"))
+
+    assert result.score == 100.0
+    assert data["cue_present"] is False
+    assert data["severity"] == "none"
+    assert data["cue_types"] == []
+
+
+def test_cueing_length_cue_preserves_type_and_fails():
+    result, data = _evaluate_cueing(
+        make_cueing_question(),
+        _judge_cueing(True, "strong", cue_types=["length"], key_revealed_by=["longest option"]),
+    )
+
+    assert result.score == 0.0
+    assert data["cue_types"] == ["length"]
+    assert data["severity"] == "strong"
+    assert data["key_revealed_by"] == ["longest option"]
+
+
+def test_cueing_unknown_types_are_dropped():
+    """Types outside the known vocabulary never reach the output."""
+    _, data = _evaluate_cueing(
+        make_cueing_question(),
+        _judge_cueing(True, "minor", cue_types=["grammatical", "specificity", "vibes"]),
+    )
+
+    assert data["cue_types"] == ["grammatical"]
+
+
+@pytest.mark.parametrize(
+    "cue_present,judge_severity,expected_severity",
+    [
+        # "a cue is present" and "severity none" cannot both hold.
+        (True, "none", "minor"),
+        (False, "strong", "none"),
+        (True, "strong", "strong"),
+        (False, "none", "none"),
+    ],
+)
+def test_cueing_severity_is_reconciled_with_the_verdict(
+    cue_present, judge_severity, expected_severity
+):
+    _, data = _evaluate_cueing(
+        make_cueing_question(), _judge_cueing(cue_present, judge_severity, cue_types=["semantic"])
+    )
+
+    assert data["severity"] == expected_severity
+    # A no-cue verdict carries no cue types, whatever the judge listed.
+    assert bool(data["cue_types"]) is cue_present
+
+
+def test_cueing_raw_response_carries_diagnostics():
+    result, _ = _evaluate_cueing(
+        make_cueing_question(), _judge_cueing(True, "minor", cue_types=["convergence"])
+    )
+
+    for field in (
+        "cue_present",
+        "severity",
+        "cue_types",
+        "key_revealed_by",
+        "rationale",
+        "length_signal",
+        "score",
+    ):
+        assert f'"{field}"' in result.raw_response

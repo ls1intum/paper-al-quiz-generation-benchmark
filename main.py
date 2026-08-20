@@ -21,6 +21,7 @@ from src.metrics.homogeneous_options import HomogeneousOptionsMetric
 from src.metrics.accuracy import FactualAccuracyMetric
 from src.metrics.answer_key_correctness import AnswerKeyCorrectnessMetric
 from src.metrics.objective_alignment import ObjectiveAlignmentMetric
+from src.metrics.absence_of_cueing import AbsenceOfCueingMetric
 from src.runners.benchmark import BenchmarkRunner
 from src.utils.config_loader import ConfigLoader
 from src.utils.io import IOUtils
@@ -38,6 +39,7 @@ def register_metrics() -> None:
     MetricRegistry.register(FactualAccuracyMetric)
     MetricRegistry.register(AnswerKeyCorrectnessMetric)
     MetricRegistry.register(ObjectiveAlignmentMetric)
+    MetricRegistry.register(AbsenceOfCueingMetric)
 
 
 def main() -> int:

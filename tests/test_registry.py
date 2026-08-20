@@ -40,3 +40,7 @@ def test_answer_key_correctness_is_registered(registered_metrics):
 def test_objective_alignment_is_registered(registered_metrics):
     assert "objective_alignment" in registered_metrics
     assert MetricRegistry.create("objective_alignment").name == "objective_alignment"
+
+def test_absence_of_cueing_is_registered(registered_metrics):
+    assert "absence_of_cueing" in registered_metrics
+    assert MetricRegistry.create("absence_of_cueing").name == "absence_of_cueing"
