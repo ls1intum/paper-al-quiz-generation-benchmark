@@ -36,3 +36,7 @@ def test_create_unknown_metric():
 def test_answer_key_correctness_is_registered(registered_metrics):
     assert "answer_key_correctness" in registered_metrics
     assert MetricRegistry.create("answer_key_correctness").name == "answer_key_correctness"
+
+def test_objective_alignment_is_registered(registered_metrics):
+    assert "objective_alignment" in registered_metrics
+    assert MetricRegistry.create("objective_alignment").name == "objective_alignment"

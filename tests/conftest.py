@@ -18,6 +18,7 @@ from src.metrics.clarity import ClarityMetric
 from src.metrics.homogeneous_options import HomogeneousOptionsMetric
 from src.metrics.accuracy import FactualAccuracyMetric
 from src.metrics.answer_key_correctness import AnswerKeyCorrectnessMetric
+from src.metrics.objective_alignment import ObjectiveAlignmentMetric
 from src.models.config import BenchmarkConfig, EvaluatorConfig, InputOutputConfig, MetricConfig
 from src.models.quiz import Quiz, QuizQuestion, QuestionType
 
@@ -29,7 +30,8 @@ class MockLLMProvider(LLMProvider):
       - extract: prompt contains '"critical_concepts"' and 'must-know'
       - map:     prompt contains '"cognitive_level_score"'
       - score:   prompt contains '"final_score"'
-    The answer_key_correctness judge phase is detected by '"key_correct"'.
+    The answer_key_correctness judge phase is detected by '"key_correct"',
+    and the objective_alignment judge phase by '"alignment_level"'.
     All other calls fall back to a deterministic hash-based score.
     """
 
@@ -91,6 +93,15 @@ class MockLLMProvider(LLMProvider):
         }
 
     @staticmethod
+    def _objective_alignment_response() -> Dict[str, Any]:
+        return {
+            "alignment_level": "direct",
+            "matched_objective_aspects": ["mock aspect"],
+            "missing_or_misaligned_aspects": [],
+            "rationale": "Mock alignment verdict",
+        }
+
+    @staticmethod
     def _detect_coverage_phase(prompt: str) -> Optional[str]:
         """Identify which coverage phase produced this prompt by inspecting
         the JSON key names the prompt asks the LLM to return."""
@@ -117,6 +128,9 @@ class MockLLMProvider(LLMProvider):
 
         if '"key_correct"' in prompt:
             return json.dumps(self._answer_key_response())
+
+        if '"alignment_level"' in prompt:
+            return json.dumps(self._objective_alignment_response())
 
         phase = self._detect_coverage_phase(prompt)
         if phase == "extract":
@@ -145,6 +159,9 @@ class MockLLMProvider(LLMProvider):
         if '"key_correct"' in prompt:
             return self._answer_key_response()
 
+        if '"alignment_level"' in prompt:
+            return self._objective_alignment_response()
+
         phase = self._detect_coverage_phase(prompt)
         if phase == "extract":
             return self._coverage_extract_response()
@@ -166,6 +183,7 @@ def registered_metrics() -> Iterable[str]:
     MetricRegistry.register(HomogeneousOptionsMetric)
     MetricRegistry.register(FactualAccuracyMetric)
     MetricRegistry.register(AnswerKeyCorrectnessMetric)
+    MetricRegistry.register(ObjectiveAlignmentMetric)
     yield MetricRegistry.list_metrics()
     MetricRegistry.clear()
 

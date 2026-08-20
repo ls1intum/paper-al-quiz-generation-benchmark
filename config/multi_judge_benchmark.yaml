@@ -76,6 +76,11 @@ metrics:
     evaluators: ["qwen", "openai-gpt"]
     enabled: true
 
+  - name: "objective_alignment"
+    version: "1.0"
+    evaluators: ["qwen", "openai-gpt"]
+    enabled: true
+
   - name: "grammatical_correctness"
     version: "1.0"
     evaluators: ["qwen", "openai-gpt"]

@@ -10,6 +10,7 @@ from .distractor import DistractorQualityMetric
 from .homogeneous_options import HomogeneousOptionsMetric
 from .accuracy import FactualAccuracyMetric
 from .answer_key_correctness import AnswerKeyCorrectnessMetric
+from .objective_alignment import ObjectiveAlignmentMetric
 
 __all__ = [
     "BaseMetric",
@@ -24,4 +25,5 @@ __all__ = [
     "HomogeneousOptionsMetric",
     "FactualAccuracyMetric",
     "AnswerKeyCorrectnessMetric",
+    "ObjectiveAlignmentMetric",
 ]

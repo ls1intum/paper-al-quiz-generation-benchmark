@@ -8,13 +8,14 @@ documents divergences from the definition, and lists actionable improvements.
 
 ## Summary
 
-The benchmark registers **8 metrics** (`src/metrics/__init__.py`):
+The benchmark registers **9 metrics** (`src/metrics/__init__.py`):
 `coverage`, `difficulty`, `accuracy`, `clarity`, `distractor_quality`,
-`homogeneous_options`, `grammatical_correctness`, `answer_key_correctness`.
+`homogeneous_options`, `grammatical_correctness`, `answer_key_correctness`,
+`objective_alignment`.
 
 | # | Criterion (paper) | Metric | Status |
 |---|---|---|---|
-| 1 | Alignment with Learning Objectives | `coverage` | ⚠️ Partial — measures *source-topic* coverage, not stated learning objectives |
+| 1 | Alignment with Learning Objectives | `objective_alignment` | ✅ Covered |
 | 2 | Cognitive Level Appropriateness | `difficulty` (+ `coverage` depth) | ⚠️ Partial — scores *absolute* level, not appropriateness vs. a target |
 | 3 | Factual Accuracy | `accuracy` | ✅ Covered |
 | 4 | Clarity and Precision | `clarity` | ⚠️ Partial — negative phrasing not checked |
@@ -24,8 +25,7 @@ The benchmark registers **8 metrics** (`src/metrics/__init__.py`):
 | 8 | Absence of Cueing | (partial in `distractor_quality`) | ❌ Largely missing — no dedicated metric |
 | 9 | Grammatical Correctness | `grammatical_correctness` | ✅ Covered |
 
-**Headline gaps:** Criterion 8 (Absence of Cueing) has no dedicated metric.
-Criterion 1 conflates source coverage with learning-objective alignment, and
+**Headline gaps:** Criterion 8 (Absence of Cueing) has no dedicated metric, and
 Criterion 4 omits the explicit negative-phrasing check named in its definition.
 
 ---
@@ -34,27 +34,40 @@ Criterion 4 omits the explicit negative-phrasing check named in its definition.
 
 **Definition:** *Questions accurately assess intended learning outcomes and match instructional goals.*
 
-**Status: ⚠️ Partial / diverges.**
+**Status: ✅ Covered** by `objective_alignment` (`src/metrics/objective_alignment.py`),
+question-level, one result per item with `question_id` populated.
 
-`CoverageMetric` (`src/metrics/coverage.py`) extracts topics and "critical
-concepts" from the **source material** and scores breadth/depth/balance/critical
-coverage against them. This is a content-coverage proxy, not alignment with
-*stated learning objectives*. There is no learning-objectives input in the
-pipeline: `QuizInstructions` (`src/models/instruction.py`) has no
-`learning_objectives` field, and the only reference to learning objectives in
-the codebase is read for display context in `grammatic.py:143-145` — never
-scored against. The criterion's references (Sireci 1998 construct/content
-validity, Moreno 2006) concern alignment to *intended outcomes*, which the
-benchmark does not measure.
+The metric scores each item against the objective stated for it in
+`question.metadata.learning_objective` — a reference value that pre-exists the item, so scoring
+is classification against an independent catalogue rather than back-fitting an objective to an
+item that already exists.
 
-**Divergences:**
-- Ground truth is auto-derived from source text, not from instructor-supplied learning objectives.
-- "Match instructional goals" is unmeasured; an LLM-invented topic set stands in for the intended outcomes.
+- **Four-level ordinal, no midpoint.** The judge picks `direct` / `partial` / `weak` / `none` and
+  the score is derived from that level (`100 / 66.7 / 33.3 / 0`), so a verdict and its number
+  cannot disagree. The distinction the metric is built around is direct assessment versus loose
+  topical relatedness: an item testing a prerequisite, surface vocabulary, or an adjacent concept
+  scores `weak`, not `direct`.
+- **Per-item, not per-quiz.** The objective lives in question metadata because a question set can
+  mix items drawn from several quizzes, where one quiz-level objective list would not apply.
+- **Items with no stated objective** are returned `applicable=false` /
+  `alignment_level="not_applicable"` and are never guessed at. They remain ratable on every other
+  metric.
+
+**Divergences / caveats:**
+1. **Not-applicable items score `100.0`.** This follows the convention `homogeneous_options`
+   already uses for excluded questions, but it means an unfiltered mean counts every
+   objective-less item as perfect. **Analysis must filter on `applicable` before aggregating.**
+2. `coverage` is retained and unchanged, but it is **not** the alignment metric — it measures
+   how well a quiz covers its *source material* (breadth/depth/balance over extracted topics),
+   which is a different construct. It should be reported as source-content coverage, never as
+   learning-objective alignment.
+3. Improvement 1 below is **superseded**: adding `learning_objectives` to `QuizInstructions` is
+   the wrong home for the reference value, since it is a per-item property.
 
 **Actionable improvements:**
-1. Add a `learning_objectives: List[str]` field to `QuizInstructions` and thread it through `PhaseInput`.
-2. Add an alignment sub-score (or a new `objective_alignment` metric) that maps each question to the supplied objectives and scores coverage/match against them, falling back to source-topic extraction only when no objectives are provided.
-3. Document explicitly in the paper/metric docstring that `coverage` measures source-content coverage and is a *proxy* for, not a direct measure of, learning-objective alignment.
+1. ~~Add a `learning_objectives: List[str]` field to `QuizInstructions` and thread it through `PhaseInput`.~~ **Superseded** — the reference value is per-item and lives in `question.metadata.learning_objective`.
+2. ~~Add an alignment sub-score (or a new `objective_alignment` metric)…~~ **Done.**
+3. Document explicitly in the metric docstring that `coverage` measures source-content coverage and is a *proxy* for, not a direct measure of, learning-objective alignment. *(Still open — `coverage.py` itself is unchanged.)*
 
 ---
 
@@ -257,8 +270,9 @@ Ordered by impact on faithfulness to the literature-derived criteria.
 `paper-al-quiz-generation` and is **generated**, so it must be regenerated rather than
 hand-edited:
 
-- `tools/corpus/build_pools.py` — add `("answer_key_correctness", "1.0")` to `METRICS`.
-- `data-format-spec.md` §10 (the ❌ line for C2) and §11 (the resolved metric-subset bullet).
-- `roadmap-to-datacollection.md` task 2.3, and the 5.4 check "Confirm C2/C8 metrics landed".
+- `tools/corpus/build_pools.py` — add `("answer_key_correctness", "1.0")` and
+  `("objective_alignment", "1.0")` to `METRICS`.
+- `data-format-spec.md` §10 (the ❌ lines for C2 and C3) and §11 (the resolved metric-subset bullet).
+- `roadmap-to-datacollection.md` task 2.3 (C2 and C3 both land here), and the 5.4 check.
 - Re-run `build_pools.py` to regenerate `tools/corpus/out/pool-run.yaml`.
 - `paper-benchmark/sections/threats-to-validity.tex` — the source-asymmetry threat above.

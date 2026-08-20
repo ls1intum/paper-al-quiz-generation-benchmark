@@ -443,7 +443,7 @@ paper-al-quiz-generation-benchmark/
 │   │   ├── __init__.py
 │   │   ├── base.py               # BaseMetric interface
 │   │   ├── accuracy.py           # Factual accuracy assessment
-│   │   ├── alignment.py          # Learning objective alignment
+│   │   ├── objective_alignment.py # Learning objective alignment
 │   │   ├── cognitive_level.py    # Bloom's taxonomy evaluation
 │   │   ├── clarity.py            # Language clarity assessment
 │   │   ├── answer_correctness.py # Answer key validation
@@ -511,7 +511,7 @@ paper-al-quiz-generation-benchmark/
 │
 ├── docs/
 │   ├── metrics/                  # Detailed metric documentation
-│   │   ├── alignment.md
+│   │   ├── objective_alignment.md
 │   │   ├── cognitive_level.md
 │   │   └── ...
 │   │

@@ -7,29 +7,56 @@ sidebar_position: 4
 
 ### 1. Alignment with Learning Objectives
 
-**Purpose**: Verify questions accurately assess intended learning outcomes and match instructional goals.
+**Metric name**: `objective_alignment`
+
+**Purpose**: Measure how directly each item assesses the learning objective stated for it. The
+stated objective is the reference value — an item can be well written, factually sound, and
+on-topic for the course and still score low here, because the only thing being measured is
+whether it assesses *that* objective.
 
 **References**: Haladyna et al. [10], Sireci [17]
 
-**Scope**: Question-level
+**Scope**: Question-level — one result per question, with `question_id` populated.
 
-**Parameters**:
-- `learning_objectives`: Source of objectives ("auto_extract", "provided", or list)
-- `alignment_threshold`: Minimum acceptable alignment score (default: 70)
+**Required input**: `question.metadata.learning_objective`. This is per-question, not per-quiz:
+a quiz-level objective list cannot serve a question set drawn from several quizzes. The metric
+never invents an objective when the field is missing.
 
-**Evaluation Criteria**:
-- Direct assessment of stated objectives
-- Coverage of key concepts
-- Appropriate depth and breadth
+**Scoring**: the judge picks one of four levels and the score follows from it, so a verdict and
+its number can never disagree. There is deliberately no midpoint.
+
+| Level | Score | Meaning |
+|---|---|---|
+| `direct` | `100.0` | Assesses the stated objective head-on, at the concept or skill level it describes. |
+| `partial` | `66.7` | Assesses part of the objective, or assesses it at a shallower level than stated. |
+| `weak` | `33.3` | Related only through a prerequisite, surface vocabulary, or a tangential concept. |
+| `none` | `0.0` | Does not assess the stated objective at all. |
+
+**Items without an objective**: reported as `applicable: false` with
+`alignment_level: "not_applicable"` and a score of `100.0`. They are excluded from the measure,
+not judged to be perfect.
+
+:::warning
+`applicable: false` items score `100.0`, so **filter on `applicable` before averaging**. A naive
+mean over all items counts every objective-less item as a perfect score.
+:::
+
+**Relationship to `coverage`**: `coverage` is a quiz-level measure of how well a quiz covers its
+*source material*. It is a content-coverage measure, not an objective-alignment one — the two
+answer different questions and neither substitutes for the other.
+
+**Output** (`raw_response`):
+- `applicable`, `alignment_level`, `score`
+- `learning_objective` — the objective the item was judged against
+- `matched_objective_aspects` — which parts of the objective the item assesses
+- `missing_or_misaligned_aspects` — what it leaves untested or tests in a different direction
+- `rationale`
 
 **Example Configuration**:
 ```yaml
-- name: "alignment"
+- name: "objective_alignment"
   version: "1.0"
   evaluators: ["gpt4"]
-  parameters:
-    learning_objectives: "auto_extract"
-    alignment_threshold: 75
 ```
 
 ---

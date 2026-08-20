@@ -16,6 +16,10 @@ from src.metrics.answer_key_correctness import (
     AnswerKeyCorrectnessMetric,
     detect_catch_all_options,
 )
+from src.metrics.objective_alignment import (
+    ObjectiveAlignmentMetric,
+    get_learning_objective,
+)
 from src.models.quiz import QuizQuestion, QuestionType, Quiz
 from tests.conftest import MockLLMProvider
 
@@ -690,3 +694,153 @@ def test_answer_key_unknown_judge_flags_are_dropped():
     )
 
     assert data["issue_flags"] == ["multiple_defensible"]
+
+
+# ── objective_alignment ──────────────────────────────────────────────────── #
+
+OBJECTIVE = "Streams — Du verstehst das Konzept von Streams und kannst sie anwenden."
+
+
+def make_question_with_objective(objective=OBJECTIVE) -> QuizQuestion:
+    metadata = {"topic": "Streams", "domain": "java"}
+    if objective is not None:
+        metadata["learning_objective"] = objective
+    return QuizQuestion(
+        question_id="q_lo",
+        question_type=QuestionType.SINGLE_CHOICE,
+        question_text="Which call turns a List into a Stream?",
+        options=["list.stream()", "list.iterator()", "list.toArray()", "list.size()"],
+        correct_answer="list.stream()",
+        metadata=metadata,
+    )
+
+
+def _judge_alignment(level: str, **overrides) -> dict:
+    return {
+        "alignment_level": level,
+        "matched_objective_aspects": overrides.get("matched", ["applying streams"]),
+        "missing_or_misaligned_aspects": overrides.get("missing", []),
+        "rationale": overrides.get("rationale", "mock rationale"),
+    }
+
+
+def _evaluate_alignment(question, judge_response) -> tuple:
+    metric = ObjectiveAlignmentMetric()
+    mock_llm = MockLLMProvider(model="mock-model", responses=[judge_response])
+    result = metric.evaluate(question=question, llm_client=mock_llm)
+    return result, json.loads(result.raw_response)
+
+
+def test_objective_alignment_prompt_requires_question():
+    metric = ObjectiveAlignmentMetric()
+    inp = make_phase_input(metric, "judge")
+    with pytest.raises(ValueError, match="requires a question"):
+        inp.prompt_builder(inp)
+
+
+def test_objective_alignment_prompt_includes_objective_and_item():
+    """The objective must appear verbatim, alongside the options and the marked answer."""
+    metric = ObjectiveAlignmentMetric()
+    question = make_question_with_objective()
+    inp = make_phase_input(metric, "judge", question=question)
+    prompt = inp.prompt_builder(inp)
+
+    assert OBJECTIVE in prompt
+    for option in question.options:
+        assert option in prompt
+    assert "Marked Correct Answer: list.stream()" in prompt
+    assert "Source Material: None" not in prompt
+
+
+@pytest.mark.parametrize(
+    "metadata,expected",
+    [
+        ({}, None),
+        ({"learning_objective": None}, None),
+        ({"learning_objective": ""}, None),
+        ({"learning_objective": "   "}, None),
+        ({"learning_objective": "  Streams  "}, "Streams"),
+    ],
+)
+def test_get_learning_objective(metadata, expected):
+    """An absent key, a null, and a whitespace-only string all mean 'no objective'."""
+    question = QuizQuestion(
+        question_id="q",
+        question_type=QuestionType.SINGLE_CHOICE,
+        question_text="t",
+        options=["a", "b"],
+        correct_answer="a",
+        metadata=metadata,
+    )
+    assert get_learning_objective(question) == expected
+
+
+@pytest.mark.parametrize(
+    "level,expected_score",
+    [("direct", 100.0), ("partial", 66.7), ("weak", 33.3), ("none", 0.0)],
+)
+def test_objective_alignment_level_determines_score(level, expected_score):
+    """The score is derived from the level, never supplied by the judge."""
+    result, data = _evaluate_alignment(make_question_with_objective(), _judge_alignment(level))
+
+    assert result.score == expected_score
+    assert data["alignment_level"] == level
+    assert data["applicable"] is True
+
+
+def test_objective_alignment_direct_echoes_objective():
+    result, data = _evaluate_alignment(make_question_with_objective(), _judge_alignment("direct"))
+
+    assert result.score == 100.0
+    assert data["learning_objective"] == OBJECTIVE
+    assert data["matched_objective_aspects"] == ["applying streams"]
+
+
+def test_objective_alignment_weak_preserved_in_raw_response():
+    """A weak verdict keeps its level and its evidence in raw_response."""
+    result, data = _evaluate_alignment(
+        make_question_with_objective(),
+        _judge_alignment("weak", matched=["stream vocabulary"], missing=["applying streams"]),
+    )
+
+    assert '"alignment_level": "weak"' in result.raw_response
+    assert result.score == 33.3
+    assert data["missing_or_misaligned_aspects"] == ["applying streams"]
+
+
+def test_objective_alignment_missing_objective_is_not_applicable():
+    """An item with no objective is excluded, whatever the judge answered."""
+    question = make_question_with_objective(objective=None)
+    # The judge is fed a contradicting "direct" verdict; it must be discarded.
+    result, data = _evaluate_alignment(question, _judge_alignment("direct"))
+
+    assert data["applicable"] is False
+    assert data["alignment_level"] == "not_applicable"
+    assert data["learning_objective"] is None
+    assert data["matched_objective_aspects"] == []
+    assert result.score == 100.0
+
+
+def test_objective_alignment_blank_objective_is_not_applicable():
+    """A whitespace-only objective is treated the same as an absent one."""
+    _, data = _evaluate_alignment(
+        make_question_with_objective(objective="   "), _judge_alignment("direct")
+    )
+
+    assert data["applicable"] is False
+    assert data["alignment_level"] == "not_applicable"
+
+
+def test_objective_alignment_raw_response_carries_diagnostics():
+    result, _ = _evaluate_alignment(make_question_with_objective(), _judge_alignment("partial"))
+
+    for field in (
+        "applicable",
+        "alignment_level",
+        "learning_objective",
+        "matched_objective_aspects",
+        "missing_or_misaligned_aspects",
+        "rationale",
+        "score",
+    ):
+        assert f'"{field}"' in result.raw_response
