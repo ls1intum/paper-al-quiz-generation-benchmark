@@ -21,6 +21,7 @@ from src.metrics.objective_alignment import (
     get_learning_objective,
 )
 from src.models.quiz import QuizQuestion, QuestionType, Quiz
+from src.models.result import EvaluationResult
 from tests.conftest import MockLLMProvider
 
 
@@ -844,3 +845,97 @@ def test_objective_alignment_raw_response_carries_diagnostics():
         "score",
     ):
         assert f'"{field}"' in result.raw_response
+
+
+# ── homogeneous_options per-question expansion ───────────────────────────── #
+
+
+def _homogeneity_result(*entries) -> EvaluationResult:
+    return EvaluationResult(
+        score=90.0,
+        raw_response="{}",
+        metadata={"phases": {"score_question": {"results": list(entries)}}},
+    )
+
+
+def _question_score(question_id="q1", applicable=True, score=87.5, severity="none", issues=None):
+    return {
+        "question_id": question_id,
+        "applicable": applicable,
+        "grammatical_parallelism_score": 90.0,
+        "content_type_homogeneity_score": 85.0,
+        "format_consistency_score": 95.0,
+        "question_score": score,
+        "severity": severity,
+        "issues": issues if issues is not None else [],
+        "rationale": "mock rationale",
+    }
+
+
+def test_expand_question_results_default_is_empty():
+    """Metrics with no per-question breakdown give the runner nothing extra."""
+    result = EvaluationResult(score=50.0, raw_response="{}", metadata={})
+    assert FactualAccuracyMetric().expand_question_results(result) == []
+
+
+def test_homogeneous_options_expands_one_row_per_question():
+    metric = HomogeneousOptionsMetric()
+    rows = metric.expand_question_results(
+        _homogeneity_result(
+            _question_score("q1", score=87.5),
+            _question_score("q2", score=62.0, severity="minor", issues=["length_outlier"]),
+        )
+    )
+
+    assert [(qid, score) for qid, score, _ in rows] == [("q1", 87.5), ("q2", 62.0)]
+
+
+def test_homogeneous_options_expanded_raw_response_carries_diagnostics():
+    metric = HomogeneousOptionsMetric()
+    rows = metric.expand_question_results(
+        _homogeneity_result(_question_score("q1", severity="minor", issues=["length_outlier"]))
+    )
+
+    data = json.loads(rows[0][2])
+    assert data["severity"] == "minor"
+    assert data["issues"] == ["length_outlier"]
+    assert data["rationale"] == "mock rationale"
+    assert data["applicable"] is True
+
+
+def test_homogeneous_options_expands_not_applicable_questions():
+    """True/false items keep their existing excluded-but-present behaviour."""
+    metric = HomogeneousOptionsMetric()
+    rows = metric.expand_question_results(
+        _homogeneity_result(
+            _question_score("q_tf", applicable=False, score=100.0, issues=["not_applicable"])
+        )
+    )
+
+    assert len(rows) == 1
+    assert rows[0][1] == 100.0
+    assert json.loads(rows[0][2])["applicable"] is False
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        {},
+        {"phases": {}},
+        {"phases": {"score_question": {"results": []}}},
+        {"phases": {"score_question": "not a dict"}},
+    ],
+)
+def test_homogeneous_options_expansion_tolerates_missing_phase(metadata):
+    """A malformed run yields no rows instead of raising, so the aggregate survives."""
+    result = EvaluationResult(score=90.0, raw_response="{}", metadata=metadata)
+    assert HomogeneousOptionsMetric().expand_question_results(result) == []
+
+
+def test_homogeneous_options_expansion_skips_entries_without_question_id():
+    metric = HomogeneousOptionsMetric()
+    entry = _question_score("q1")
+    del entry["question_id"]
+    rows = metric.expand_question_results(_homogeneity_result(entry, _question_score("q2")))
+
+    assert [qid for qid, _, _ in rows] == ["q2"]

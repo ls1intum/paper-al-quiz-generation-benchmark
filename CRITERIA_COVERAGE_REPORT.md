@@ -21,7 +21,7 @@ The benchmark registers **9 metrics** (`src/metrics/__init__.py`):
 | 4 | Clarity and Precision | `clarity` | ⚠️ Partial — negative phrasing not checked |
 | 5 | Answer Key Correctness | `answer_key_correctness` | ✅ Covered |
 | 6 | Distractor Quality | `distractor_quality` | ✅ Covered |
-| 7 | Homogeneous Options | `homogeneous_options` | ✅ Covered |
+| 7 | Homogeneous Options | `homogeneous_options` | ✅ Covered — now reported per item |
 | 8 | Absence of Cueing | (partial in `distractor_quality`) | ❌ Largely missing — no dedicated metric |
 | 9 | Grammatical Correctness | `grammatical_correctness` | ✅ Covered |
 
@@ -193,16 +193,40 @@ explicit deduction triggers. This is a strong, definition-aligned implementation
 
 **Definition:** *All answer choices are parallel in grammatical structure and homogeneous in content type; empirical evidence on the effect of homogeneity on psychometric properties is mixed.*
 
-**Status: ✅ Covered.**
+**Status: ✅ Covered**, and as of this change **reported per item**.
 
 `HomogeneousOptionsMetric` (`src/metrics/homogeneous_options.py`) classifies
 each option's grammatical form, content type, completeness, and length, then
 scores grammatical parallelism, content-type homogeneity, and format
-consistency, aggregating with a major-violation penalty. Matches the definition
-closely.
+consistency. Matches the definition closely.
 
-**Minor notes / improvements:**
-1. The paper's definition explicitly flags that the evidence is **mixed** (Applegate 2019 found no consistent psychometric effect). Consider documenting that this metric encodes a contested guideline, and/or down-weighting it relative to better-supported criteria so it does not dominate aggregate scores.
+**Per-item extraction.** Both LLM phases are fan-out phases — every question
+gets its own prompt and its own scored response carrying `question_id`,
+`question_score`, `severity`, `issues` and `rationale`. Those judgements
+previously survived only as nested JSON inside a single quiz-level
+`MetricResult`. The metric now hands them back through a
+`BaseMetric.expand_question_results` hook and the runner emits one row per
+question, joinable by `(quiz_id, question_id)`. **No additional LLM calls** —
+the data already existed and was being discarded at the boundary.
+
+- The per-item rows **replace** the quiz-level aggregate row. `ResultsAggregator.aggregate`
+  pools every score sharing a `metric_name` into one mean, and inter-rater reliability keys items
+  by `(run, quiz_id, question_id)`; emitting both kinds under one name would mix N item scores
+  with one penalized aggregate and add a spurious `question_id=None` item. Replacing is also a
+  strict IRR improvement — N items per quiz instead of 1.
+- Nothing is lost: mean question score, major-violation rate, perfect-homogeneity rate and issue
+  distribution are all recomputable from the per-item rows.
+- True/false items remain explicitly not applicable — they still produce a row, with
+  `applicable: false` and a score of `100.0`. **Filter on `applicable` before averaging.**
+
+**Open items:**
+1. **Scale.** The metric emits a continuous 0-100 score plus a three-level severity
+   (`none` / `minor` / `major`). The human rating scale for this criterion is a four-point
+   ordinal. The judge was deliberately not rebuilt — the task here was the extraction path, and
+   rewriting a working judge to change its scale is a separate decision. Binning the continuous
+   score into four bands post hoc was rejected: the cut-points would be invented rather than
+   chosen by the judge, which is not the same measurement.
+2. The paper's definition explicitly flags that the evidence is **mixed** (Applegate 2019 found no consistent psychometric effect). Consider documenting that this metric encodes a contested guideline, and/or down-weighting it relative to better-supported criteria so it does not dominate aggregate scores.
 
 ---
 
@@ -276,3 +300,8 @@ hand-edited:
 - `roadmap-to-datacollection.md` task 2.3 (C2 and C3 both land here), and the 5.4 check.
 - Re-run `build_pools.py` to regenerate `tools/corpus/out/pool-run.yaml`.
 - `paper-benchmark/sections/threats-to-validity.tex` — the source-asymmetry threat above.
+- `tools/corpus/build_pools.py` — the 15-item pool cap rests on a stale assumption. Its comment
+  says `homogeneous_options` "formats the whole pool into one prompt and must return one summary
+  per question", so a large pool would truncate. Both of that metric's LLM phases are fan-out
+  phases: one prompt and one response **per question**, so response length does not scale with
+  pool size. The cap is harmless but over-constrained, and the stated rationale is wrong.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from typing import Any, Dict, Iterable, List, Optional, Type
 
 import pytest
@@ -31,7 +32,8 @@ class MockLLMProvider(LLMProvider):
       - map:     prompt contains '"cognitive_level_score"'
       - score:   prompt contains '"final_score"'
     The answer_key_correctness judge phase is detected by '"key_correct"',
-    and the objective_alignment judge phase by '"alignment_level"'.
+    and the objective_alignment judge phase by '"alignment_level"'. The two
+    homogeneous_options fan-out phases echo back the prompt's question id.
     All other calls fall back to a deterministic hash-based score.
     """
 
@@ -102,6 +104,38 @@ class MockLLMProvider(LLMProvider):
         }
 
     @staticmethod
+    def _question_id_from_prompt(prompt: str) -> str:
+        """Echo back the question id the prompt asked about, so fan-out phases align."""
+        match = re.search(r"Question ID: (\S+)", prompt)
+        return match.group(1) if match else "q1"
+
+    @classmethod
+    def _homogeneous_analyze_response(cls, prompt: str) -> Dict[str, Any]:
+        return {
+            "question_id": cls._question_id_from_prompt(prompt),
+            "applicable": True,
+            "exclusion_reason": None,
+            "option_analyses": [],
+            "dominant_grammatical_pattern": "noun_phrase",
+            "dominant_content_type": "concept_term",
+            "structural_outliers": [],
+        }
+
+    @classmethod
+    def _homogeneous_score_response(cls, prompt: str) -> Dict[str, Any]:
+        return {
+            "question_id": cls._question_id_from_prompt(prompt),
+            "applicable": True,
+            "grammatical_parallelism_score": 90.0,
+            "content_type_homogeneity_score": 90.0,
+            "format_consistency_score": 100.0,
+            "question_score": 91.0,
+            "severity": "none",
+            "issues": [],
+            "rationale": "Mock homogeneity verdict",
+        }
+
+    @staticmethod
     def _detect_coverage_phase(prompt: str) -> Optional[str]:
         """Identify which coverage phase produced this prompt by inspecting
         the JSON key names the prompt asks the LLM to return."""
@@ -132,6 +166,12 @@ class MockLLMProvider(LLMProvider):
         if '"alignment_level"' in prompt:
             return json.dumps(self._objective_alignment_response())
 
+        if '"dominant_grammatical_pattern"' in prompt:
+            return json.dumps(self._homogeneous_analyze_response(prompt))
+
+        if '"grammatical_parallelism_score"' in prompt:
+            return json.dumps(self._homogeneous_score_response(prompt))
+
         phase = self._detect_coverage_phase(prompt)
         if phase == "extract":
             return json.dumps(self._coverage_extract_response())
@@ -161,6 +201,12 @@ class MockLLMProvider(LLMProvider):
 
         if '"alignment_level"' in prompt:
             return self._objective_alignment_response()
+
+        if '"dominant_grammatical_pattern"' in prompt:
+            return self._homogeneous_analyze_response(prompt)
+
+        if '"grammatical_parallelism_score"' in prompt:
+            return self._homogeneous_score_response(prompt)
 
         phase = self._detect_coverage_phase(prompt)
         if phase == "extract":

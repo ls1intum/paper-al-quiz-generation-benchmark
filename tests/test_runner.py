@@ -142,3 +142,35 @@ def test_runner_produces_one_objective_alignment_result_per_question(
         assert metric.metric_name == "objective_alignment"
         # sample_quiz carries no learning objectives, so every item is excluded.
         assert '"applicable": false' in metric.raw_response
+
+
+def test_runner_expands_homogeneous_options_to_per_question_rows(
+    registered_metrics, mock_llm_provider, sample_config, sample_quiz
+):
+    """The quiz-level aggregate row is replaced by one row per question."""
+    from dataclasses import replace
+
+    config = replace(
+        sample_config,
+        runs=1,
+        metrics=[
+            MetricConfig(
+                name="homogeneous_options",
+                version="1.0",
+                evaluators=["mock_eval"],
+                parameters={},
+                enabled=True,
+            )
+        ],
+    )
+    results = BenchmarkRunner(config).run(quizzes=[sample_quiz], source_texts={})
+
+    metrics = results[0].metrics
+    assert len(metrics) == len(sample_quiz.questions)
+    assert {m.question_id for m in metrics} == {"q1", "q2"}
+    # No aggregate row survives: pooling it with the item scores under one
+    # metric_name would corrupt every downstream mean.
+    assert all(m.question_id is not None for m in metrics)
+    for metric in metrics:
+        assert metric.metric_name == "homogeneous_options"
+        assert '"severity"' in metric.raw_response

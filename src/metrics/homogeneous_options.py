@@ -1,10 +1,12 @@
 """Homogeneous options metric implementation."""
 
+import json
 from statistics import median
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..models.result import EvaluationResult
 from .base import BaseMetric, MetricScope
 from .phase import Phase, PhaseInput, PhaseOutput
 
@@ -297,6 +299,31 @@ Respond with ONLY a JSON object in this format:
             "aggregation_reasoning": aggregation_reasoning,
             "score": round(computed_score, 2),
         }
+
+    def expand_question_results(self, result: EvaluationResult) -> List[Tuple[str, float, str]]:
+        """Hand back the per-question scores this metric already produced.
+
+        The score_question phase judges every question separately; without this
+        the runner would only ever see the quiz-level aggregate. Reads a nested
+        dict, so a missing or malformed phase output yields no rows rather than
+        raising -- the caller falls back to the aggregate.
+        """
+        phases = result.metadata.get("phases", {})
+        scoring = phases.get("score_question")
+        if not isinstance(scoring, dict):
+            return []
+
+        rows = []
+        for entry in scoring.get("results", []):
+            if not isinstance(entry, dict):
+                continue
+            question_id = entry.get("question_id")
+            if not question_id:
+                continue
+            rows.append(
+                (str(question_id), float(entry["question_score"]), json.dumps(entry, ensure_ascii=True))
+            )
+        return rows
 
     @staticmethod
     def _get_question_result(

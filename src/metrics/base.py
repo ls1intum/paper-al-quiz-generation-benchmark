@@ -4,7 +4,7 @@ import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Dict, List, Optional, Callable, Tuple
 from pydantic import BaseModel, Field
 from ..models.quiz import Quiz, QuizQuestion
 from ..models.result import EvaluationResult
@@ -497,6 +497,17 @@ Respond with ONLY this JSON object:
     def format_insights(self, raw_response: str, quiz_id: str) -> Optional[str]:
         """Extract qualitative insights from a metric's raw response for display."""
         return None
+
+    def expand_question_results(self, result: EvaluationResult) -> List[Tuple[str, float, str]]:
+        """Per-question rows a quiz-level metric scored internally.
+
+        Returns (question_id, score, raw_response) tuples. A metric that judges
+        each question separately but aggregates before reporting can hand those
+        judgements back here, so the runner emits one result per question
+        instead of one opaque quiz-level blob. Empty for metrics that have no
+        per-question breakdown to give.
+        """
+        return []
 
     def validate_params(self, **params: Any) -> None:
         """Validate provided parameters against metric's parameter definitions."""

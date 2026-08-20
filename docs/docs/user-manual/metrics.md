@@ -279,13 +279,25 @@ The metric produces structured analysis and scoring output:
 
 **References**: Haladyna et al. [10], Downing [8], Applegate et al. [18]
 
-**Scope**: Quiz-level, with per-question analysis and quiz-level aggregation
+**Scope**: Registered quiz-level, but **reported per question** — the metric judges every
+question separately and emits one result per question, each with `question_id` populated.
+Scores are joinable by `(quiz_id, question_id)` without parsing nested JSON.
 
 **Implementation Notes**:
-- The metric runs in three phases: per-question option analysis, per-question scoring, and quiz-level aggregation.
+- The metric runs in three phases: per-question option analysis, per-question scoring, and a quiz-level aggregation computed in Python with no extra model call.
 - For each applicable question, answer choices are classified by grammatical form, content type, and formatting signals before being scored.
-- The final quiz-level score combines the per-question scores and applies a small penalty when major heterogeneity issues recur across a quiz.
-- True/false questions are treated as not applicable and are excluded from the aggregate denominator.
+- Because each question is judged independently, prompt size does not grow with the number of questions in a quiz.
+- The per-question rows replace the quiz-level aggregate in the results file. Emitting both under one metric name would pool item scores with a quiz-level summary in every downstream average. The quiz-level figures — mean question score, major-violation rate, issue distribution — are recomputable from the per-question rows, which carry score, severity and issues.
+- True/false questions are treated as not applicable: they still produce a row, with `applicable: false`, a score of `100.0`, and `not_applicable` among the issues.
+
+**Output** (`raw_response`, one object per question):
+- `question_score`, `severity` (`none` / `minor` / `major`), `issues`, `rationale`
+- `applicable`, plus the three sub-scores (grammatical parallelism, content-type homogeneity, format consistency)
+
+:::warning
+Not-applicable questions score `100.0`, so **filter on `applicable` before averaging** — otherwise
+every true/false item counts as perfectly homogeneous.
+:::
 
 **Evaluation Criteria**:
 - Parallel grammatical structure across answer choices

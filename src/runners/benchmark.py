@@ -4,7 +4,7 @@ import logging
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from ..evaluators.base import LLMProvider
 from ..evaluators.factory import LLMProviderFactory
@@ -13,7 +13,7 @@ from ..metrics.base import BaseMetric, MetricScope
 from ..metrics.registry import MetricRegistry
 from ..models.config import BenchmarkConfig
 from ..models.quiz import Quiz, QuizQuestion
-from ..models.result import BenchmarkResult, MetricResult
+from ..models.result import BenchmarkResult, EvaluationResult, MetricResult
 from ..utils.config_loader import ConfigLoader
 from ..utils.io import IOUtils
 from ..models.instruction import QuizInstructions
@@ -147,7 +147,7 @@ class BenchmarkRunner:
         source_text: Optional[str],
         parameters: Dict,
         instructions: Optional[QuizInstructions] = None,
-    ) -> Optional[MetricResult]:
+    ) -> Optional[Tuple[EvaluationResult, MetricResult]]:
         try:
             result = metric.evaluate(
                 quiz=quiz,
@@ -156,7 +156,7 @@ class BenchmarkRunner:
                 instructions=instructions,
                 **parameters,
             )
-            return MetricResult(
+            return result, MetricResult(
                 metric_name=metric.name,
                 metric_version=metric.version,
                 score=result.score,
@@ -169,6 +169,39 @@ class BenchmarkRunner:
         except Exception as e:
             self.logger.error("Error evaluating quiz %s: %s", quiz.quiz_id, e)
             return None
+
+    def _expand_quiz_result(
+        self,
+        metric: BaseMetric,
+        result: EvaluationResult,
+        evaluator: LLMProvider,
+        quiz: Quiz,
+        parameters: Dict,
+    ) -> List[MetricResult]:
+        """Split a quiz-level result into per-question rows, when the metric has them.
+
+        Metrics that judge each question internally expose those judgements via
+        expand_question_results. Returning them as separate rows is what makes
+        the scores joinable per question; an empty list means the caller keeps
+        the quiz-level row as-is.
+        """
+        try:
+            return [
+                MetricResult(
+                    metric_name=metric.name,
+                    metric_version=metric.version,
+                    score=score,
+                    evaluator_model=evaluator.model_name,
+                    quiz_id=quiz.quiz_id,
+                    question_id=question_id,
+                    parameters=parameters,
+                    raw_response=raw_response,
+                )
+                for question_id, score, raw_response in metric.expand_question_results(result)
+            ]
+        except Exception as e:
+            self.logger.error("Error expanding %s for quiz %s: %s", metric.name, quiz.quiz_id, e)
+            return []
 
     def _evaluate_question(
         self,
@@ -300,7 +333,7 @@ class BenchmarkRunner:
                         if result:
                             metric_results.append(result)
                 else:
-                    result = self._evaluate_quiz_level(
+                    evaluated = self._evaluate_quiz_level(
                         metric,
                         evaluator,
                         quiz,
@@ -308,8 +341,15 @@ class BenchmarkRunner:
                         metric_config.parameters,
                         instructions,
                     )
-                    if result:
-                        metric_results.append(result)
+                    if evaluated:
+                        evaluation, result = evaluated
+                        # Per-question rows replace the aggregate row rather than
+                        # joining it: sharing one metric_name would pool item
+                        # scores with a quiz-level summary in every downstream mean.
+                        expanded = self._expand_quiz_result(
+                            metric, evaluation, evaluator, quiz, metric_config.parameters
+                        )
+                        metric_results.extend(expanded or [result])
 
         # ── Difficulty compliance: runs after ALL metrics, outside the loop ── #
         adjusted_difficulty = self._check_difficulty_compliance(
