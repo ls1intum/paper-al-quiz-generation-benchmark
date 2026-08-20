@@ -97,26 +97,57 @@ sidebar_position: 4
 
 ### 4. Answer Key Correctness
 
-**Purpose**: Verify exactly one option is unambiguously correct (or clearly best) while all distractors are unambiguously incorrect.
+**Metric name**: `answer_key_correctness`
+
+**Purpose**: Verify the marked answer key is correct and unambiguous — exactly one option is
+unambiguously correct (or, for multiple choice, the keyed set is exactly the correct set) while
+all distractors are unambiguously incorrect, and no catch-all option is present.
 
 **References**: Haladyna et al. [10], Haladyna & Rodriguez [11]
 
-**Scope**: Question-level
+**Scope**: Question-level — one result per question, with `question_id` populated.
 
-**Evaluation Criteria**:
-- One clearly correct answer
-- All distractors are definitively incorrect
-- No ambiguity in correctness
-- Correct answer is verifiable from source material
+**Scoring**: **Binary** — `100.0` when the key is correct and unambiguous, `0.0` otherwise.
+Unlike the other metrics this one is not an ordinal: a key is either defensible or it is not, and
+there is no useful middle ground to score. Averaging the metric across a quiz therefore reads
+directly as the share of items with a sound answer key, and the issue flags say why the rest
+failed.
+
+**Rules by question type**:
+- `single_choice` / `true_false`: exactly one option is unambiguously correct, and it is the keyed one.
+- `multiple_choice`: the keyed **set** must equal the unambiguously-correct **set** — every keyed
+  option is correct **and** no unkeyed option is also defensible.
+
+**Issue flags** (reported in `raw_response`, empty when the key is sound):
+
+| Flag | Meaning |
+|---|---|
+| `multiple_defensible` | An unkeyed option is also defensible — the key omits a correct option. |
+| `keyed_answer_wrong` | A keyed option is actually incorrect. |
+| `no_correct_option` | None of the options is correct. |
+| `catch_all_present` | An "all/none of the above" style option appears. |
+
+**Deterministic checks** (applied after the judge, so they hold regardless of the judge model):
+- **Catch-all detection** — options opening with an "all of the above" / "none of the above"
+  phrase, in English or German, fail the criterion even when technically correct. Detection is
+  pure Python, so the same items are flagged by every judge model.
+- **Empty key** — an item with no marked answer (`correct_answer: []`) is evaluated normally and
+  flagged `no_correct_option` rather than crashing the run.
+
+**Source material**: optional. When a source is available it is supplied as supporting context;
+when it is absent the judge reasons from general expert knowledge and the item wording.
+
+**Output** (`raw_response`):
+- `key_correct` — the Yes/No verdict
+- `defensible_correct_options` — the full set the judge considers correct
+- `misclassified_options` — which options are keyed wrongly
+- `issue_flags`, `catch_all_options`, `rationale`, `score`
 
 **Example Configuration**:
 ```yaml
-- name: "answer_correctness"
+- name: "answer_key_correctness"
   version: "1.0"
   evaluators: ["gpt4"]
-  parameters:
-    verify_source: true
-    require_unambiguous: true
 ```
 
 ---

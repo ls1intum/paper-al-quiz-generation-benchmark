@@ -9,6 +9,7 @@ from .grammatic import GrammaticalCorrectnessMetric
 from .distractor import DistractorQualityMetric
 from .homogeneous_options import HomogeneousOptionsMetric
 from .accuracy import FactualAccuracyMetric
+from .answer_key_correctness import AnswerKeyCorrectnessMetric
 
 __all__ = [
     "BaseMetric",
@@ -22,4 +23,5 @@ __all__ = [
     "DistractorQualityMetric",
     "HomogeneousOptionsMetric",
     "FactualAccuracyMetric",
+    "AnswerKeyCorrectnessMetric",
 ]

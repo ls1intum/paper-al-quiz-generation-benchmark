@@ -19,6 +19,7 @@ from src.metrics.clarity import ClarityMetric
 from src.metrics.distractor import DistractorQualityMetric
 from src.metrics.homogeneous_options import HomogeneousOptionsMetric
 from src.metrics.accuracy import FactualAccuracyMetric
+from src.metrics.answer_key_correctness import AnswerKeyCorrectnessMetric
 from src.runners.benchmark import BenchmarkRunner
 from src.utils.config_loader import ConfigLoader
 from src.utils.io import IOUtils
@@ -34,6 +35,7 @@ def register_metrics() -> None:
     MetricRegistry.register(DistractorQualityMetric)
     MetricRegistry.register(HomogeneousOptionsMetric)
     MetricRegistry.register(FactualAccuracyMetric)
+    MetricRegistry.register(AnswerKeyCorrectnessMetric)
 
 
 def main() -> int:

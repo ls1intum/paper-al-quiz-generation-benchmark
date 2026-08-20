@@ -32,3 +32,7 @@ def test_create_unknown_metric():
     MetricRegistry.clear()
     with pytest.raises(ValueError):
         MetricRegistry.create("missing_metric")
+
+def test_answer_key_correctness_is_registered(registered_metrics):
+    assert "answer_key_correctness" in registered_metrics
+    assert MetricRegistry.create("answer_key_correctness").name == "answer_key_correctness"

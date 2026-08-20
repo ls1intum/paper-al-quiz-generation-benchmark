@@ -54,6 +54,11 @@ metrics:
     evaluators: ["qwen", "openai-gpt"]
     enabled: true
 
+  - name: "answer_key_correctness"
+    version: "1.0"
+    evaluators: ["qwen", "openai-gpt"]
+    enabled: true
+
   - name: "clarity"
     version: "1.0"
     evaluators: ["qwen", "openai-gpt"]

@@ -8,9 +8,9 @@ documents divergences from the definition, and lists actionable improvements.
 
 ## Summary
 
-The benchmark registers **7 metrics** (`src/metrics/__init__.py`):
+The benchmark registers **8 metrics** (`src/metrics/__init__.py`):
 `coverage`, `difficulty`, `accuracy`, `clarity`, `distractor_quality`,
-`homogeneous_options`, `grammatical_correctness`.
+`homogeneous_options`, `grammatical_correctness`, `answer_key_correctness`.
 
 | # | Criterion (paper) | Metric | Status |
 |---|---|---|---|
@@ -18,16 +18,15 @@ The benchmark registers **7 metrics** (`src/metrics/__init__.py`):
 | 2 | Cognitive Level Appropriateness | `difficulty` (+ `coverage` depth) | ⚠️ Partial — scores *absolute* level, not appropriateness vs. a target |
 | 3 | Factual Accuracy | `accuracy` | ✅ Covered |
 | 4 | Clarity and Precision | `clarity` | ⚠️ Partial — negative phrasing not checked |
-| 5 | Answer Key Correctness | — | ❌ Missing — no dedicated metric |
+| 5 | Answer Key Correctness | `answer_key_correctness` | ✅ Covered |
 | 6 | Distractor Quality | `distractor_quality` | ✅ Covered |
 | 7 | Homogeneous Options | `homogeneous_options` | ✅ Covered |
 | 8 | Absence of Cueing | (partial in `distractor_quality`) | ❌ Largely missing — no dedicated metric |
 | 9 | Grammatical Correctness | `grammatical_correctness` | ✅ Covered |
 
-**Headline gaps:** Criterion 5 (Answer Key Correctness) and Criterion 8
-(Absence of Cueing) have no dedicated metric. Criterion 1 conflates source
-coverage with learning-objective alignment, and Criterion 4 omits the explicit
-negative-phrasing check named in its definition.
+**Headline gaps:** Criterion 8 (Absence of Cueing) has no dedicated metric.
+Criterion 1 conflates source coverage with learning-objective alignment, and
+Criterion 4 omits the explicit negative-phrasing check named in its definition.
 
 ---
 
@@ -122,18 +121,41 @@ distinctness, overlap, "trick" wordings, and overall readability — covering th
 
 **Definition:** *Exactly one option is unambiguously correct (or clearly best) while all distractors are unambiguously incorrect; "none/all of the above" options are excluded.*
 
-**Status: ❌ Missing.**
+**Status: ✅ Covered** by `answer_key_correctness` (`src/metrics/answer_key_correctness.py`),
+question-level, one result per item with `question_id` populated.
 
-No metric covers this criterion. Specifically:
-- **"Exactly one correct"** is not checked. `accuracy` verifies the *designated* answer is factually correct but never tests whether a distractor is *also* defensibly correct — the exact failure mode the related-work section highlights (Doughty 2024: AI items show 4.9% multiple-correct rate vs. 1.1% human).
-- **"All distractors unambiguously incorrect"** is not verified; `distractor_quality` measures plausibility/discrimination, not correctness.
-- **"none/all of the above" exclusion** is never checked anywhere in `src/` (confirmed by search).
-- `clarity` lists "Is there a single, clearly correct answer?" as one incidental consideration (`clarity.py:100`), but it is folded into a clarity score and does not test distractor incorrectness or catch-all options.
+The metric mirrors Form A §3.2 of `human-validation-plan.md` so that the judge and the human
+raters answer the same question on the same scale:
 
-**Actionable improvements (high priority):**
-1. Add a dedicated `answer_key_correctness` metric that, given source material: (a) verifies the keyed answer is correct, (b) checks each distractor is unambiguously incorrect / not also defensible, and (c) flags multiple-defensible-answer items.
-2. Add a deterministic check (Python, no LLM) that detects "none of the above" / "all of the above" style options and penalizes/flags them per Di Battista 2014 / Dochy 2001.
-3. Report a quiz-level "multiple-correct rate" and "catch-all-option rate" to mirror the metrics cited in the related work.
+- **Binary verdict.** "Is the marked answer key correct and unambiguous?" → `score` is `100.0`
+  or `0.0`, never an ordinal. C2 is an *objective* criterion validated by the judge's
+  accuracy/precision/recall against an adjudicated gold standard; an ordinal judge score would
+  need a post-hoc cut-point to compare against a binary human verdict.
+- **Exactly the four Form A sub-flags:** `multiple_defensible`, `keyed_answer_wrong`,
+  `no_correct_option`, `catch_all_present`. Flags the judge invents outside this set are dropped,
+  so every judge flag maps 1:1 onto a rater checkbox.
+- **Set comparison for multiple choice** — the keyed set must equal the unambiguously-correct
+  set, closing the gap `accuracy` leaves open (it checks the keyed answer, never whether a
+  distractor is *also* defensible).
+- **Deterministic catch-all detection** (Python, no LLM) forces a failing verdict, so the two
+  catch-all seeds among the 8 seeded C2 items are caught identically by every judge model.
+- **Empty keys** (`correct_answer: []`, e.g. `1819ER_q3`) are flagged `no_correct_option` and
+  scored `0.0` rather than aborting the run.
+
+**Open items:**
+1. Quiz-level aggregate rates — "multiple-correct rate" and "catch-all-option rate" — to mirror
+   the figures cited in the related work (Doughty 2024, Di Battista 2014). Not implemented; the
+   per-item flags are in `MetricResult.raw_response`, so these are computable from stored results
+   without re-running any judge.
+2. **Threat to validity — source asymmetry.** The metric passes `source_text` to the judge when a
+   quiz has one, but §4 of the validation plan gives human raters no fixed source passage
+   ("experts verify by knowledge / lookup"), and only some quizzes carry a source. That is an
+   information asymmetry inside an objective-criterion comparison. It is inert for the planned
+   run (`pool-run.yaml` executes source-free), but it must be stated in
+   `threats-to-validity.tex` when the results are written up.
+3. The metric is registered in `config/multi_judge_benchmark.yaml`. Adding it to the actual
+   data-collection run requires editing `build_pools.py` in the paper repository and
+   regenerating `pool-run.yaml` — see the note at the end of this report.
 
 ---
 
@@ -218,10 +240,25 @@ definition.
 
 Ordered by impact on faithfulness to the literature-derived criteria.
 
-1. **[P0] Add an Answer Key Correctness metric (Criterion 5).** No coverage today; directly addresses the AI-specific failure mode (multiple defensible answers) emphasized in the related work. Include a deterministic "none/all of the above" detector.
+1. ~~**[P0] Add an Answer Key Correctness metric (Criterion 5).**~~ **Done** — `answer_key_correctness`, binary per Form A §3.2, with a deterministic "none/all of the above" detector. Directly addresses the AI-specific failure mode (multiple defensible answers) emphasized in the related work.
 2. **[P0] Add an Absence-of-Cueing metric (Criterion 8).** Currently only an incidental distractor sub-check; add stem→key grammatical/length/word-repetition/convergence cue detection.
 3. **[P1] Score against stated learning objectives (Criterion 1).** Add a `learning_objectives` input and an alignment sub-score; stop equating source-topic coverage with objective alignment, or document the proxy explicitly.
 4. **[P1] Add negative-phrasing detection to `clarity` (Criterion 4).** Named in the definition but absent from the prompt.
 5. **[P2] Reconcile cognitive-level handling (Criterion 2).** Unify the Bloom taxonomy between `coverage` (3-level) and `difficulty` (6-level); separate Bloom level from the easy/medium/hard band; score appropriateness against a target when available.
 6. **[P2] Reflect contested/AI-specific evidence in weighting & docs.** Flag `homogeneous_options` as a contested guideline (Applegate 2019); strengthen `accuracy`'s explicit source-grounded hallucination check.
 7. **[P3] Cosmetic robustness.** Guard `accuracy` against `source_text=None`; document T/F exclusions for `distractor_quality`/`homogeneous_options`; add per-item breakdowns for quiz-level grammar.
+
+---
+
+## Follow-up in the paper repository
+
+`answer_key_correctness` is registered in this repository and in
+`config/multi_judge_benchmark.yaml`, but the actual data-collection run config lives in
+`paper-al-quiz-generation` and is **generated**, so it must be regenerated rather than
+hand-edited:
+
+- `tools/corpus/build_pools.py` — add `("answer_key_correctness", "1.0")` to `METRICS`.
+- `data-format-spec.md` §10 (the ❌ line for C2) and §11 (the resolved metric-subset bullet).
+- `roadmap-to-datacollection.md` task 2.3, and the 5.4 check "Confirm C2/C8 metrics landed".
+- Re-run `build_pools.py` to regenerate `tools/corpus/out/pool-run.yaml`.
+- `paper-benchmark/sections/threats-to-validity.tex` — the source-asymmetry threat above.

@@ -82,3 +82,33 @@ def test_runner_errors_on_empty_quizzes(registered_metrics, mock_llm_provider, s
     runner = BenchmarkRunner(sample_config)
     with pytest.raises(ValueError):
         runner.run(quizzes=[], source_texts={})
+
+
+def test_runner_produces_one_answer_key_result_per_question(
+    registered_metrics, mock_llm_provider, sample_config, sample_quiz
+):
+    """The metric is question-level: N questions must yield N results, each with a question_id."""
+    from dataclasses import replace
+
+    config = replace(
+        sample_config,
+        runs=1,
+        metrics=[
+            MetricConfig(
+                name="answer_key_correctness",
+                version="1.0",
+                evaluators=["mock_eval"],
+                parameters={},
+                enabled=True,
+            )
+        ],
+    )
+    results = BenchmarkRunner(config).run(quizzes=[sample_quiz], source_texts={})
+
+    metrics = results[0].metrics
+    assert len(metrics) == len(sample_quiz.questions)
+    assert {m.question_id for m in metrics} == {"q1", "q2"}
+    for metric in metrics:
+        assert metric.metric_name == "answer_key_correctness"
+        assert metric.question_id is not None
+        assert metric.score in (0.0, 100.0)

@@ -1,5 +1,7 @@
 """Tests for metric implementations."""
 
+import json
+
 import pytest
 
 from src.metrics.difficulty import DifficultyMetric
@@ -10,6 +12,10 @@ from src.metrics.base import ScoreResponse
 from src.metrics.homogeneous_options import HomogeneousOptionsMetric
 from src.metrics.phase import Phase, PhaseInput, PhaseOutput
 from src.metrics.accuracy import FactualAccuracyMetric
+from src.metrics.answer_key_correctness import (
+    AnswerKeyCorrectnessMetric,
+    detect_catch_all_options,
+)
 from src.models.quiz import QuizQuestion, QuestionType, Quiz
 from tests.conftest import MockLLMProvider
 
@@ -510,3 +516,177 @@ def test_homogeneous_options_evaluate_end_to_end():
     result = metric.evaluate(quiz=make_quiz(), llm_client=mock_llm)
     assert result.score == 95.5
     assert '"score": 95.5' in result.raw_response
+
+
+# ── answer_key_correctness ───────────────────────────────────────────────── #
+
+
+def _judge(key_correct: bool, **overrides) -> dict:
+    """A judge-phase response; overrides fill in the diagnostic sub-fields."""
+    return {
+        "key_correct": key_correct,
+        "defensible_correct_options": overrides.get("defensible", []),
+        "misclassified_options": overrides.get("misclassified", []),
+        "issue_flags": overrides.get("flags", []),
+        "rationale": overrides.get("rationale", "mock rationale"),
+    }
+
+
+def _evaluate_key(question, judge_response) -> tuple:
+    """Run the metric over one question, returning (EvaluationResult, parsed raw_response)."""
+    metric = AnswerKeyCorrectnessMetric()
+    mock_llm = MockLLMProvider(model="mock-model", responses=[judge_response])
+    result = metric.evaluate(question=question, llm_client=mock_llm)
+    return result, json.loads(result.raw_response)
+
+
+def test_answer_key_prompt_requires_question():
+    """Judge prompt builder should raise ValueError when question is missing."""
+    metric = AnswerKeyCorrectnessMetric()
+    inp = make_phase_input(metric, "judge")
+    with pytest.raises(ValueError, match="requires a question"):
+        inp.prompt_builder(inp)
+
+
+def test_answer_key_prompt_includes_options_and_key():
+    """Judge prompt should present every option and the marked key."""
+    metric = AnswerKeyCorrectnessMetric()
+    inp = make_phase_input(metric, "judge", question=make_question())
+    prompt = inp.prompt_builder(inp)
+
+    for option in make_question().options:
+        assert option in prompt
+    assert "Marked Correct Answer (key): 4" in prompt
+    assert "single_choice" in prompt
+
+
+def test_answer_key_prompt_without_source_asks_for_expert_knowledge():
+    """Missing source_text must not render as 'None' (see accuracy.py:60)."""
+    metric = AnswerKeyCorrectnessMetric()
+    inp = make_phase_input(metric, "judge", question=make_question())
+    prompt = inp.prompt_builder(inp)
+
+    assert "Source Material: None" not in prompt
+    assert "general expert knowledge" in prompt
+
+
+@pytest.mark.parametrize(
+    "options,expected",
+    [
+        (["Paris", "All of the above"], ["All of the above"]),
+        (["Keine der genannten", "Berlin"], ["Keine der genannten"]),
+        (["(Alle oben genannten)"], ["(Alle oben genannten)"]),
+        (["None of these statements is true"], ["None of these statements is true"]),
+        # Must NOT overflag ordinary domain prose.
+        (["A list of all listed items"], []),
+        (["All answers are stored in a hash map"], []),
+        (["The method returns all answers"], []),
+    ],
+)
+def test_detect_catch_all_options(options, expected):
+    """Catch-all detection covers English and German without flagging domain text."""
+    assert detect_catch_all_options(options) == expected
+
+
+def test_answer_key_correct_single_choice_scores_100():
+    """A correctly keyed single_choice item passes with no flags."""
+    result, data = _evaluate_key(make_question(), _judge(True, defensible=["4"]))
+
+    assert result.score == 100.0
+    assert data["key_correct"] is True
+    assert data["issue_flags"] == []
+    assert data["catch_all_options"] == []
+
+
+def test_answer_key_multiple_choice_omitted_correct_option():
+    """An unkeyed but defensible option flags multiple_defensible and fails."""
+    question = QuizQuestion(
+        question_id="q_mc",
+        question_type=QuestionType.MULTIPLE_CHOICE,
+        question_text="Which are prime?",
+        options=["2", "3", "4"],
+        correct_answer=["2"],
+    )
+    result, data = _evaluate_key(
+        question,
+        _judge(False, defensible=["2", "3"], misclassified=["3"], flags=["multiple_defensible"]),
+    )
+
+    assert result.score == 0.0
+    assert data["issue_flags"] == ["multiple_defensible"]
+    assert data["misclassified_options"] == ["3"]
+
+
+def test_answer_key_wrong_keyed_option():
+    """A keyed option that is actually incorrect flags keyed_answer_wrong."""
+    question = QuizQuestion(
+        question_id="q_wrong",
+        question_type=QuestionType.SINGLE_CHOICE,
+        question_text="What is 2+2?",
+        options=["2", "3", "4", "5"],
+        correct_answer="5",
+    )
+    result, data = _evaluate_key(
+        question, _judge(False, defensible=["4"], misclassified=["5"], flags=["keyed_answer_wrong"])
+    )
+
+    assert result.score == 0.0
+    assert data["issue_flags"] == ["keyed_answer_wrong"]
+
+
+def test_answer_key_catch_all_overrides_a_passing_judge():
+    """A catch-all option fails the item even when the judge said the key is fine."""
+    question = QuizQuestion(
+        question_id="q_catch_all",
+        question_type=QuestionType.SINGLE_CHOICE,
+        question_text="Which apply?",
+        options=["Speed", "Cost", "All of the above"],
+        correct_answer="All of the above",
+    )
+    result, data = _evaluate_key(question, _judge(True, defensible=["All of the above"]))
+
+    assert result.score == 0.0
+    assert data["key_correct"] is False
+    assert data["issue_flags"] == ["catch_all_present"]
+    assert data["catch_all_options"] == ["All of the above"]
+
+
+def test_answer_key_empty_key_does_not_crash():
+    """An item with no marked answer evaluates to a failing result, not an exception."""
+    question = QuizQuestion(
+        question_id="q_empty_key",
+        question_type=QuestionType.MULTIPLE_CHOICE,
+        question_text="Which statements hold?",
+        options=["A", "B", "C"],
+        correct_answer=[],
+    )
+    result, data = _evaluate_key(question, _judge(True, defensible=[]))
+
+    assert result.score == 0.0
+    assert data["key_correct"] is False
+    assert "no_correct_option" in data["issue_flags"]
+
+
+def test_answer_key_raw_response_carries_diagnostics():
+    """raw_response must expose the full diagnostic payload, not just a score."""
+    result, _ = _evaluate_key(make_question(), _judge(True, defensible=["4"]))
+
+    for field in (
+        "key_correct",
+        "defensible_correct_options",
+        "misclassified_options",
+        "issue_flags",
+        "catch_all_options",
+        "rationale",
+        "score",
+    ):
+        assert f'"{field}"' in result.raw_response
+
+
+def test_answer_key_unknown_judge_flags_are_dropped():
+    """Flags outside the four known issue flags never reach the output."""
+    _, data = _evaluate_key(
+        make_question(), _judge(False, flags=["multiple_defensible", "ambiguous_key", "nonsense"])
+    )
+
+    assert data["issue_flags"] == ["multiple_defensible"]
