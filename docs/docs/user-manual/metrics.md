@@ -380,27 +380,56 @@ homogeneity too and are reported by both.
 
 ### 8. Grammatical Correctness
 
-**Purpose**: Ensure both stem and options are grammatically correct and properly punctuated.
+**Metric name**: `grammatical_correctness`
+
+**Purpose**: Verify that an item's stem and all of its options are grammatically correct, well
+spelled, and properly punctuated.
 
 **References**: Haladyna et al. [10], Haladyna & Rodriguez [11]
 
-**Scope**: Question-level
+**Scope**: Question-level — one result per question, with `question_id` populated. The stem and
+every option are judged together: one broken option makes the item worse however clean the rest
+reads.
 
-**Evaluation Criteria**:
-- Proper grammar in stem
-- Proper grammar in all options
-- Correct punctuation
-- Subject-verb agreement
-- Consistent tense usage
+**Scoring**: the judge picks one of four severity levels and the score follows from it, so a
+verdict and its number can never disagree. There is deliberately no midpoint.
+
+| Severity | Score | Meaning |
+|---|---|---|
+| `none` | `100.0` | No errors; professional quality throughout. |
+| `minor` | `66.7` | Small issues only — a typo, a missing comma, inconsistent capitalization. |
+| `major` | `33.3` | Clear grammatical errors that disrupt reading flow. |
+| `critical` | `0.0` | Errors that obscure the meaning or make the item hard to understand. |
+
+**Evaluation Criteria**: grammar (agreement, tense, articles, pronouns, sentence structure),
+spelling, punctuation, capitalization, complete-sentence structure and parallel construction,
+technical-writing standards, and terminology consistency where it affects readability.
+
+**Parameters**:
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `language` | `"English"` | Which language's grammar rules to apply. |
+
+**Language mismatch is not a grammar defect.** Items are always judged in the language they are
+actually written in — a well-written German item scores `none` even when English was requested.
+Whether the quiz matches a requested language is an *instruction compliance* question about the
+quiz as a whole, so it is checked once per quiz and reported separately as
+`adjusted_grammar` in the run metadata. Per-item scores are never modified by it, which keeps
+them meaning one thing: how well the item is written.
+
+**Output** (`raw_response`):
+- `severity`, `score`
+- `grammar_issues`, `spelling_issues`, `punctuation_issues` — the specific problems found, empty when that category is clean
+- `rationale`
 
 **Example Configuration**:
 ```yaml
-- name: "grammar"
-  version: "1.0"
+- name: "grammatical_correctness"
+  version: "2.0"
   evaluators: ["gpt4"]
   parameters:
-    strict_mode: true
-    check_punctuation: true
+    language: "English"
 ```
 
 ---

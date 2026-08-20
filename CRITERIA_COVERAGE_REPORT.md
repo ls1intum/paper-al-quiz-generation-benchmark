@@ -23,7 +23,7 @@ The benchmark registers **10 metrics** (`src/metrics/__init__.py`):
 | 6 | Distractor Quality | `distractor_quality` | ✅ Covered |
 | 7 | Homogeneous Options | `homogeneous_options` | ✅ Covered — now reported per item |
 | 8 | Absence of Cueing | `absence_of_cueing` | ✅ Covered |
-| 9 | Grammatical Correctness | `grammatical_correctness` | ✅ Covered |
+| 9 | Grammatical Correctness | `grammatical_correctness` | ✅ Covered — now reported per item |
 
 **Headline gaps:** Criterion 4 omits the explicit negative-phrasing check named
 in its definition. Every other criterion now has a dedicated metric.
@@ -272,18 +272,46 @@ too and are reported by both — a known and expected overlap, not double-counti
 
 ## Criterion 9 — Grammatical Correctness
 
-**Definition:** *Both stem and options are grammatically correct and properly punctuated.*
+**Definition:** *Question stems and answer options are free of grammatical, spelling, and punctuation errors.*
 
-**Status: ✅ Covered.**
+**Status: ✅ Covered**, and as of this change **reported per item**.
 
-`GrammaticalCorrectnessMetric` (`src/metrics/grammatic.py`) evaluates grammar,
-spelling, punctuation, sentence structure, and technical-writing standards
-across both stems and options, with severity-weighted deductions. Language
-mismatch is handled separately to avoid double-penalization. Matches the
-definition.
+`GrammaticalCorrectnessMetric` (`src/metrics/grammatic.py`) is now
+`MetricScope.QUESTION_LEVEL`: one result per question, `question_id` populated,
+joinable by `(quiz_id, question_id)`.
 
-**Minor notes / improvements:**
-1. Quiz-level single score may mask a single badly-broken item among many clean ones; consider reporting a per-item breakdown or a worst-item flag (the definition is item-scoped).
+**Why the conversion was needed.** The metric previously formatted every question into a single
+prompt and returned one score for the whole quiz, so a single broken item among fifteen clean
+ones was invisible in the average. Unlike Criterion 7, there was nothing to extract — the
+per-question judgement was never made, so the prompt and schema had to be rewritten rather than
+merely re-plumbed.
+
+- **Four-level scale.** The judge picks `none` / `minor` / `major` / `critical` and the score is
+  derived from it (`100 / 66.7 / 33.3 / 0`), so a verdict and its number cannot disagree. The
+  stem and every option are judged together — one broken option makes the item worse however
+  clean the rest reads.
+- **Structured issue lists** (`grammar_issues`, `spelling_issues`, `punctuation_issues`) replace
+  the bare numeric score the metric used to return, so a low score can be traced to specific
+  problems.
+- **`error_weights` was removed.** It existed to guide a continuous deduction; the four severity
+  levels replace it. No config in this repo sets it, and `validate_params` now rejects it loudly
+  rather than ignoring it silently.
+
+**Language compliance moved out of the item score.** The `language` instruction is no longer
+coupled to the metric via `_has_adjustable_instructions`. Leaving it coupled after the scope flip
+would have fired one compliance LLM call *per question* to answer a question about the whole
+quiz, and could have reached different language verdicts for items in the same quiz. It is now
+checked once per quiz in `BenchmarkRunner._check_language_compliance`, beside the existing
+`_check_difficulty_compliance`, which already solves the identical problem for the question-level
+`difficulty` metric.
+
+Following that precedent, **the per-question rows are never modified**: the compliance-adjusted
+quiz mean is recorded in `BenchmarkResult.metadata["adjusted_grammar"]`, alongside
+`adjusted_difficulty`. This is the stronger reading of the requirement that language mismatch
+stay "an instruction compliance adjustment, not grammar quality itself" — folding it into every
+item score would be exactly the contamination that rule guards against. Per-item scores therefore
+hold pure grammar quality, which is also what a human rater judges. Cost is unchanged: the
+adjustment fires once per (quiz, metric, evaluator), as before.
 
 ---
 
@@ -309,7 +337,10 @@ Ordered by impact on faithfulness to the literature-derived criteria.
 hand-edited:
 
 - `tools/corpus/build_pools.py` — add `("answer_key_correctness", "1.0")`,
-  `("objective_alignment", "1.0")` and `("absence_of_cueing", "1.0")` to `METRICS`.
+  `("objective_alignment", "1.0")` and `("absence_of_cueing", "1.0")` to `METRICS`, and bump
+  `grammatical_correctness` to `"2.0"`. That metric was excluded from the pool subset because it
+  was "quiz-level, one score per whole quiz with no per-question breakdown" — that reason no
+  longer holds, so it can now be added.
 - `data-format-spec.md` §10 (the ❌ lines for C2, C3 and C8) and §11 (the resolved metric-subset bullet).
 - `roadmap-to-datacollection.md` task 2.3 (C2, C3 and C8 all land here), and the 5.4 check
   "Confirm C2/C8 metrics landed" — both now have metrics, so RQ2 reaches all 30 seeds.

@@ -292,6 +292,68 @@ class BenchmarkRunner:
         )
         return adjusted
 
+    def _check_language_compliance(
+        self,
+        quiz: Quiz,
+        metric_results: List[MetricResult],
+        source_text: Optional[str],
+        instructions: Optional[QuizInstructions],
+    ) -> Optional[float]:
+        """Check the quiz against the requested language, once per quiz.
+
+        Grammar is scored per question and in whatever language the item is
+        actually written in, so the language-mismatch question -- a property of
+        the quiz, not of any one item -- is asked here instead. Per-question
+        scores are never modified: a language mismatch is an instruction
+        compliance failure, not a grammar defect, and mixing the two would make
+        the per-item grammar scores mean two things at once.
+
+        Returns the compliance-adjusted mean grammar score, or None when there
+        is nothing to check.
+        """
+        if not instructions or not instructions.language:
+            return None
+
+        by_evaluator: Dict[str, List[float]] = {}
+        for result in metric_results:
+            if result.metric_name == "grammatical_correctness":
+                by_evaluator.setdefault(result.evaluator_model, []).append(result.score)
+        if not by_evaluator:
+            return None
+
+        try:
+            metric = MetricRegistry.create("grammatical_correctness")
+        except ValueError:
+            return None
+
+        adjusted_scores = []
+        for evaluator_model, scores in by_evaluator.items():
+            evaluator = next(
+                (e for e in self.evaluators.values() if e.model_name == evaluator_model), None
+            )
+            if evaluator is None:
+                continue
+            try:
+                # Each judge assesses its own compliance, over its own scores.
+                adjusted_scores.append(
+                    metric.adjust_score_for_custom_prompt(
+                        raw_score=round(sum(scores) / len(scores), 1),
+                        interpreted_instruction="",
+                        quiz=quiz,
+                        source_text=source_text,
+                        llm_client=evaluator,
+                        instructions=instructions,
+                    )
+                )
+            except Exception as e:
+                self.logger.error(
+                    "Error checking language compliance for quiz %s: %s", quiz.quiz_id, e
+                )
+
+        if not adjusted_scores:
+            return None
+        return round(sum(adjusted_scores) / len(adjusted_scores), 1)
+
     def _evaluate_quiz(
         self, quiz: Quiz, source_text: Optional[str], run_number: int
     ) -> BenchmarkResult:
@@ -351,9 +413,15 @@ class BenchmarkRunner:
                         )
                         metric_results.extend(expanded or [result])
 
-        # ── Difficulty compliance: runs after ALL metrics, outside the loop ── #
+        # ── Instruction compliance: runs after ALL metrics, outside the loop ── #
+        # Both metrics score one question at a time, so their quiz-level
+        # compliance questions are asked once here rather than once per item.
+        # Neither touches the per-question rows.
         adjusted_difficulty = self._check_difficulty_compliance(
             quiz.quiz_id, metric_results, instructions
+        )
+        adjusted_grammar = self._check_language_compliance(
+            quiz, metric_results, source_text, instructions
         )
 
         completed_at = datetime.now()
@@ -372,5 +440,6 @@ class BenchmarkRunner:
                 "num_questions": quiz.num_questions,
                 "instructions": instructions.model_dump() if instructions else None,
                 "adjusted_difficulty": adjusted_difficulty,
+                "adjusted_grammar": adjusted_grammar,
             },
         )

@@ -324,7 +324,7 @@ class QuizInstructions(BaseModel):
     
     language: Optional[str] = None
     # Language the quiz should be written in (e.g., "English", "Spanish")
-    # Couple: grammatical_correctness metric only
+    # Couple: grammatical_correctness, checked once per quiz in the runner
     
     num_questions: Optional[int] = None
     # Ideal number of questions; drives breadth penalty in coverage metric
@@ -359,14 +359,27 @@ Instructions are processed in two stages during metric evaluation:
    - Computes compliance adjustment (positive, negative, or zero)
    - Adjustment applied in Python and clamped to [0, 100]
 
+3. **Quiz-level compliance checks** (in `BenchmarkRunner`, after every metric has run):
+   - `difficulty` and `language` are checked here rather than inside their metrics, because both
+     metrics score one question at a time. A per-question adjustment would cost one LLM call per
+     item to answer a question about the whole quiz, and could reach different verdicts for
+     items in the same quiz.
+   - `_check_difficulty_compliance()` compares the mean per-question difficulty against the
+     requested band, in Python.
+   - `_check_language_compliance()` means each evaluator's per-question grammar scores and calls
+     `adjust_score_for_custom_prompt()` once per (quiz, evaluator).
+   - **Neither modifies the per-question rows.** Results are recorded in
+     `BenchmarkResult.metadata` as `adjusted_difficulty` and `adjusted_grammar`, keeping
+     compliance separate from the quality each metric measures.
+
 **Field-to-Metric Coupling**
 
 Each structured instruction field is coupled to specific metrics to prevent logical conflicts:
 
 | Instruction Field | Target Metrics | Reasoning |
 |---|---|---|
-| `language` | `grammatical_correctness` only | Language mismatch is a compliance issue, not a quality issue; grammar is scored on actual language |
-| `difficulty` | `difficulty` only | Difficulty band compliance is separate from other quality metrics |
+| `language` | `grammatical_correctness`, checked once per quiz in the runner | Language mismatch is a compliance issue, not a quality issue; grammar is scored on actual language and per-item scores are left untouched |
+| `difficulty` | `difficulty`, checked once per quiz in the runner | Difficulty band compliance is separate from other quality metrics |
 | `question_types` | `clarity` only | Question type mismatch affects clarity (type expectations), not other metrics |
 | `custom_prompt` | All metrics | Content/topic directives are open-ended; each metric decides whether relevant |
 

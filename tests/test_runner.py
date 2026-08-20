@@ -204,3 +204,75 @@ def test_runner_produces_one_cueing_result_per_question(
         assert metric.metric_name == "absence_of_cueing"
         assert metric.question_id is not None
         assert metric.score in (0.0, 100.0)
+
+
+def _grammar_only_config(sample_config):
+    from dataclasses import replace
+
+    return replace(
+        sample_config,
+        runs=1,
+        metrics=[
+            MetricConfig(
+                name="grammatical_correctness",
+                version="2.0",
+                evaluators=["mock_eval"],
+                parameters={},
+                enabled=True,
+            )
+        ],
+    )
+
+
+def test_runner_produces_one_grammar_result_per_question(
+    registered_metrics, mock_llm_provider, sample_config, sample_quiz
+):
+    """Grammar is now scored per item, so one broken item can no longer hide in a quiz mean."""
+    results = BenchmarkRunner(_grammar_only_config(sample_config)).run(
+        quizzes=[sample_quiz], source_texts={}
+    )
+
+    metrics = results[0].metrics
+    assert len(metrics) == len(sample_quiz.questions)
+    assert {m.question_id for m in metrics} == {"q1", "q2"}
+    for metric in metrics:
+        assert metric.metric_name == "grammatical_correctness"
+        assert metric.question_id is not None
+        assert metric.score in (0.0, 33.3, 66.7, 100.0)
+
+    # No language instruction -> no compliance call, nothing to record.
+    assert results[0].metadata["adjusted_grammar"] is None
+
+
+def test_runner_language_compliance_does_not_touch_item_scores(
+    registered_metrics, mock_llm_provider, sample_config, sample_quiz, tmp_path
+):
+    """A language mismatch is an instruction failure, not a grammar defect."""
+    import json as _json
+    from dataclasses import replace
+
+    instructions_dir = tmp_path / "instructions"
+    instructions_dir.mkdir(parents=True, exist_ok=True)
+    (instructions_dir / "intent.json").write_text(_json.dumps({"language": "German"}))
+
+    config = _grammar_only_config(sample_config)
+    config = replace(
+        config,
+        input_output=replace(
+            config.input_output, instructions_directory=str(instructions_dir)
+        ),
+    )
+    quiz = replace(sample_quiz, instructions="intent.json")
+
+    results = BenchmarkRunner(config).run(quizzes=[quiz], source_texts={})
+    metrics = results[0].metrics
+
+    # Per-question rows stay pure grammar...
+    assert len(metrics) == len(quiz.questions)
+    for metric in metrics:
+        assert metric.score in (0.0, 33.3, 66.7, 100.0)
+    # ...and the compliance verdict is recorded once, beside the difficulty one,
+    # computed from those same rows (the mock returns a zero adjustment, so the
+    # value must be exactly their mean -- proving the aggregation path ran).
+    expected_mean = round(sum(m.score for m in metrics) / len(metrics), 1)
+    assert results[0].metadata["adjusted_grammar"] == expected_mean

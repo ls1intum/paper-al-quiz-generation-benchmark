@@ -21,6 +21,7 @@ from src.metrics.accuracy import FactualAccuracyMetric
 from src.metrics.answer_key_correctness import AnswerKeyCorrectnessMetric
 from src.metrics.objective_alignment import ObjectiveAlignmentMetric
 from src.metrics.absence_of_cueing import AbsenceOfCueingMetric
+from src.metrics.grammatic import GrammaticalCorrectnessMetric
 from src.models.config import BenchmarkConfig, EvaluatorConfig, InputOutputConfig, MetricConfig
 from src.models.quiz import Quiz, QuizQuestion, QuestionType
 
@@ -34,7 +35,8 @@ class MockLLMProvider(LLMProvider):
       - score:   prompt contains '"final_score"'
     The answer_key_correctness judge phase is detected by '"key_correct"',
     the objective_alignment judge phase by '"alignment_level"', and the
-    absence_of_cueing judge phase by '"cue_present"'. The two
+    the absence_of_cueing judge phase by '"cue_present"', and the
+    grammatical_correctness judge phase by '"grammar_issues"'. The two
     homogeneous_options fan-out phases echo back the prompt's question id.
     All other calls fall back to a deterministic hash-based score.
     """
@@ -103,6 +105,16 @@ class MockLLMProvider(LLMProvider):
             "matched_objective_aspects": ["mock aspect"],
             "missing_or_misaligned_aspects": [],
             "rationale": "Mock alignment verdict",
+        }
+
+    @staticmethod
+    def _grammar_response() -> Dict[str, Any]:
+        return {
+            "severity": "none",
+            "grammar_issues": [],
+            "spelling_issues": [],
+            "punctuation_issues": [],
+            "rationale": "Mock grammar verdict",
         }
 
     @staticmethod
@@ -181,6 +193,9 @@ class MockLLMProvider(LLMProvider):
         if '"cue_present"' in prompt:
             return json.dumps(self._cueing_response())
 
+        if '"grammar_issues"' in prompt:
+            return json.dumps(self._grammar_response())
+
         if '"dominant_grammatical_pattern"' in prompt:
             return json.dumps(self._homogeneous_analyze_response(prompt))
 
@@ -220,6 +235,9 @@ class MockLLMProvider(LLMProvider):
         if '"cue_present"' in prompt:
             return self._cueing_response()
 
+        if '"grammar_issues"' in prompt:
+            return self._grammar_response()
+
         if '"dominant_grammatical_pattern"' in prompt:
             return self._homogeneous_analyze_response(prompt)
 
@@ -249,6 +267,7 @@ def registered_metrics() -> Iterable[str]:
     MetricRegistry.register(AnswerKeyCorrectnessMetric)
     MetricRegistry.register(ObjectiveAlignmentMetric)
     MetricRegistry.register(AbsenceOfCueingMetric)
+    MetricRegistry.register(GrammaticalCorrectnessMetric)
     yield MetricRegistry.list_metrics()
     MetricRegistry.clear()
 

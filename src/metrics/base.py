@@ -159,15 +159,19 @@ class BaseMetric(ABC):
         """Return True if any instruction field is relevant to this metric.
 
         Structured fields are coupled to specific metrics:
-          language       → grammatical_correctness
-          difficulty     → difficulty
           question_types → clarity
           custom_prompt  → coverage only (topic/content focus is not relevant
                            to grammar, difficulty, or clarity metrics)
+
+        Two compliance checks are deliberately absent here because their metrics
+        score one question at a time: firing a per-question adjustment to answer
+        a question about the whole quiz would cost one call per item and could
+        reach different verdicts for items in the same quiz. The runner checks
+        both once per quiz instead, over the aggregated per-question scores --
+        `difficulty` against its requested band, and `language` through
+        adjust_score_for_custom_prompt.
         """
         if instructions.custom_prompt and self.name == "coverage":
-            return True
-        if instructions.language and self.name == "grammatical_correctness":
             return True
         if instructions.question_types and self.name == "clarity":
             return True

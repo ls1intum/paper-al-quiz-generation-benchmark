@@ -24,6 +24,7 @@ from src.metrics.absence_of_cueing import (
     AbsenceOfCueingMetric,
     analyze_length_signal,
 )
+from src.metrics.grammatic import GrammaticalCorrectnessMetric
 from src.models.quiz import QuizQuestion, QuestionType, Quiz
 from src.models.result import EvaluationResult
 from tests.conftest import MockLLMProvider
@@ -1105,3 +1106,123 @@ def test_cueing_raw_response_carries_diagnostics():
         "score",
     ):
         assert f'"{field}"' in result.raw_response
+
+
+# ── grammatical_correctness ──────────────────────────────────────────────── #
+
+
+def _judge_grammar(severity, **overrides) -> dict:
+    return {
+        "severity": severity,
+        "grammar_issues": overrides.get("grammar", []),
+        "spelling_issues": overrides.get("spelling", []),
+        "punctuation_issues": overrides.get("punctuation", []),
+        "rationale": overrides.get("rationale", "mock rationale"),
+    }
+
+
+def _evaluate_grammar(question, judge_response, **params) -> tuple:
+    metric = GrammaticalCorrectnessMetric()
+    mock_llm = MockLLMProvider(model="mock-model", responses=[judge_response])
+    result = metric.evaluate(question=question, llm_client=mock_llm, **params)
+    return result, json.loads(result.raw_response)
+
+
+def test_grammar_is_question_level():
+    """The whole point of the conversion: one score per item, not per quiz."""
+    from src.metrics.base import MetricScope
+
+    assert GrammaticalCorrectnessMetric().scope == MetricScope.QUESTION_LEVEL
+
+
+def test_grammar_prompt_requires_question():
+    metric = GrammaticalCorrectnessMetric()
+    inp = make_phase_input(metric, "judge")
+    with pytest.raises(ValueError, match="requires a question"):
+        inp.prompt_builder(inp)
+
+
+def test_grammar_prompt_includes_stem_options_and_key():
+    metric = GrammaticalCorrectnessMetric()
+    question = make_question()
+    inp = make_phase_input(metric, "judge", question=question)
+    prompt = inp.prompt_builder(inp)
+
+    assert question.question_text in prompt
+    for option in question.options:
+        assert option in prompt
+    assert "Marked Correct Answer: 4" in prompt
+
+
+def test_grammar_prompt_excludes_other_questions():
+    """A per-item prompt must not carry its neighbours along."""
+    metric = GrammaticalCorrectnessMetric()
+    other = QuizQuestion(
+        question_id="q2",
+        question_type=QuestionType.TRUE_FALSE,
+        question_text="Python is a snake.",
+        options=["True", "False"],
+        correct_answer="True",
+    )
+    quiz = Quiz(
+        quiz_id="quiz_1",
+        title="Test Quiz",
+        source_material="source.md",
+        questions=[make_question(), other],
+    )
+    inp = make_phase_input(metric, "judge", question=make_question(), quiz=quiz)
+    prompt = inp.prompt_builder(inp)
+
+    assert make_question().question_text in prompt
+    assert other.question_text not in prompt
+
+
+@pytest.mark.parametrize(
+    "severity,expected_score",
+    [("none", 100.0), ("minor", 66.7), ("major", 33.3), ("critical", 0.0)],
+)
+def test_grammar_severity_determines_score(severity, expected_score):
+    """The score is derived from the severity, never supplied by the judge."""
+    result, data = _evaluate_grammar(make_question(), _judge_grammar(severity))
+
+    assert result.score == expected_score
+    assert data["severity"] == severity
+
+
+def test_grammar_issue_lists_survive_into_raw_response():
+    result, data = _evaluate_grammar(
+        make_question(),
+        _judge_grammar(
+            "major",
+            grammar=["subject-verb disagreement in option 2"],
+            spelling=["'recieve' in the stem"],
+            punctuation=["missing terminal period"],
+        ),
+    )
+
+    assert data["grammar_issues"] == ["subject-verb disagreement in option 2"]
+    assert data["spelling_issues"] == ["'recieve' in the stem"]
+    assert data["punctuation_issues"] == ["missing terminal period"]
+    for field in ("severity", "rationale", "score"):
+        assert f'"{field}"' in result.raw_response
+
+
+def test_grammar_language_parameter_reaches_the_prompt():
+    metric = GrammaticalCorrectnessMetric()
+    inp = make_phase_input(metric, "judge", question=make_question(), params={"language": "German"})
+
+    assert "Language: German" in inp.prompt_builder(inp)
+
+
+def test_grammar_language_defaults_to_english():
+    metric = GrammaticalCorrectnessMetric()
+    inp = make_phase_input(metric, "judge", question=make_question())
+
+    assert "Language: English" in inp.prompt_builder(inp)
+
+
+def test_grammar_rejects_the_removed_error_weights_parameter():
+    """error_weights guided a continuous deduction; the severity levels replaced it."""
+    metric = GrammaticalCorrectnessMetric()
+    with pytest.raises(ValueError, match="Unknown parameter"):
+        metric.validate_params(error_weights={"critical": 1.0})
