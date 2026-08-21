@@ -25,6 +25,7 @@ from src.metrics.absence_of_cueing import (
     analyze_length_signal,
 )
 from src.metrics.grammatic import GrammaticalCorrectnessMetric
+from src.metrics.cognitive_level import CognitiveLevelMetric, get_bloom_intended, MATCH_SCORES
 from src.models.quiz import QuizQuestion, QuestionType, Quiz
 from src.models.result import EvaluationResult
 from tests.conftest import MockLLMProvider
@@ -58,7 +59,7 @@ def make_phase_input(metric, phase_name, **kwargs) -> PhaseInput:
 
 
 @pytest.mark.parametrize("score", [42.0, 88.0, 85.5])
-@pytest.mark.parametrize("metric_cls", [DifficultyMetric, ClarityMetric, DistractorQualityMetric, FactualAccuracyMetric])
+@pytest.mark.parametrize("metric_cls", [DifficultyMetric, FactualAccuracyMetric])
 def test_simple_metric_parse_score_success(metric_cls, score):
     """Single-stage metrics should parse a PhaseOutput with a valid score."""
     metric = metric_cls()
@@ -67,7 +68,7 @@ def test_simple_metric_parse_score_success(metric_cls, score):
 
 
 @pytest.mark.parametrize("score", [-1, 101])
-@pytest.mark.parametrize("metric_cls", [DifficultyMetric, ClarityMetric, DistractorQualityMetric, FactualAccuracyMetric])
+@pytest.mark.parametrize("metric_cls", [DifficultyMetric, FactualAccuracyMetric])
 def test_simple_metric_parse_score_failure(metric_cls, score):
     """Single-stage metrics should reject out-of-range scores."""
     metric = metric_cls()
@@ -105,7 +106,7 @@ def test_difficulty_param_validation():
 def test_clarity_phase_requires_question():
     """Clarity prompt builder should raise ValueError when question is missing."""
     metric = ClarityMetric()
-    inp = make_phase_input(metric, "score")
+    inp = make_phase_input(metric, "judge")
     with pytest.raises(ValueError, match="requires a question"):
         inp.prompt_builder(inp)
 
@@ -113,10 +114,36 @@ def test_clarity_phase_requires_question():
 def test_clarity_phase_builds_prompt():
     """Clarity prompt builder should return a non-empty string."""
     metric = ClarityMetric()
-    inp = make_phase_input(metric, "score", question=make_question())
+    inp = make_phase_input(metric, "judge", question=make_question())
     prompt = inp.prompt_builder(inp)
     assert isinstance(prompt, str)
     assert len(prompt) > 0
+    assert "Negative Phrasing" in prompt  # P2-3: negation check
+
+
+def test_clarity_finalize_maps_verdicts():
+    """Each clarity verdict maps to the correct score."""
+    from src.metrics.clarity import CLARITY_SCORES, ClarityMetric as _CM
+    metric = _CM()
+    for level, expected_score in CLARITY_SCORES.items():
+        inp = PhaseInput(
+            prompt_builder=None,
+            question=make_question(),
+            accumulated={
+                "judge": PhaseOutput(
+                    phase_name="judge",
+                    data={
+                        "clarity_level": level,
+                        "question_clarity_issues": [],
+                        "option_clarity_issues": [],
+                        "contains_negation": False,
+                        "rationale": "test",
+                    },
+                )
+            },
+        )
+        result = metric.phases[-1].process(inp, llm_client=None)
+        assert result["score"] == expected_score
 
 
 def test_coverage_parse_score_success():
@@ -273,12 +300,16 @@ def test_distractor_quality_analyze_phase_requires_question():
     with pytest.raises(ValueError, match="distractor_quality analyze phase requires a question"):
         inp.prompt_builder(inp)
 
-def test_distractor_quality_analyze_phase_requires_source_text():
-    """Distractor quality analyze prompt builder should raise ValueError when source_text is missing."""
+
+def test_distractor_quality_analyze_phase_source_optional():
+    """P0-2b: analyze phase no longer raises when source_text is None."""
     metric = DistractorQualityMetric()
     inp = make_phase_input(metric, "analyze", question=make_question())
-    with pytest.raises(ValueError, match="distractor_quality analyze phase requires source_text"):
-        inp.prompt_builder(inp)
+    prompt = inp.prompt_builder(inp)
+    assert isinstance(prompt, str)
+    assert "Source Material:" not in prompt
+    assert "KNOWLEDGE ALIGNMENT" in prompt
+
 
 def test_distractor_quality_analyze_phase_builds_prompt():
     """Distractor quality analyze prompt builder should return a non-empty string."""
@@ -287,17 +318,20 @@ def test_distractor_quality_analyze_phase_builds_prompt():
     prompt = inp.prompt_builder(inp)
     assert isinstance(prompt, str)
     assert len(prompt) > 0
+    assert "Source Material:" in prompt
+    assert "SOURCE ALIGNMENT" in prompt
 
-def test_distractor_quality_score_phase_requires_analyze_output():
-    """Distractor quality score prompt builder should raise ValueError when analyze output is missing."""
+
+def test_distractor_quality_judge_phase_requires_analyze_output():
+    """Distractor quality judge prompt builder should raise ValueError when analyze output is missing."""
     metric = DistractorQualityMetric()
-    # Missing 'accumulated' entirely
-    inp = make_phase_input(metric, "score")
+    inp = make_phase_input(metric, "judge")
     with pytest.raises(ValueError, match="requires 'analyze' phase output in accumulated"):
         inp.prompt_builder(inp)
 
-def test_distractor_quality_score_phase_builds_prompt():
-    """Distractor quality score prompt builder should return a non-empty string."""
+
+def test_distractor_quality_judge_phase_builds_prompt():
+    """Distractor quality judge prompt builder should return a non-empty string."""
     metric = DistractorQualityMetric()
     analyze_output = PhaseOutput(
         phase_name="analyze",
@@ -307,16 +341,40 @@ def test_distractor_quality_score_phase_builds_prompt():
             "discrimination_analysis": "test",
             "collective_analysis": "test",
             "difficulty_calibration": "test",
+            "source_grounded": True,
         }
     )
     inp = make_phase_input(
         metric,
-        "score",
+        "judge",
         accumulated={"analyze": analyze_output}
     )
     prompt = inp.prompt_builder(inp)
     assert isinstance(prompt, str)
     assert len(prompt) > 0
+
+
+def test_distractor_quality_finalize_maps_verdicts():
+    """Each distractor quality verdict maps to the correct score."""
+    from src.metrics.distractor import QUALITY_SCORES
+    metric = DistractorQualityMetric()
+    for level, expected_score in QUALITY_SCORES.items():
+        inp = PhaseInput(
+            prompt_builder=None,
+            question=make_question(),
+            accumulated={
+                "judge": PhaseOutput(
+                    phase_name="judge",
+                    data={
+                        "quality_level": level,
+                        "deduction_summary": "test",
+                        "rationale": "test",
+                    },
+                )
+            },
+        )
+        result = metric.phases[-1].process(inp, llm_client=None)
+        assert result["score"] == expected_score
 def test_homogeneous_options_parse_score_success():
     """HomogeneousOptionsMetric should extract score from aggregate output."""
     metric = HomogeneousOptionsMetric()
@@ -454,11 +512,7 @@ def test_homogeneous_options_aggregate_phase_computes_result():
                     {
                         "question_id": "q1",
                         "applicable": True,
-                        "grammatical_parallelism_score": 90.0,
-                        "content_type_homogeneity_score": 80.0,
-                        "format_consistency_score": 100.0,
-                        "question_score": 87.5,
-                        "severity": "none",
+                        "homogeneity_level": "good",
                         "issues": [],
                         "rationale": "parallel numeric values",
                     }
@@ -468,7 +522,7 @@ def test_homogeneous_options_aggregate_phase_computes_result():
     }
     inp = PhaseInput(prompt_builder=None, quiz=make_quiz(), accumulated=accumulated)
     result = metric.phases[-1].process(inp, llm_client=None)
-    assert result["score"] == 87.5
+    assert result["score"] == 66.7
     assert result["num_questions_applicable"] == 1
     assert "Aggregated 1 applicable questions" in result["aggregation_reasoning"]
 
@@ -512,11 +566,7 @@ def test_homogeneous_options_evaluate_end_to_end():
             {
                 "question_id": "q1",
                 "applicable": True,
-                "grammatical_parallelism_score": 95.0,
-                "content_type_homogeneity_score": 95.0,
-                "format_consistency_score": 100.0,
-                "question_score": 95.5,
-                "severity": "none",
+                "homogeneity_level": "excellent",
                 "issues": [],
                 "rationale": "All options are parallel.",
             },
@@ -524,8 +574,8 @@ def test_homogeneous_options_evaluate_end_to_end():
     )
 
     result = metric.evaluate(quiz=make_quiz(), llm_client=mock_llm)
-    assert result.score == 95.5
-    assert '"score": 95.5' in result.raw_response
+    assert result.score == 100.0
+    assert '"score": 100.0' in result.raw_response
 
 
 # ── answer_key_correctness ───────────────────────────────────────────────── #
@@ -863,15 +913,11 @@ def _homogeneity_result(*entries) -> EvaluationResult:
     )
 
 
-def _question_score(question_id="q1", applicable=True, score=87.5, severity="none", issues=None):
+def _question_score(question_id="q1", applicable=True, score=66.7, homogeneity_level="good", issues=None):
     return {
         "question_id": question_id,
         "applicable": applicable,
-        "grammatical_parallelism_score": 90.0,
-        "content_type_homogeneity_score": 85.0,
-        "format_consistency_score": 95.0,
-        "question_score": score,
-        "severity": severity,
+        "homogeneity_level": homogeneity_level,
         "issues": issues if issues is not None else [],
         "rationale": "mock rationale",
     }
@@ -887,22 +933,22 @@ def test_homogeneous_options_expands_one_row_per_question():
     metric = HomogeneousOptionsMetric()
     rows = metric.expand_question_results(
         _homogeneity_result(
-            _question_score("q1", score=87.5),
-            _question_score("q2", score=62.0, severity="minor", issues=["length_outlier"]),
+            _question_score("q1", homogeneity_level="good"),
+            _question_score("q2", homogeneity_level="fair", issues=["length_outlier"]),
         )
     )
 
-    assert [(qid, score) for qid, score, _ in rows] == [("q1", 87.5), ("q2", 62.0)]
+    assert [(qid, score) for qid, score, _ in rows] == [("q1", 66.7), ("q2", 33.3)]
 
 
 def test_homogeneous_options_expanded_raw_response_carries_diagnostics():
     metric = HomogeneousOptionsMetric()
     rows = metric.expand_question_results(
-        _homogeneity_result(_question_score("q1", severity="minor", issues=["length_outlier"]))
+        _homogeneity_result(_question_score("q1", homogeneity_level="good", issues=["length_outlier"]))
     )
 
     data = json.loads(rows[0][2])
-    assert data["severity"] == "minor"
+    assert data["homogeneity_level"] == "good"
     assert data["issues"] == ["length_outlier"]
     assert data["rationale"] == "mock rationale"
     assert data["applicable"] is True
@@ -913,7 +959,7 @@ def test_homogeneous_options_expands_not_applicable_questions():
     metric = HomogeneousOptionsMetric()
     rows = metric.expand_question_results(
         _homogeneity_result(
-            _question_score("q_tf", applicable=False, score=100.0, issues=["not_applicable"])
+            _question_score("q_tf", applicable=False, homogeneity_level="excellent", issues=["not_applicable"])
         )
     )
 
@@ -1226,3 +1272,142 @@ def test_grammar_rejects_the_removed_error_weights_parameter():
     metric = GrammaticalCorrectnessMetric()
     with pytest.raises(ValueError, match="Unknown parameter"):
         metric.validate_params(error_weights={"critical": 1.0})
+
+
+# ── cognitive_level ──────────────────────────────────────────────────────── #
+
+
+def _make_question_with_bloom(bloom_intended=None) -> QuizQuestion:
+    metadata = {}
+    if bloom_intended is not None:
+        metadata["bloom_intended"] = bloom_intended
+    return QuizQuestion(
+        question_id="q_bloom",
+        question_type=QuestionType.SINGLE_CHOICE,
+        question_text="What is polymorphism?",
+        options=["A", "B", "C", "D"],
+        correct_answer="A",
+        metadata=metadata,
+    )
+
+
+def test_cognitive_level_prompt_requires_question():
+    metric = CognitiveLevelMetric()
+    inp = make_phase_input(metric, "judge")
+    with pytest.raises(ValueError, match="requires a question"):
+        inp.prompt_builder(inp)
+
+
+def test_cognitive_level_prompt_builds():
+    metric = CognitiveLevelMetric()
+    inp = make_phase_input(metric, "judge", question=_make_question_with_bloom("APPLY"))
+    prompt = inp.prompt_builder(inp)
+    assert "REMEMBER" in prompt
+    assert "CREATE" in prompt
+    # Must NOT show the intended level (avoid anchoring)
+    assert "APPLY" not in prompt or "APPLY:" in prompt  # APPLY appears in level list, not as intended
+
+
+def test_cognitive_level_finalize_matches():
+    metric = CognitiveLevelMetric()
+    question = _make_question_with_bloom("UNDERSTAND")
+    inp = PhaseInput(
+        prompt_builder=None,
+        question=question,
+        accumulated={
+            "judge": PhaseOutput(
+                phase_name="judge",
+                data={"assigned_level": "UNDERSTAND", "rationale": "test"},
+            )
+        },
+    )
+    result = metric.phases[-1].process(inp, llm_client=None)
+    assert result["match"] == "matches"
+    assert result["score"] == 100.0
+    assert result["applicable"] is True
+
+
+def test_cognitive_level_finalize_below():
+    metric = CognitiveLevelMetric()
+    question = _make_question_with_bloom("ANALYZE")
+    inp = PhaseInput(
+        prompt_builder=None,
+        question=question,
+        accumulated={
+            "judge": PhaseOutput(
+                phase_name="judge",
+                data={"assigned_level": "REMEMBER", "rationale": "test"},
+            )
+        },
+    )
+    result = metric.phases[-1].process(inp, llm_client=None)
+    assert result["match"] == "below"
+    assert result["score"] == 0.0
+
+
+def test_cognitive_level_finalize_above():
+    metric = CognitiveLevelMetric()
+    question = _make_question_with_bloom("UNDERSTAND")
+    inp = PhaseInput(
+        prompt_builder=None,
+        question=question,
+        accumulated={
+            "judge": PhaseOutput(
+                phase_name="judge",
+                data={"assigned_level": "EVALUATE", "rationale": "test"},
+            )
+        },
+    )
+    result = metric.phases[-1].process(inp, llm_client=None)
+    assert result["match"] == "above"
+    assert result["score"] == 66.7
+
+
+def test_cognitive_level_finalize_not_applicable():
+    """Items without bloom_intended → applicable=False."""
+    metric = CognitiveLevelMetric()
+    question = _make_question_with_bloom()  # no bloom_intended
+    inp = PhaseInput(
+        prompt_builder=None,
+        question=question,
+        accumulated={
+            "judge": PhaseOutput(
+                phase_name="judge",
+                data={"assigned_level": "APPLY", "rationale": "test"},
+            )
+        },
+    )
+    result = metric.phases[-1].process(inp, llm_client=None)
+    assert result["applicable"] is False
+    assert result["match"] == "not_applicable"
+    assert result["score"] == 100.0
+
+
+def test_get_bloom_intended_normalizes():
+    q = _make_question_with_bloom("apply")
+    assert get_bloom_intended(q) == "APPLY"
+
+
+def test_get_bloom_intended_rejects_invalid():
+    q = _make_question_with_bloom("INVENT")
+    assert get_bloom_intended(q) is None
+
+
+# ── accuracy source guard (P2-2) ────────────────────────────────────────── #
+
+
+def test_accuracy_source_none_does_not_inject_literal_none():
+    """P2-2: source_text=None must not render as 'Source Material: None'."""
+    metric = FactualAccuracyMetric()
+    inp = make_phase_input(metric, "score", question=make_question())
+    prompt = inp.prompt_builder(inp)
+    assert "Source Material: None" not in prompt
+    assert "expert knowledge" in prompt
+
+
+def test_accuracy_source_present_includes_material():
+    metric = FactualAccuracyMetric()
+    inp = make_phase_input(metric, "score", question=make_question(), source_text="Some content")
+    prompt = inp.prompt_builder(inp)
+    assert "Source Material:" in prompt
+    assert "Some content" in prompt

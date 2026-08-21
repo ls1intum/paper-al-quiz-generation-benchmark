@@ -1,5 +1,6 @@
 """Results aggregation module."""
 
+import json
 import statistics
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, TypedDict, Union
@@ -12,6 +13,7 @@ from ..models.result import (
     AggregatedResults,
     BenchmarkResult,
     MetricAggregation,
+    MetricResult,
 )
 
 
@@ -21,8 +23,22 @@ class CeilingEffectResult(TypedDict):
     rater_std_devs: List[float]
 
 
+_METRICS_WITH_APPLICABLE = {"objective_alignment", "homogeneous_options", "cognitive_level"}
+
+
 class ResultsAggregator:
     """Aggregates benchmark results across multiple runs."""
+
+    @staticmethod
+    def _is_applicable(result: MetricResult) -> bool:
+        """Check whether a MetricResult is applicable (should be included in aggregation)."""
+        if result.metric_name not in _METRICS_WITH_APPLICABLE:
+            return True
+        try:
+            data = json.loads(result.raw_response)
+            return data.get("applicable", True)
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            return True
 
     @staticmethod
     def bootstrap_confidence_interval(
@@ -83,10 +99,13 @@ class ResultsAggregator:
         total_runs = len(set(r.run_number for r in results))
 
         # Group metric results by (metric_name, evaluator_model, quiz_id, question_id)
+        # P1-3: exclude inapplicable items so they don't inflate means
         grouped_scores: Dict[tuple, List[float]] = defaultdict(list)
 
         for result in results:
             for metric in result.metrics:
+                if not ResultsAggregator._is_applicable(metric):
+                    continue
                 key = (
                     metric.metric_name,
                     metric.evaluator_model,

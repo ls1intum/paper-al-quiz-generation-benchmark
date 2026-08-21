@@ -11,6 +11,14 @@ from .base import BaseMetric, MetricScope
 from .phase import Phase, PhaseInput, PhaseOutput
 
 
+HOMOGENEITY_SCORES = {
+    "excellent": 100.0,
+    "good": 66.7,
+    "fair": 33.3,
+    "poor": 0.0,
+}
+
+
 class OptionAnalysis(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -41,11 +49,7 @@ class QuestionHomogeneityScoreResponse(BaseModel):
 
     question_id: str
     applicable: bool
-    grammatical_parallelism_score: float = Field(ge=0, le=100)
-    content_type_homogeneity_score: float = Field(ge=0, le=100)
-    format_consistency_score: float = Field(ge=0, le=100)
-    question_score: float = Field(ge=0, le=100)
-    severity: str
+    homogeneity_level: str = "excellent"
     issues: List[str] = Field(default_factory=list)
     rationale: str
 
@@ -63,7 +67,7 @@ class QuestionScoreSummary(BaseModel):
     question_id: str
     applicable: bool
     score: float = Field(ge=0, le=100)
-    severity: str
+    homogeneity_level: str
 
 
 class AggregateHomogeneityResponse(BaseModel):
@@ -91,7 +95,7 @@ class HomogeneousOptionsMetric(BaseMetric):
 
     @property
     def version(self) -> str:
-        return "1.0"
+        return "2.0"
 
     @property
     def scope(self) -> MetricScope:
@@ -189,37 +193,33 @@ Question: {inp.question.question_text}
 Structured Analysis:
 {analysis}
 
-Scoring rubric:
-- grammatical_parallelism_score: Are all options parallel in grammatical form?
-- content_type_homogeneity_score: Are all options the same kind of thing?
-- format_consistency_score: Are there avoidable formatting, punctuation, or length inconsistencies?
+**Verdict definitions**:
+- "excellent": All options share the same grammatical form and content type.
+               No formatting, punctuation, or length inconsistencies. Perfect parallelism.
+- "good":      Minor inconsistencies in one dimension (e.g., slight length variation),
+               but overall structure is parallel and professional.
+- "fair":      Noticeable heterogeneity — mixed grammatical forms or content types,
+               but options are still classifiable and not misleading.
+- "poor":      Severe heterogeneity — options mix fundamentally different structures
+               (e.g., code with prose, single words with full sentences).
 
-Weighting:
-question_score = 0.45 * grammatical_parallelism_score
-               + 0.45 * content_type_homogeneity_score
-               + 0.10 * format_consistency_score
-
-Severity:
-- none: question_score >= 85
-- minor: 60 <= question_score < 85
-- major: question_score < 60
+Evaluate across these three dimensions, then pick the verdict that best fits:
+- Grammatical parallelism: Are all options parallel in grammatical form?
+- Content type homogeneity: Are all options the same kind of thing?
+- Format consistency: Are there avoidable formatting, punctuation, or length inconsistencies?
 
 Issue labels should be short machine-readable strings such as:
 mixed_sentence_and_phrase, mixed_code_and_prose, mixed_definition_and_example,
 mixed_numeric_and_textual, length_outlier, punctuation_outlier, not_applicable.
 
-If the question is not applicable, return applicable=false, set all sub-scores and question_score to 100,
-severity to "none", and include "not_applicable" in issues.
+If the question is not applicable, return applicable=false, homogeneity_level="excellent",
+and include "not_applicable" in issues.
 
 Respond with ONLY a JSON object in this format:
 {{
   "question_id": "{inp.question.question_id}",
   "applicable": true,
-  "grammatical_parallelism_score": 90,
-  "content_type_homogeneity_score": 85,
-  "format_consistency_score": 95,
-  "question_score": 89.0,
-  "severity": "none",
+  "homogeneity_level": "excellent" | "good" | "fair" | "poor",
   "issues": ["length_outlier"],
   "rationale": "brief explanation"
 }}"""
@@ -238,7 +238,12 @@ Respond with ONLY a JSON object in this format:
 
         total_questions = inp.quiz.num_questions
         applicable_results = [r for r in results if r.get("applicable")]
-        applicable_scores = [float(r["question_score"]) for r in applicable_results]
+
+        # Map verdict to score for each applicable question
+        applicable_scores = [
+            HOMOGENEITY_SCORES.get(r.get("homogeneity_level", "excellent"), 100.0)
+            for r in applicable_results
+        ]
 
         num_applicable = len(applicable_results)
         num_excluded = total_questions - num_applicable
@@ -247,12 +252,12 @@ Respond with ONLY a JSON object in this format:
         )
         median_question_score = median(applicable_scores) if applicable_scores else 100.0
         major_violation_rate = (
-            sum(1 for r in applicable_results if r.get("severity") == "major") / num_applicable
+            sum(1 for s in applicable_scores if s <= 33.3) / num_applicable
             if applicable_results
             else 0.0
         )
         perfect_homogeneity_rate = (
-            sum(1 for r in applicable_results if float(r.get("question_score", 0)) >= 95)
+            sum(1 for s in applicable_scores if s >= 95)
             / num_applicable
             if applicable_results
             else 0.0
@@ -266,8 +271,8 @@ Respond with ONLY a JSON object in this format:
             QuestionScoreSummary(
                 question_id=r.get("question_id"),
                 applicable=bool(r.get("applicable")),
-                score=float(r.get("question_score", 100)),
-                severity=str(r.get("severity")),
+                score=HOMOGENEITY_SCORES.get(r.get("homogeneity_level", "excellent"), 100.0),
+                homogeneity_level=r.get("homogeneity_level", "excellent"),
             ).model_dump()
             for r in results
         ]
@@ -301,13 +306,7 @@ Respond with ONLY a JSON object in this format:
         }
 
     def expand_question_results(self, result: EvaluationResult) -> List[Tuple[str, float, str]]:
-        """Hand back the per-question scores this metric already produced.
-
-        The score_question phase judges every question separately; without this
-        the runner would only ever see the quiz-level aggregate. Reads a nested
-        dict, so a missing or malformed phase output yields no rows rather than
-        raising -- the caller falls back to the aggregate.
-        """
+        """Hand back the per-question scores this metric already produced."""
         phases = result.metadata.get("phases", {})
         scoring = phases.get("score_question")
         if not isinstance(scoring, dict):
@@ -320,8 +319,10 @@ Respond with ONLY a JSON object in this format:
             question_id = entry.get("question_id")
             if not question_id:
                 continue
+            level = entry.get("homogeneity_level", "excellent")
+            score = HOMOGENEITY_SCORES.get(level, 100.0)
             rows.append(
-                (str(question_id), float(entry["question_score"]), json.dumps(entry, ensure_ascii=True))
+                (str(question_id), score, json.dumps(entry, ensure_ascii=True))
             )
         return rows
 

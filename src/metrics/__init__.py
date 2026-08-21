@@ -12,6 +12,7 @@ from .accuracy import FactualAccuracyMetric
 from .answer_key_correctness import AnswerKeyCorrectnessMetric
 from .objective_alignment import ObjectiveAlignmentMetric
 from .absence_of_cueing import AbsenceOfCueingMetric
+from .cognitive_level import CognitiveLevelMetric
 
 __all__ = [
     "BaseMetric",
@@ -28,4 +29,5 @@ __all__ = [
     "AnswerKeyCorrectnessMetric",
     "ObjectiveAlignmentMetric",
     "AbsenceOfCueingMetric",
+    "CognitiveLevelMetric",
 ]

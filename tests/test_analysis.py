@@ -357,3 +357,54 @@ def test_detect_ceiling_effect_low_variance():
     ceiling = ResultsAggregator.detect_ceiling_effect(reliability_array)
     assert ceiling["has_ceiling_effect"] is True
     assert 0 in ceiling["affected_rater_indices"]  # First rater flagged
+
+
+# ============================================================================
+# P1-3: Applicable filter
+# ============================================================================
+
+import json
+
+
+def test_aggregate_excludes_inapplicable_items():
+    """P1-3: inapplicable items (applicable=false) must be excluded from means."""
+    applicable_raw = json.dumps({"applicable": True, "alignment_level": "partial", "score": 66.7})
+    inapplicable_raw = json.dumps({"applicable": False, "alignment_level": "not_applicable", "score": 100.0})
+
+    results = [
+        BenchmarkResult(
+            benchmark_id="b1",
+            benchmark_version="1.0",
+            config_hash="hash",
+            quiz_id="quiz_1",
+            run_number=1,
+            metrics=[
+                MetricResult(
+                    metric_name="objective_alignment",
+                    metric_version="1.0",
+                    score=66.7,
+                    evaluator_model="mock",
+                    quiz_id="quiz_1",
+                    question_id="q1",
+                    raw_response=applicable_raw,
+                ),
+                MetricResult(
+                    metric_name="objective_alignment",
+                    metric_version="1.0",
+                    score=100.0,
+                    evaluator_model="mock",
+                    quiz_id="quiz_1",
+                    question_id="q2",
+                    raw_response=inapplicable_raw,
+                ),
+            ],
+            started_at=datetime.now(),
+            completed_at=datetime.now(),
+        )
+    ]
+
+    aggregated = ResultsAggregator.aggregate(results, "test")
+    agg = aggregated.get_aggregation("objective_alignment", "mock")
+    # Only the applicable item (66.7) should contribute to the mean, not the 100.0
+    assert agg is not None
+    assert agg.mean == 66.7

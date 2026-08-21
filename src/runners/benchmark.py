@@ -382,6 +382,7 @@ class BenchmarkRunner:
                 self.logger.info("Running %s with %s...", metric_config.name, evaluator_name)
 
                 if metric.scope == MetricScope.QUESTION_LEVEL:
+                    question_results = []
                     for question in quiz.questions:
                         result = self._evaluate_question(
                             metric,
@@ -392,8 +393,15 @@ class BenchmarkRunner:
                             metric_config.parameters,
                             instructions,
                         )
-                        if result:
-                            metric_results.append(result)
+                        question_results.append(result)
+                    # P0-2a: fail loud if every question failed for this metric
+                    if quiz.questions and all(r is None for r in question_results):
+                        raise RuntimeError(
+                            f"Metric '{metric_config.name}' failed for every question "
+                            f"in quiz '{quiz.quiz_id}' — this indicates a systematic "
+                            f"metric or configuration error, not a transient failure."
+                        )
+                    metric_results.extend(r for r in question_results if r is not None)
                 else:
                     evaluated = self._evaluate_quiz_level(
                         metric,

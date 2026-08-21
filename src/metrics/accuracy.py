@@ -57,7 +57,11 @@ class FactualAccuracyMetric(BaseMetric):
         question = inp.question
         options_text = "\n".join(f"{i}. {option}" for i, option in enumerate(question.options, 1))
 
-        source_context = f"Source Material: {inp.source_text}"
+        source_context = (
+            f"Source Material:\n{inp.source_text}"
+            if inp.source_text
+            else "No source material is available. Evaluate factual accuracy using expert knowledge."
+        )
 
         return f"""Evaluate the factual accuracy of the following quiz question and its answers.
 

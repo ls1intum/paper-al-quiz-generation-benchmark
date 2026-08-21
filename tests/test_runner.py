@@ -173,7 +173,7 @@ def test_runner_expands_homogeneous_options_to_per_question_rows(
     assert all(m.question_id is not None for m in metrics)
     for metric in metrics:
         assert metric.metric_name == "homogeneous_options"
-        assert '"severity"' in metric.raw_response
+        assert '"homogeneity_level"' in metric.raw_response
 
 
 def test_runner_produces_one_cueing_result_per_question(
@@ -276,3 +276,73 @@ def test_runner_language_compliance_does_not_touch_item_scores(
     # value must be exactly their mean -- proving the aggregation path ran).
     expected_mean = round(sum(m.score for m in metrics) / len(metrics), 1)
     assert results[0].metadata["adjusted_grammar"] == expected_mean
+
+
+def test_runner_raises_when_metric_fails_every_question(
+    registered_metrics, mock_llm_provider, sample_config, sample_quiz
+):
+    """P0-2a: if a question-level metric fails for every question, the runner must raise."""
+    from dataclasses import replace
+    from unittest.mock import patch
+
+    config = replace(
+        sample_config,
+        runs=1,
+        metrics=[
+            MetricConfig(
+                name="clarity",
+                version="2.0",
+                evaluators=["mock_eval"],
+                parameters={},
+                enabled=True,
+            )
+        ],
+    )
+    runner = BenchmarkRunner(config)
+
+    # Make the metric's evaluate() always raise
+    with patch.object(
+        runner.metrics["clarity"],
+        "evaluate",
+        side_effect=RuntimeError("boom"),
+    ):
+        with pytest.raises(RuntimeError, match="failed for every question"):
+            runner.run(quizzes=[sample_quiz], source_texts={"quiz_1": "text"})
+
+
+def test_runner_tolerates_partial_question_failure(
+    registered_metrics, mock_llm_provider, sample_config, sample_quiz
+):
+    """If only some questions fail, the runner continues and includes the rest."""
+    from dataclasses import replace
+    from unittest.mock import patch, MagicMock
+
+    config = replace(
+        sample_config,
+        runs=1,
+        metrics=[
+            MetricConfig(
+                name="clarity",
+                version="2.0",
+                evaluators=["mock_eval"],
+                parameters={},
+                enabled=True,
+            )
+        ],
+    )
+    runner = BenchmarkRunner(config)
+
+    original_evaluate = runner.metrics["clarity"].evaluate
+    call_count = [0]
+
+    def fail_first(*args, **kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            raise RuntimeError("boom")
+        return original_evaluate(*args, **kwargs)
+
+    with patch.object(runner.metrics["clarity"], "evaluate", side_effect=fail_first):
+        results = runner.run(quizzes=[sample_quiz], source_texts={"quiz_1": "text"})
+
+    # One question failed, one succeeded
+    assert len(results[0].metrics) == 1
