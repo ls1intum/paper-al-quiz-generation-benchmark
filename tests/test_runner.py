@@ -346,3 +346,21 @@ def test_runner_tolerates_partial_question_failure(
 
     # One question failed, one succeeded
     assert len(results[0].metrics) == 1
+
+
+def test_evaluator_init_failure_raises(monkeypatch, sample_config):
+    """A declared evaluator that cannot be created must abort the run, not be skipped.
+
+    Silently dropping one leaves a sweep with fewer judges than planned, visible only in
+    metadata.json after the calls have been spent -- and two of the four models reported in
+    the paper are locally served.
+    """
+    from src.evaluators.factory import LLMProviderFactory
+    from src.runners.benchmark import BenchmarkRunner
+
+    def boom(cfg):
+        raise ConnectionError("model not served")
+
+    monkeypatch.setattr(LLMProviderFactory, "create", staticmethod(boom))
+    with pytest.raises(RuntimeError, match="Failed to initialize evaluator"):
+        BenchmarkRunner(sample_config)

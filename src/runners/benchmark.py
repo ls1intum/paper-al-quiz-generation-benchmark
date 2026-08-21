@@ -38,11 +38,16 @@ class BenchmarkRunner:
                 self.evaluators[eval_name] = evaluator
                 self.logger.info("Initialized evaluator: %s (%s)", eval_name, eval_config.model)
             except Exception as e:
-                if eval_config.provider == "ollama":
-                    raise RuntimeError(
-                        f"Failed to initialize Ollama evaluator '{eval_name}': {e}"
-                    ) from e
-                self.logger.warning("Failed to initialize evaluator %s: %s", eval_name, e)
+                # Fail loud for every provider, not just ollama. A declared evaluator that is
+                # silently skipped means a sweep completes with fewer judges than planned, and
+                # that only surfaces by reading metadata.json afterwards -- by which point tens
+                # of thousands of calls have been spent. To exclude a model, remove it from the
+                # config; the per-model configs make that trivial.
+                raise RuntimeError(
+                    f"Failed to initialize evaluator '{eval_name}' "
+                    f"(provider={eval_config.provider}, model={eval_config.model}): {e}. "
+                    f"Remove it from the config if the omission is intended."
+                ) from e
 
     def _init_metrics(self) -> None:
         for metric_config in self.config.get_enabled_metrics():
