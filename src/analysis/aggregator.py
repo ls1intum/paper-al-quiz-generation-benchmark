@@ -205,7 +205,7 @@ class ResultsAggregator:
 
         for result in results:
             for metric in result.metrics:
-                if metric.metric_name == metric_name:
+                if metric.metric_name == metric_name and ResultsAggregator._is_applicable(metric):
                     by_evaluator[metric.evaluator_model].append(metric.score)
 
         # Calculate aggregations

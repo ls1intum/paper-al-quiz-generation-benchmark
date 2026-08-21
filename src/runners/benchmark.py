@@ -184,6 +184,7 @@ class BenchmarkRunner:
         evaluator: LLMProvider,
         quiz: Quiz,
         parameters: dict,
+        usage: dict[str, int] | None = None,
     ) -> list[MetricResult]:
         """Split a quiz-level result into per-question rows, when the metric has them.
 
@@ -203,6 +204,7 @@ class BenchmarkRunner:
                     question_id=question_id,
                     parameters=parameters,
                     raw_response=raw_response,
+                    usage=usage,
                 )
                 for question_id, score, raw_response in metric.expand_question_results(result)
             ]
@@ -453,7 +455,12 @@ class BenchmarkRunner:
                         # joining it: sharing one metric_name would pool item
                         # scores with a quiz-level summary in every downstream mean.
                         expanded = self._expand_quiz_result(
-                            metric, evaluation, evaluator, quiz, metric_config.parameters
+                            metric,
+                            evaluation,
+                            evaluator,
+                            quiz,
+                            metric_config.parameters,
+                            usage=result.usage,
                         )
                         metric_results.extend(expanded or [result])
 
