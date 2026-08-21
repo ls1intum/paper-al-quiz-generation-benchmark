@@ -162,10 +162,23 @@ def main() -> int:
         results = runner.run()
         logger.info("Benchmark complete. Generated %s result objects.", len(results))
 
+        # Extract phase details before saving results (avoids duplication)
+        all_phase_details = []
+        for result in results:
+            details = result.metadata.pop("phase_details", [])
+            all_phase_details.extend(details)
+
         # Save individual results
         results_file = run_dir / "results.json"
         logger.info("Saving results to %s...", results_file)
         IOUtils.save_results(results, str(results_file))
+
+        # Save detailed phase data
+        if all_phase_details:
+            detailed_file = run_dir / "detailed_responses.json"
+            with open(detailed_file, "w", encoding="utf-8") as f:
+                json.dump(all_phase_details, f, indent=2)
+            logger.info("Detailed responses saved to %s", detailed_file)
 
         # Token usage
         usage_text = ResultsReporter.usage_summary(results)

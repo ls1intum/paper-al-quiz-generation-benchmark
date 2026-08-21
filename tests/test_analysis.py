@@ -408,3 +408,15 @@ def test_aggregate_excludes_inapplicable_items():
     # Only the applicable item (66.7) should contribute to the mean, not the 100.0
     assert agg is not None
     assert agg.mean == 66.7
+    assert agg.n_applicable == 1
+    assert agg.n_total == 2
+
+
+def test_aggregate_counts_all_applicable_for_normal_metrics():
+    """For metrics not in _METRICS_WITH_APPLICABLE, n_applicable == n_total."""
+    results = [make_result(1, 40.0), make_result(2, 60.0)]
+    aggregated = ResultsAggregator.aggregate(results, "test")
+    agg = aggregated.get_aggregation("difficulty", "mock")
+    assert agg is not None
+    assert agg.n_applicable == 2
+    assert agg.n_total == 2

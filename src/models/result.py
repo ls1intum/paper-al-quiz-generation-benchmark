@@ -128,6 +128,8 @@ class MetricAggregation:
     per_run_scores: List[float]
     ci_lower: float = 0.0
     ci_upper: float = 0.0
+    n_applicable: int = 0
+    n_total: int = 0
     num_runs: int = field(init=False)
 
     def __post_init__(self) -> None:

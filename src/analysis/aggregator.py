@@ -101,11 +101,16 @@ class ResultsAggregator:
         # Group metric results by (metric_name, evaluator_model, quiz_id, question_id)
         # P1-3: exclude inapplicable items so they don't inflate means
         grouped_scores: Dict[tuple, List[float]] = defaultdict(list)
+        total_counts: Dict[tuple, int] = defaultdict(int)
+        applicable_counts: Dict[tuple, int] = defaultdict(int)
 
         for result in results:
             for metric in result.metrics:
+                agg_key = (metric.metric_name, metric.evaluator_model)
+                total_counts[agg_key] += 1
                 if not ResultsAggregator._is_applicable(metric):
                     continue
+                applicable_counts[agg_key] += 1
                 key = (
                     metric.metric_name,
                     metric.evaluator_model,
@@ -138,6 +143,8 @@ class ResultsAggregator:
                 per_run_scores=all_scores,
                 ci_lower=ci_lower,
                 ci_upper=ci_upper,
+                n_applicable=applicable_counts[(metric_name, evaluator_model)],
+                n_total=total_counts[(metric_name, evaluator_model)],
             )
 
         # Calculate inter-rater reliability for each metric

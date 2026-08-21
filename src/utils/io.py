@@ -210,6 +210,13 @@ class IOUtils:
         for result in results:
             metrics_list = []
             for metric in result.metrics:
+                # Parse raw_response from string to dict for clean JSON output
+                raw = metric.raw_response
+                try:
+                    raw = json.loads(raw) if isinstance(raw, str) else raw
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
                 metrics_list.append(
                     {
                         "metric_name": metric.metric_name,
@@ -220,7 +227,8 @@ class IOUtils:
                         "question_id": metric.question_id,
                         "parameters": metric.parameters,
                         "evaluated_at": metric.evaluated_at.isoformat(),
-                        "raw_response": metric.raw_response,
+                        "raw_response": raw,
+                        "usage": metric.usage,
                     }
                 )
 
@@ -272,6 +280,8 @@ class IOUtils:
                 "ci_upper": agg.ci_upper,
                 "per_run_scores": agg.per_run_scores,
                 "num_runs": agg.num_runs,
+                "n_applicable": agg.n_applicable,
+                "n_total": agg.n_total,
             }
 
         result_dict = {

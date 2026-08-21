@@ -399,3 +399,23 @@ def test_metric_results_carry_usage_field(
             assert m.usage is not None, f"{m.metric_name} missing usage"
             assert "prompt_tokens" in m.usage
             assert "completion_tokens" in m.usage
+
+
+def test_runner_populates_phase_details_on_metadata(
+    registered_metrics, mock_llm_provider, sample_config, sample_quiz
+):
+    """BenchmarkResult.metadata must contain phase_details with phase data for each evaluation."""
+    runner = BenchmarkRunner(sample_config)
+    results = runner.run(quizzes=[sample_quiz], source_texts={"quiz_1": "source text"})
+
+    for result in results:
+        assert "phase_details" in result.metadata
+        details = result.metadata["phase_details"]
+        assert len(details) > 0
+        for entry in details:
+            assert "metric_name" in entry
+            assert "evaluator_model" in entry
+            assert "quiz_id" in entry
+            assert "run_number" in entry
+            assert "phases" in entry
+            assert isinstance(entry["phases"], dict)
