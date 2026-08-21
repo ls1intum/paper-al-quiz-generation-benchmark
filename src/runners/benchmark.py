@@ -154,6 +154,7 @@ class BenchmarkRunner:
         instructions: Optional[QuizInstructions] = None,
     ) -> Optional[Tuple[EvaluationResult, MetricResult]]:
         try:
+            evaluator.reset_usage()
             result = metric.evaluate(
                 quiz=quiz,
                 source_text=source_text,
@@ -161,6 +162,7 @@ class BenchmarkRunner:
                 instructions=instructions,
                 **parameters,
             )
+            usage = evaluator.get_accumulated_usage()
             return result, MetricResult(
                 metric_name=metric.name,
                 metric_version=metric.version,
@@ -170,6 +172,7 @@ class BenchmarkRunner:
                 question_id=None,
                 parameters=parameters,
                 raw_response=result.raw_response,
+                usage=usage,
             )
         except Exception as e:
             self.logger.error("Error evaluating quiz %s: %s", quiz.quiz_id, e)
@@ -219,6 +222,7 @@ class BenchmarkRunner:
         instructions: Optional[QuizInstructions] = None,
     ) -> Optional[MetricResult]:
         try:
+            evaluator.reset_usage()
             result = metric.evaluate(
                 question=question,
                 quiz=quiz,
@@ -227,6 +231,7 @@ class BenchmarkRunner:
                 instructions=instructions,
                 **parameters,
             )
+            usage = evaluator.get_accumulated_usage()
             return MetricResult(
                 metric_name=metric.name,
                 metric_version=metric.version,
@@ -236,6 +241,7 @@ class BenchmarkRunner:
                 question_id=question.question_id,
                 parameters=parameters,
                 raw_response=result.raw_response,
+                usage=usage,
             )
         except Exception as e:
             self.logger.error("Error evaluating question %s: %s", question.question_id, e)

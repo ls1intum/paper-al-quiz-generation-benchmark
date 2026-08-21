@@ -1,5 +1,6 @@
 """Results reporting module."""
 
+from collections import defaultdict
 from typing import Any, Dict, List
 
 from ..models.result import AggregatedResults, BenchmarkResult
@@ -201,6 +202,64 @@ class ResultsReporter:
         lines.append("=" * 70)
 
         return "\n".join(lines)
+
+    @staticmethod
+    def usage_summary(results: List[BenchmarkResult]) -> str:
+        """One-line-per-cell token usage table grouped by evaluator x metric."""
+        buckets: Dict[str, Dict[str, Dict[str, int]]] = defaultdict(
+            lambda: defaultdict(lambda: {"prompt_tokens": 0, "completion_tokens": 0})
+        )
+        for result in results:
+            for m in result.metrics:
+                if m.usage:
+                    b = buckets[m.evaluator_model][m.metric_name]
+                    b["prompt_tokens"] += m.usage.get("prompt_tokens", 0)
+                    b["completion_tokens"] += m.usage.get("completion_tokens", 0)
+
+        if not buckets:
+            return "No token usage data recorded."
+
+        lines = ["", "=" * 80, "TOKEN USAGE SUMMARY", "=" * 80]
+        grand_prompt = grand_completion = 0
+
+        for evaluator in sorted(buckets):
+            lines.append(f"\n  Evaluator: {evaluator}")
+            lines.append(f"    {'Metric':<30} {'Prompt':>10} {'Completion':>12} {'Total':>10}")
+            lines.append("    " + "-" * 66)
+            eval_prompt = eval_completion = 0
+            for metric in sorted(buckets[evaluator]):
+                p = buckets[evaluator][metric]["prompt_tokens"]
+                c = buckets[evaluator][metric]["completion_tokens"]
+                lines.append(f"    {metric:<30} {p:>10,} {c:>12,} {p + c:>10,}")
+                eval_prompt += p
+                eval_completion += c
+            lines.append("    " + "-" * 66)
+            lines.append(
+                f"    {'SUBTOTAL':<30} {eval_prompt:>10,} {eval_completion:>12,} "
+                f"{eval_prompt + eval_completion:>10,}"
+            )
+            grand_prompt += eval_prompt
+            grand_completion += eval_completion
+
+        lines.append(f"\n  {'GRAND TOTAL':<32} {grand_prompt:>10,} {grand_completion:>12,} "
+                      f"{grand_prompt + grand_completion:>10,}")
+        lines.append("=" * 80)
+        return "\n".join(lines)
+
+    @staticmethod
+    def usage_dict(results: List[BenchmarkResult]) -> Dict[str, Any]:
+        """Machine-readable usage breakdown: {evaluator: {metric: {tokens}}}."""
+        buckets: Dict[str, Dict[str, Dict[str, int]]] = defaultdict(
+            lambda: defaultdict(lambda: {"prompt_tokens": 0, "completion_tokens": 0})
+        )
+        for result in results:
+            for m in result.metrics:
+                if m.usage:
+                    b = buckets[m.evaluator_model][m.metric_name]
+                    b["prompt_tokens"] += m.usage.get("prompt_tokens", 0)
+                    b["completion_tokens"] += m.usage.get("completion_tokens", 0)
+        # Convert nested defaultdicts to plain dicts for JSON serialization
+        return {ev: dict(metrics) for ev, metrics in buckets.items()}
 
     @staticmethod
     def export_to_dict(aggregated: AggregatedResults) -> Dict[str, Any]:

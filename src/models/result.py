@@ -30,6 +30,7 @@ class MetricResult:
     parameters: Dict[str, Any] = field(default_factory=dict)
     evaluated_at: datetime = field(default_factory=datetime.now)
     raw_response: Optional[str] = None
+    usage: Optional[Dict[str, int]] = None
 
     def __post_init__(self) -> None:
         """Validate score range."""

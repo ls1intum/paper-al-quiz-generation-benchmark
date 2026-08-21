@@ -364,3 +364,38 @@ def test_evaluator_init_failure_raises(monkeypatch, sample_config):
     monkeypatch.setattr(LLMProviderFactory, "create", staticmethod(boom))
     with pytest.raises(RuntimeError, match="Failed to initialize evaluator"):
         BenchmarkRunner(sample_config)
+
+
+def test_usage_accumulator():
+    """Base accumulator: reset, record, read."""
+    from tests.conftest import MockLLMProvider
+
+    provider = MockLLMProvider(model="test")
+    provider.reset_usage()
+    assert provider.get_accumulated_usage() == {"prompt_tokens": 0, "completion_tokens": 0}
+
+    # Simulate two LLM calls
+    class FakeMsg:
+        usage_metadata = {"input_tokens": 100, "output_tokens": 25}
+
+    provider._record_usage(FakeMsg())
+    provider._record_usage(FakeMsg())
+    usage = provider.get_accumulated_usage()
+    assert usage == {"prompt_tokens": 200, "completion_tokens": 50}
+
+    provider.reset_usage()
+    assert provider.get_accumulated_usage() == {"prompt_tokens": 0, "completion_tokens": 0}
+
+
+def test_metric_results_carry_usage_field(
+    registered_metrics, mock_llm_provider, sample_config, sample_quiz
+):
+    """Every MetricResult must have a usage dict (zeroes from mock, but present)."""
+    runner = BenchmarkRunner(sample_config)
+    results = runner.run(quizzes=[sample_quiz], source_texts={"quiz_1": "source text"})
+
+    for result in results:
+        for m in result.metrics:
+            assert m.usage is not None, f"{m.metric_name} missing usage"
+            assert "prompt_tokens" in m.usage
+            assert "completion_tokens" in m.usage

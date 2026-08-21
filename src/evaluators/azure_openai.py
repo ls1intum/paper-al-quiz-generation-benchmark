@@ -97,6 +97,7 @@ class AzureOpenAIProvider(LLMProvider):
         else:
             response = self.llm.invoke(prompt)
 
+        self._record_usage(response)
         content = response.content
         if isinstance(content, str):
             return content
@@ -125,10 +126,12 @@ class AzureOpenAIProvider(LLMProvider):
                 max_completion_tokens=tokens,
                 **{**self.additional_params, **kwargs},
             )
-            response = llm.with_structured_output(schema).invoke(prompt)
+            result = llm.with_structured_output(schema, include_raw=True).invoke(prompt)
         else:
-            response = self.llm.with_structured_output(schema).invoke(prompt)
+            result = self.llm.with_structured_output(schema, include_raw=True).invoke(prompt)
 
+        self._record_usage(result["raw"])
+        response = result["parsed"]
         if isinstance(response, BaseModel):
             return response.model_dump()
         if isinstance(response, dict):

@@ -167,6 +167,16 @@ def main() -> int:
         logger.info("Saving results to %s...", results_file)
         IOUtils.save_results(results, str(results_file))
 
+        # Token usage
+        usage_text = ResultsReporter.usage_summary(results)
+        logger.info(usage_text)
+        usage_data = ResultsReporter.usage_dict(results)
+        if usage_data:
+            usage_file = run_dir / "usage.json"
+            with open(usage_file, "w", encoding="utf-8") as f:
+                json.dump(usage_data, f, indent=2)
+            logger.info("Usage saved to %s", usage_file)
+
         # Aggregate and save if requested
         if not args.no_aggregate:
             logger.info("Aggregating results...")
