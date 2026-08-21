@@ -42,6 +42,7 @@ def test_load_quiz_and_all_quizzes(tmp_path):
     assert len(quizzes_single) == 1
     assert quizzes_single[0].quiz_id == "quiz_1"
 
+
 def test_load_all_quizzes_skips_invalid(tmp_path):
     quiz_dir = tmp_path / "quizzes"
     quiz_dir.mkdir()
@@ -70,18 +71,22 @@ def test_load_all_quizzes_skips_invalid(tmp_path):
     assert len(quizzes) == 1
     assert quizzes[0].quiz_id == "quiz_valid"
 
+
 def test_load_quiz_file_not_found(tmp_path):
     with pytest.raises(FileNotFoundError):
         IOUtils.load_quiz(str(tmp_path / "nonexistent.json"))
+
 
 def test_load_all_quizzes_directory_not_found(tmp_path):
     with pytest.raises(FileNotFoundError):
         IOUtils.load_all_quizzes(str(tmp_path / "nonexistent"))
 
+
 def test_load_source_text_markdown(tmp_path):
     source_path = tmp_path / "source.md"
     source_path.write_text("hello")
     assert IOUtils.load_source_text(str(source_path)) == "hello"
+
 
 def test_load_source_text_unsupported_format(tmp_path):
     source_path = tmp_path / "source.txt"
@@ -89,9 +94,11 @@ def test_load_source_text_unsupported_format(tmp_path):
     with pytest.raises(ValueError, match="Unsupported file format"):
         IOUtils.load_source_text(str(source_path))
 
+
 def test_load_source_text_file_not_found(tmp_path):
     with pytest.raises(FileNotFoundError):
         IOUtils.load_source_text(str(tmp_path / "nonexistent.md"))
+
 
 def test_save_results_and_aggregated_results(tmp_path):
     question = QuizQuestion(

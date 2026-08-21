@@ -35,8 +35,8 @@ class ResultsAggregator:
         if result.metric_name not in _METRICS_WITH_APPLICABLE:
             return True
         try:
-            data = json.loads(result.raw_response)
-            return data.get("applicable", True)
+            data = json.loads(result.raw_response or "")
+            return bool(data.get("applicable", True))
         except (json.JSONDecodeError, TypeError, AttributeError):
             return True
 
@@ -106,11 +106,11 @@ class ResultsAggregator:
 
         for result in results:
             for metric in result.metrics:
-                agg_key = (metric.metric_name, metric.evaluator_model)
-                total_counts[agg_key] += 1
+                count_key = (metric.metric_name, metric.evaluator_model)
+                total_counts[count_key] += 1
                 if not ResultsAggregator._is_applicable(metric):
                     continue
-                applicable_counts[agg_key] += 1
+                applicable_counts[count_key] += 1
                 key = (
                     metric.metric_name,
                     metric.evaluator_model,

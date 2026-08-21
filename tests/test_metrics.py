@@ -25,7 +25,7 @@ from src.metrics.absence_of_cueing import (
     analyze_length_signal,
 )
 from src.metrics.grammatic import GrammaticalCorrectnessMetric
-from src.metrics.cognitive_level import CognitiveLevelMetric, get_bloom_intended, MATCH_SCORES
+from src.metrics.cognitive_level import CognitiveLevelMetric, get_bloom_intended
 from src.models.quiz import QuizQuestion, QuestionType, Quiz
 from src.models.result import EvaluationResult
 from tests.conftest import MockLLMProvider
@@ -124,6 +124,7 @@ def test_clarity_phase_builds_prompt():
 def test_clarity_finalize_maps_verdicts():
     """Each clarity verdict maps to the correct score."""
     from src.metrics.clarity import CLARITY_SCORES, ClarityMetric as _CM
+
     metric = _CM()
     for level, expected_score in CLARITY_SCORES.items():
         inp = PhaseInput(
@@ -293,6 +294,7 @@ def test_coverage_param_validation():
     with pytest.raises(ValueError, match="should be of type str"):
         metric.validate_params(granularity=10)
 
+
 def test_distractor_quality_analyze_phase_requires_question():
     """Distractor quality analyze prompt builder should raise ValueError when question is missing."""
     metric = DistractorQualityMetric()
@@ -342,13 +344,9 @@ def test_distractor_quality_judge_phase_builds_prompt():
             "collective_analysis": "test",
             "difficulty_calibration": "test",
             "source_grounded": True,
-        }
+        },
     )
-    inp = make_phase_input(
-        metric,
-        "judge",
-        accumulated={"analyze": analyze_output}
-    )
+    inp = make_phase_input(metric, "judge", accumulated={"analyze": analyze_output})
     prompt = inp.prompt_builder(inp)
     assert isinstance(prompt, str)
     assert len(prompt) > 0
@@ -357,6 +355,7 @@ def test_distractor_quality_judge_phase_builds_prompt():
 def test_distractor_quality_finalize_maps_verdicts():
     """Each distractor quality verdict maps to the correct score."""
     from src.metrics.distractor import QUALITY_SCORES
+
     metric = DistractorQualityMetric()
     for level, expected_score in QUALITY_SCORES.items():
         inp = PhaseInput(
@@ -375,6 +374,8 @@ def test_distractor_quality_finalize_maps_verdicts():
         )
         result = metric.phases[-1].process(inp, llm_client=None)
         assert result["score"] == expected_score
+
+
 def test_homogeneous_options_parse_score_success():
     """HomogeneousOptionsMetric should extract score from aggregate output."""
     metric = HomogeneousOptionsMetric()
@@ -913,7 +914,9 @@ def _homogeneity_result(*entries) -> EvaluationResult:
     )
 
 
-def _question_score(question_id="q1", applicable=True, score=66.7, homogeneity_level="good", issues=None):
+def _question_score(
+    question_id="q1", applicable=True, score=66.7, homogeneity_level="good", issues=None
+):
     return {
         "question_id": question_id,
         "applicable": applicable,
@@ -944,7 +947,9 @@ def test_homogeneous_options_expands_one_row_per_question():
 def test_homogeneous_options_expanded_raw_response_carries_diagnostics():
     metric = HomogeneousOptionsMetric()
     rows = metric.expand_question_results(
-        _homogeneity_result(_question_score("q1", homogeneity_level="good", issues=["length_outlier"]))
+        _homogeneity_result(
+            _question_score("q1", homogeneity_level="good", issues=["length_outlier"])
+        )
     )
 
     data = json.loads(rows[0][2])
@@ -959,7 +964,9 @@ def test_homogeneous_options_expands_not_applicable_questions():
     metric = HomogeneousOptionsMetric()
     rows = metric.expand_question_results(
         _homogeneity_result(
-            _question_score("q_tf", applicable=False, homogeneity_level="excellent", issues=["not_applicable"])
+            _question_score(
+                "q_tf", applicable=False, homogeneity_level="excellent", issues=["not_applicable"]
+            )
         )
     )
 
@@ -1305,7 +1312,9 @@ def test_cognitive_level_prompt_builds():
     assert "REMEMBER" in prompt
     assert "CREATE" in prompt
     # Must NOT show the intended level (avoid anchoring)
-    assert "APPLY" not in prompt or "APPLY:" in prompt  # APPLY appears in level list, not as intended
+    assert (
+        "APPLY" not in prompt or "APPLY:" in prompt
+    )  # APPLY appears in level list, not as intended
 
 
 def test_cognitive_level_finalize_matches():

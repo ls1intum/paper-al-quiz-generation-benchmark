@@ -1,10 +1,9 @@
 """Tests for data models."""
 
 import pytest
-from datetime import datetime
 
 from src.models.quiz import Quiz, QuizQuestion, QuestionType
-from src.models.result import MetricResult, BenchmarkResult, MetricAggregation
+from src.models.result import MetricResult, MetricAggregation
 
 
 def test_quiz_question_creation():

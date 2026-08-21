@@ -50,6 +50,9 @@ def get_learning_objective(question: QuizQuestion) -> Optional[str]:
     return objective or None
 
 
+AlignmentLevel = Literal["direct", "partial", "weak", "none", "not_applicable"]
+
+
 class ObjectiveAlignmentJudgeResponse(BaseModel):
     """The judge's verdict and its evidence. Deliberately carries no score.
 
@@ -69,7 +72,7 @@ class ObjectiveAlignmentJudgeResponse(BaseModel):
 class ObjectiveAlignmentResponse(ObjectiveAlignmentJudgeResponse):
     """Final output: the judge's level, the objective it was judged against, and the score."""
 
-    alignment_level: Literal["direct", "partial", "weak", "none", "not_applicable"]
+    alignment_level: AlignmentLevel  # type: ignore[assignment]
     applicable: bool
     learning_objective: Optional[str] = None
     score: float = Field(ge=0, le=100)
@@ -139,9 +142,7 @@ Respond with ONLY this JSON object, exactly as written:
         item_context = "\n".join(context_lines) if context_lines else "No additional context."
 
         source_context = (
-            f"\n**Supporting Source Material**:\n{inp.source_text}\n"
-            if inp.source_text
-            else ""
+            f"\n**Supporting Source Material**:\n{inp.source_text}\n" if inp.source_text else ""
         )
 
         return f"""Judge how directly the quiz item below assesses its stated learning objective.

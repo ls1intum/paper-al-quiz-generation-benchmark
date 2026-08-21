@@ -370,7 +370,7 @@ class BenchmarkRunner:
         self, quiz: Quiz, source_text: Optional[str], run_number: int
     ) -> BenchmarkResult:
         started_at = datetime.now()
-        metric_results = []
+        metric_results: List[MetricResult] = []
         phase_details = []
 
         instructions = IOUtils.load_instructions(
@@ -395,9 +395,9 @@ class BenchmarkRunner:
                 self.logger.info("Running %s with %s...", metric_config.name, evaluator_name)
 
                 if metric.scope == MetricScope.QUESTION_LEVEL:
-                    question_results = []
+                    question_results: List[Optional[MetricResult]] = []
                     for question in quiz.questions:
-                        evaluated = self._evaluate_question(
+                        q_evaluated = self._evaluate_question(
                             metric,
                             evaluator,
                             quiz,
@@ -406,17 +406,19 @@ class BenchmarkRunner:
                             metric_config.parameters,
                             instructions,
                         )
-                        if evaluated is not None:
-                            mr, phases = evaluated
+                        if q_evaluated is not None:
+                            mr, phases = q_evaluated
                             question_results.append(mr)
-                            phase_details.append({
-                                "metric_name": metric.name,
-                                "evaluator_model": evaluator.model_name,
-                                "quiz_id": quiz.quiz_id,
-                                "question_id": question.question_id,
-                                "run_number": run_number,
-                                "phases": phases,
-                            })
+                            phase_details.append(
+                                {
+                                    "metric_name": metric.name,
+                                    "evaluator_model": evaluator.model_name,
+                                    "quiz_id": quiz.quiz_id,
+                                    "question_id": question.question_id,
+                                    "run_number": run_number,
+                                    "phases": phases,
+                                }
+                            )
                         else:
                             question_results.append(None)
                     # P0-2a: fail loud if every question failed for this metric
@@ -428,7 +430,7 @@ class BenchmarkRunner:
                         )
                     metric_results.extend(r for r in question_results if r is not None)
                 else:
-                    evaluated = self._evaluate_quiz_level(
+                    quiz_evaluated = self._evaluate_quiz_level(
                         metric,
                         evaluator,
                         quiz,
@@ -436,16 +438,18 @@ class BenchmarkRunner:
                         metric_config.parameters,
                         instructions,
                     )
-                    if evaluated:
-                        evaluation, result = evaluated
-                        phase_details.append({
-                            "metric_name": metric.name,
-                            "evaluator_model": evaluator.model_name,
-                            "quiz_id": quiz.quiz_id,
-                            "question_id": None,
-                            "run_number": run_number,
-                            "phases": evaluation.metadata.get("phases", {}),
-                        })
+                    if quiz_evaluated:
+                        evaluation, result = quiz_evaluated
+                        phase_details.append(
+                            {
+                                "metric_name": metric.name,
+                                "evaluator_model": evaluator.model_name,
+                                "quiz_id": quiz.quiz_id,
+                                "question_id": None,
+                                "run_number": run_number,
+                                "phases": evaluation.metadata.get("phases", {}),
+                            }
+                        )
                         # Per-question rows replace the aggregate row rather than
                         # joining it: sharing one metric_name would pool item
                         # scores with a quiz-level summary in every downstream mean.

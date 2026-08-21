@@ -10,14 +10,13 @@ anchoring). The deterministic finalize phase compares the two. Items with no
 stated intended level are reported as not applicable.
 """
 
-from typing import Any, Callable, Dict, List, Literal, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..models.quiz import QuizQuestion
 from .base import BaseMetric, MetricScope
 from .phase import Phase, PhaseInput
-
 
 BLOOM_LEVELS = ("REMEMBER", "UNDERSTAND", "APPLY", "ANALYZE", "EVALUATE", "CREATE")
 BLOOM_RANK = {level: i for i, level in enumerate(BLOOM_LEVELS)}

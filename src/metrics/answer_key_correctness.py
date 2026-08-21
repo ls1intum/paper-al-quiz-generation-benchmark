@@ -54,7 +54,9 @@ def detect_catch_all_options(options: List[str]) -> List[str]:
     """Return the options whose normalized text opens with a catch-all phrase."""
     found = []
     for option in options:
-        normalized = " ".join(str(option).lower().split()).lstrip("([-\u2013\u2014.,:;\'\"\u201c\u201e ")
+        normalized = " ".join(str(option).lower().split()).lstrip(
+            "([-\u2013\u2014.,:;'\"\u201c\u201e "
+        )
         for phrase in CATCH_ALL_PHRASES:
             if not normalized.startswith(phrase):
                 continue

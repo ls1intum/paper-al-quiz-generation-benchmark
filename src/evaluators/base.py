@@ -97,10 +97,12 @@ class LLMProvider(ABC):
     def _record_usage(self, response: Any) -> None:
         usage = getattr(response, "usage_metadata", None)
         if usage:
-            self._usage_log.append({
-                "prompt_tokens": usage.get("input_tokens", 0),
-                "completion_tokens": usage.get("output_tokens", 0),
-            })
+            self._usage_log.append(
+                {
+                    "prompt_tokens": usage.get("input_tokens", 0),
+                    "completion_tokens": usage.get("output_tokens", 0),
+                }
+            )
 
     @property
     def model_name(self) -> str:

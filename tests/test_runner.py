@@ -258,9 +258,7 @@ def test_runner_language_compliance_does_not_touch_item_scores(
     config = _grammar_only_config(sample_config)
     config = replace(
         config,
-        input_output=replace(
-            config.input_output, instructions_directory=str(instructions_dir)
-        ),
+        input_output=replace(config.input_output, instructions_directory=str(instructions_dir)),
     )
     quiz = replace(sample_quiz, instructions="intent.json")
 
@@ -315,7 +313,7 @@ def test_runner_tolerates_partial_question_failure(
 ):
     """If only some questions fail, the runner continues and includes the rest."""
     from dataclasses import replace
-    from unittest.mock import patch, MagicMock
+    from unittest.mock import patch
 
     config = replace(
         sample_config,

@@ -7,6 +7,7 @@ import logging
 import re
 import sys
 from datetime import datetime
+from typing import Any
 from pathlib import Path
 
 from src.analysis.aggregator import ResultsAggregator
@@ -208,18 +209,18 @@ def main() -> int:
             found_insights = False
 
             # Helper to safely get attributes whether it's a dict or object
-            def safe_get(item, key, default=None):
+            def safe_get(item: Any, key: str, default: Any = None) -> Any:
                 if isinstance(item, dict):
                     return item.get(key, default)
                 return getattr(item, key, default)
 
             for result in results:
-                quiz_id = safe_get(result, 'quiz_id', 'Unknown Quiz')
-                metrics_list = safe_get(result, 'metrics', [])
+                quiz_id = safe_get(result, "quiz_id", "Unknown Quiz")
+                metrics_list = safe_get(result, "metrics", [])
 
                 for metric in metrics_list:
-                    metric_name = safe_get(metric, 'metric_name')
-                    raw_response = safe_get(metric, 'raw_response')
+                    metric_name = safe_get(metric, "metric_name")
+                    raw_response = safe_get(metric, "raw_response")
                     if metric_name and isinstance(raw_response, str):
                         try:
                             metric_instance = MetricRegistry.create(metric_name)

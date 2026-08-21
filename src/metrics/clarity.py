@@ -8,7 +8,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from .base import BaseMetric, MetricScope
 from .phase import Phase, PhaseInput
 
-
 CLARITY_SCORES = {
     "excellent": 100.0,
     "good": 66.7,

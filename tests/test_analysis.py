@@ -1,5 +1,6 @@
 """Tests for aggregation utilities."""
 
+import json
 from datetime import datetime
 
 import numpy as np
@@ -211,8 +212,8 @@ def test_compute_mad_empty():
         ]
     )
 
-    mad = ResultsAggregator.compute_mad(reliability_array)
-    # Should work since there's at least one pair
+    _mad = ResultsAggregator.compute_mad(reliability_array)  # noqa: F841
+    # Just checks it doesn't crash; single-item pairs return None
 
 
 def test_compute_spearman_high_agreement():
@@ -363,13 +364,13 @@ def test_detect_ceiling_effect_low_variance():
 # P1-3: Applicable filter
 # ============================================================================
 
-import json
-
 
 def test_aggregate_excludes_inapplicable_items():
     """P1-3: inapplicable items (applicable=false) must be excluded from means."""
     applicable_raw = json.dumps({"applicable": True, "alignment_level": "partial", "score": 66.7})
-    inapplicable_raw = json.dumps({"applicable": False, "alignment_level": "not_applicable", "score": 100.0})
+    inapplicable_raw = json.dumps(
+        {"applicable": False, "alignment_level": "not_applicable", "score": 100.0}
+    )
 
     results = [
         BenchmarkResult(

@@ -10,7 +10,6 @@ from ..models.result import EvaluationResult
 from .base import BaseMetric, MetricScope
 from .phase import Phase, PhaseInput, PhaseOutput
 
-
 HOMOGENEITY_SCORES = {
     "excellent": 100.0,
     "good": 66.7,
@@ -257,8 +256,7 @@ Respond with ONLY a JSON object in this format:
             else 0.0
         )
         perfect_homogeneity_rate = (
-            sum(1 for s in applicable_scores if s >= 95)
-            / num_applicable
+            sum(1 for s in applicable_scores if s >= 95) / num_applicable
             if applicable_results
             else 0.0
         )
@@ -321,9 +319,7 @@ Respond with ONLY a JSON object in this format:
                 continue
             level = entry.get("homogeneity_level", "excellent")
             score = HOMOGENEITY_SCORES.get(level, 100.0)
-            rows.append(
-                (str(question_id), score, json.dumps(entry, ensure_ascii=True))
-            )
+            rows.append((str(question_id), score, json.dumps(entry, ensure_ascii=True)))
         return rows
 
     @staticmethod

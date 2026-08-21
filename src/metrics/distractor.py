@@ -4,9 +4,8 @@ from typing import Any, Callable, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 from .base import BaseMetric, MetricScope
-from .phase import Phase, PhaseInput, PhaseOutput
+from .phase import Phase, PhaseInput
 from ..models.quiz import QuizQuestion, QuestionType
-
 
 QUALITY_SCORES = {
     "excellent": 100.0,
@@ -118,7 +117,9 @@ class DistractorQualityMetric(BaseMetric):
             else "No source material is available. Evaluate distractors using expert knowledge."
         )
         plausibility_label = (
-            "PLAUSIBILITY & SOURCE ALIGNMENT" if has_source else "PLAUSIBILITY & KNOWLEDGE ALIGNMENT"
+            "PLAUSIBILITY & SOURCE ALIGNMENT"
+            if has_source
+            else "PLAUSIBILITY & KNOWLEDGE ALIGNMENT"
         )
         plausibility_detail = (
             "- Does each distractor use specific vocabulary, values, or concepts from the source material?\n"

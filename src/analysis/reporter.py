@@ -241,8 +241,10 @@ class ResultsReporter:
             grand_prompt += eval_prompt
             grand_completion += eval_completion
 
-        lines.append(f"\n  {'GRAND TOTAL':<32} {grand_prompt:>10,} {grand_completion:>12,} "
-                      f"{grand_prompt + grand_completion:>10,}")
+        lines.append(
+            f"\n  {'GRAND TOTAL':<32} {grand_prompt:>10,} {grand_completion:>12,} "
+            f"{grand_prompt + grand_completion:>10,}"
+        )
         lines.append("=" * 80)
         return "\n".join(lines)
 
