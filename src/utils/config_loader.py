@@ -2,7 +2,7 @@
 
 import hashlib
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import yaml
 from dotenv import load_dotenv
@@ -28,7 +28,7 @@ class ConfigLoader:
         load_dotenv(env_file)
 
     @staticmethod
-    def load_yaml(config_path: str) -> Dict[str, Any]:
+    def load_yaml(config_path: str) -> dict[str, Any]:
         """Load YAML configuration file.
 
         Args:
@@ -46,12 +46,12 @@ class ConfigLoader:
             raise FileNotFoundError(f"Config file not found: {config_path}")
 
         with open(path, "r") as f:
-            config_dict: Dict[str, Any] = yaml.safe_load(f)
+            config_dict: dict[str, Any] = yaml.safe_load(f)
 
         return config_dict
 
     @staticmethod
-    def parse_config(config_dict: Dict[str, Any]) -> BenchmarkConfig:
+    def parse_config(config_dict: dict[str, Any]) -> BenchmarkConfig:
         """Parse configuration dictionary into BenchmarkConfig object.
 
         Args:

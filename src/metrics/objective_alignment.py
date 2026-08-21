@@ -11,7 +11,8 @@ objective are reported as not applicable rather than guessed at.
 """
 
 import json
-from typing import Any, Callable, Dict, List, Literal, Optional
+from collections.abc import Callable
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -36,7 +37,7 @@ ALIGNMENT_SCORES = {
 NOT_APPLICABLE_SCORE = 100.0
 
 
-def get_learning_objective(question: QuizQuestion) -> Optional[str]:
+def get_learning_objective(question: QuizQuestion) -> str | None:
     """Return the item's stated learning objective, or None when it has none.
 
     An absent key, an explicit null, and a whitespace-only string all mean the
@@ -64,8 +65,8 @@ class ObjectiveAlignmentJudgeResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     alignment_level: Literal["direct", "partial", "weak", "none"]
-    matched_objective_aspects: List[str] = Field(default_factory=list)
-    missing_or_misaligned_aspects: List[str] = Field(default_factory=list)
+    matched_objective_aspects: list[str] = Field(default_factory=list)
+    missing_or_misaligned_aspects: list[str] = Field(default_factory=list)
     rationale: str
 
 
@@ -74,7 +75,7 @@ class ObjectiveAlignmentResponse(ObjectiveAlignmentJudgeResponse):
 
     alignment_level: AlignmentLevel  # type: ignore[assignment]
     applicable: bool
-    learning_objective: Optional[str] = None
+    learning_objective: str | None = None
     score: float = Field(ge=0, le=100)
 
 
@@ -100,7 +101,7 @@ class ObjectiveAlignmentMetric(BaseMetric):
         return MetricScope.QUESTION_LEVEL
 
     @property
-    def phases(self) -> List[Phase]:
+    def phases(self) -> list[Phase]:
         return [
             Phase("judge", ObjectiveAlignmentJudgeResponse),
             Phase("finalize", ObjectiveAlignmentResponse, processor=self._finalize),
@@ -180,7 +181,7 @@ Respond with ONLY a JSON object matching this schema:
 }}"""
 
     @staticmethod
-    def _finalize(inp: PhaseInput) -> Dict[str, Any]:
+    def _finalize(inp: PhaseInput) -> dict[str, Any]:
         """Derive the score from the judge's level, or mark the item not applicable."""
         if inp.question is None:
             raise ValueError("objective_alignment finalize phase requires a question")
@@ -214,7 +215,7 @@ Respond with ONLY a JSON object matching this schema:
             "score": ALIGNMENT_SCORES[level],
         }
 
-    def format_insights(self, raw_response: str, quiz_id: str) -> Optional[str]:
+    def format_insights(self, raw_response: str, quiz_id: str) -> str | None:
         """Extract qualitative insights from the metric's raw response for display."""
         try:
             clean_json = raw_response.replace("```json", "").replace("```", "").strip()
@@ -257,4 +258,4 @@ Respond with ONLY a JSON object matching this schema:
             return "\n".join(lines)
 
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
-            return f"Could not parse objective alignment insights: {str(e)}"
+            return f"Could not parse objective alignment insights: {e!s}"

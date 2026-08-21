@@ -1,6 +1,6 @@
 """Factory for creating LLM providers."""
 
-from typing import Any, Dict, Type
+from typing import Any, ClassVar
 
 from ..models.config import EvaluatorConfig
 from .anthropic import AnthropicProvider
@@ -14,7 +14,7 @@ from .openai_compatible import OpenAICompatibleProvider
 class LLMProviderFactory:
     """Factory class for creating LLM providers from configuration."""
 
-    _PROVIDER_MAP: Dict[str, Type[LLMProvider]] = {
+    _PROVIDER_MAP: ClassVar[dict[str, type[LLMProvider]]] = {
         "azure_openai": AzureOpenAIProvider,
         "openai": OpenAIProvider,
         "anthropic": AnthropicProvider,
@@ -50,7 +50,7 @@ class LLMProviderFactory:
         )
 
     @classmethod
-    def create_from_dict(cls, provider_dict: Dict[str, Any]) -> LLMProvider:
+    def create_from_dict(cls, provider_dict: dict[str, Any]) -> LLMProvider:
         """Create an LLM provider from a dictionary.
 
         Args:
@@ -107,6 +107,6 @@ class LLMProviderFactory:
             ValueError: If provider_class doesn't inherit from LLMProvider
         """
         if not issubclass(provider_class, LLMProvider):
-            raise ValueError("provider_class must inherit from LLMProvider")
+            raise TypeError("provider_class must inherit from LLMProvider")
 
         cls._PROVIDER_MAP[name] = provider_class

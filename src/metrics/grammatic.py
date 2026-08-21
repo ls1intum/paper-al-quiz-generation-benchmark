@@ -1,7 +1,8 @@
 """Grammatical Correctness metric implementation."""
 
 import json
-from typing import Any, Callable, Dict, List, Literal, Optional
+from collections.abc import Callable
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -25,9 +26,9 @@ class GrammarJudgeResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     severity: Literal["none", "minor", "major", "critical"]
-    grammar_issues: List[str] = Field(default_factory=list)
-    spelling_issues: List[str] = Field(default_factory=list)
-    punctuation_issues: List[str] = Field(default_factory=list)
+    grammar_issues: list[str] = Field(default_factory=list)
+    spelling_issues: list[str] = Field(default_factory=list)
+    punctuation_issues: list[str] = Field(default_factory=list)
     rationale: str
 
 
@@ -63,7 +64,7 @@ class GrammaticalCorrectnessMetric(BaseMetric):
         return MetricScope.QUESTION_LEVEL
 
     @property
-    def parameters(self) -> List[MetricParameter]:
+    def parameters(self) -> list[MetricParameter]:
         return [
             MetricParameter(
                 name="language",
@@ -74,7 +75,7 @@ class GrammaticalCorrectnessMetric(BaseMetric):
         ]
 
     @property
-    def phases(self) -> List[Phase]:
+    def phases(self) -> list[Phase]:
         return [
             Phase("judge", GrammarJudgeResponse),
             Phase("finalize", GrammaticalCorrectnessResponse, processor=self._finalize),
@@ -137,7 +138,7 @@ Respond with ONLY a JSON object matching this schema:
 }}"""
 
     @staticmethod
-    def _finalize(inp: PhaseInput) -> Dict[str, Any]:
+    def _finalize(inp: PhaseInput) -> dict[str, Any]:
         """Derive the score from the judge's severity level."""
         judge_output = inp.accumulated.get("judge")
         if judge_output is None:
@@ -155,7 +156,7 @@ Respond with ONLY a JSON object matching this schema:
             "score": SEVERITY_SCORES[severity],
         }
 
-    def format_insights(self, raw_response: str, quiz_id: str) -> Optional[str]:
+    def format_insights(self, raw_response: str, quiz_id: str) -> str | None:
         """Extract qualitative insights from the metric's raw response for display."""
         try:
             clean_json = raw_response.replace("```json", "").replace("```", "").strip()
@@ -190,4 +191,4 @@ Respond with ONLY a JSON object matching this schema:
             return "\n".join(lines)
 
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
-            return f"Could not parse grammatical correctness insights: {str(e)}"
+            return f"Could not parse grammatical correctness insights: {e!s}"

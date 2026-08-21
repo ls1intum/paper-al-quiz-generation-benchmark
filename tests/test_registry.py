@@ -24,7 +24,7 @@ def test_register_and_list_create_clear():
 
 def test_register_requires_base_metric():
     MetricRegistry.clear()
-    with pytest.raises(ValueError):
+    with pytest.raises(TypeError):
         MetricRegistry.register(NotAMetric)  # type: ignore[arg-type]
 
 

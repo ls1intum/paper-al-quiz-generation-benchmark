@@ -1,8 +1,8 @@
 """Homogeneous options metric implementation."""
 
 import json
+from collections.abc import Callable
 from statistics import median
-from typing import Callable, List, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -36,11 +36,11 @@ class AnalyzeOptionsResponse(BaseModel):
 
     question_id: str
     applicable: bool
-    exclusion_reason: Optional[str] = None
-    option_analyses: List[OptionAnalysis] = Field(default_factory=list)
+    exclusion_reason: str | None = None
+    option_analyses: list[OptionAnalysis] = Field(default_factory=list)
     dominant_grammatical_pattern: str = ""
     dominant_content_type: str = ""
-    structural_outliers: List[str] = Field(default_factory=list)
+    structural_outliers: list[str] = Field(default_factory=list)
 
 
 class QuestionHomogeneityScoreResponse(BaseModel):
@@ -49,7 +49,7 @@ class QuestionHomogeneityScoreResponse(BaseModel):
     question_id: str
     applicable: bool
     homogeneity_level: str = "excellent"
-    issues: List[str] = Field(default_factory=list)
+    issues: list[str] = Field(default_factory=list)
     rationale: str
 
 
@@ -79,8 +79,8 @@ class AggregateHomogeneityResponse(BaseModel):
     median_question_score: float = Field(ge=0, le=100)
     major_violation_rate: float = Field(ge=0, le=1)
     perfect_homogeneity_rate: float = Field(ge=0, le=1)
-    issue_distribution: List[IssueCount] = Field(default_factory=list)
-    question_scores: List[QuestionScoreSummary] = Field(default_factory=list)
+    issue_distribution: list[IssueCount] = Field(default_factory=list)
+    question_scores: list[QuestionScoreSummary] = Field(default_factory=list)
     aggregation_reasoning: str
     score: float = Field(ge=0, le=100)
 
@@ -101,7 +101,7 @@ class HomogeneousOptionsMetric(BaseMetric):
         return MetricScope.QUIZ_LEVEL
 
     @property
-    def phases(self) -> List[Phase]:
+    def phases(self) -> list[Phase]:
         return [
             Phase("analyze_options", AnalyzeOptionsResponse, fan_out=True),
             Phase("score_question", QuestionHomogeneityScoreResponse, fan_out=True),
@@ -303,7 +303,7 @@ Respond with ONLY a JSON object in this format:
             "score": round(computed_score, 2),
         }
 
-    def expand_question_results(self, result: EvaluationResult) -> List[Tuple[str, float, str]]:
+    def expand_question_results(self, result: EvaluationResult) -> list[tuple[str, float, str]]:
         """Hand back the per-question scores this metric already produced."""
         phases = result.metadata.get("phases", {})
         scoring = phases.get("score_question")
@@ -324,8 +324,8 @@ Respond with ONLY a JSON object in this format:
 
     @staticmethod
     def _get_question_result(
-        phase_output: Optional[PhaseOutput], question_id: str
-    ) -> Optional[dict[str, object]]:
+        phase_output: PhaseOutput | None, question_id: str
+    ) -> dict[str, object] | None:
         if phase_output is None:
             return None
 

@@ -9,7 +9,8 @@ or more issue flags say why.
 """
 
 import json
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -50,7 +51,7 @@ CATCH_ALL_PHRASES = (
 )
 
 
-def detect_catch_all_options(options: List[str]) -> List[str]:
+def detect_catch_all_options(options: list[str]) -> list[str]:
     """Return the options whose normalized text opens with a catch-all phrase."""
     found = []
     for option in options:
@@ -76,16 +77,16 @@ class AnswerKeyJudgeResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     key_correct: bool
-    defensible_correct_options: List[str] = Field(default_factory=list)
-    misclassified_options: List[str] = Field(default_factory=list)
-    issue_flags: List[str] = Field(default_factory=list)
+    defensible_correct_options: list[str] = Field(default_factory=list)
+    misclassified_options: list[str] = Field(default_factory=list)
+    issue_flags: list[str] = Field(default_factory=list)
     rationale: str
 
 
 class AnswerKeyCorrectnessResponse(AnswerKeyJudgeResponse):
     """Final output: the judge verdict after the deterministic rules are applied."""
 
-    catch_all_options: List[str] = Field(default_factory=list)
+    catch_all_options: list[str] = Field(default_factory=list)
     score: float = Field(ge=0, le=100)
 
 
@@ -113,7 +114,7 @@ class AnswerKeyCorrectnessMetric(BaseMetric):
         return MetricScope.QUESTION_LEVEL
 
     @property
-    def phases(self) -> List[Phase]:
+    def phases(self) -> list[Phase]:
         return [
             Phase("judge", AnswerKeyJudgeResponse),
             Phase("finalize", AnswerKeyCorrectnessResponse, processor=self._finalize),
@@ -188,7 +189,7 @@ Respond with ONLY a JSON object matching this schema:
 }}"""
 
     @staticmethod
-    def _finalize(inp: PhaseInput) -> Dict[str, Any]:
+    def _finalize(inp: PhaseInput) -> dict[str, Any]:
         """Apply the deterministic rules on top of the judge's verdict."""
         if inp.question is None:
             raise ValueError("answer_key_correctness finalize phase requires a question")
@@ -224,7 +225,7 @@ Respond with ONLY a JSON object matching this schema:
             "score": 100.0 if key_correct else 0.0,
         }
 
-    def format_insights(self, raw_response: str, quiz_id: str) -> Optional[str]:
+    def format_insights(self, raw_response: str, quiz_id: str) -> str | None:
         """Extract qualitative insights from the metric's raw response for display."""
         try:
             clean_json = raw_response.replace("```json", "").replace("```", "").strip()
@@ -257,4 +258,4 @@ Respond with ONLY a JSON object matching this schema:
             return "\n".join(lines)
 
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
-            return f"Could not parse answer-key correctness insights: {str(e)}"
+            return f"Could not parse answer-key correctness insights: {e!s}"

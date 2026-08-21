@@ -1,7 +1,7 @@
 """Configuration data models."""
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -22,7 +22,7 @@ class EvaluatorConfig:
     model: str
     temperature: float = 0.0
     max_tokens: int = 500
-    additional_params: Dict[str, Any] = field(default_factory=dict)
+    additional_params: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -39,8 +39,8 @@ class MetricConfig:
 
     name: str
     version: str
-    evaluators: List[str]
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    evaluators: list[str]
+    parameters: dict[str, Any] = field(default_factory=dict)
     enabled: bool = True
 
 
@@ -78,12 +78,12 @@ class BenchmarkConfig:
     name: str
     version: str
     runs: int
-    evaluators: Dict[str, EvaluatorConfig]
-    metrics: List[MetricConfig]
+    evaluators: dict[str, EvaluatorConfig]
+    metrics: list[MetricConfig]
     input_output: InputOutputConfig
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def get_evaluator(self, name: str) -> Optional[EvaluatorConfig]:
+    def get_evaluator(self, name: str) -> EvaluatorConfig | None:
         """Get evaluator configuration by name.
 
         Args:
@@ -94,7 +94,7 @@ class BenchmarkConfig:
         """
         return self.evaluators.get(name)
 
-    def get_metric(self, name: str) -> Optional[MetricConfig]:
+    def get_metric(self, name: str) -> MetricConfig | None:
         """Get metric configuration by name.
 
         Args:
@@ -108,7 +108,7 @@ class BenchmarkConfig:
                 return metric
         return None
 
-    def get_enabled_metrics(self) -> List[MetricConfig]:
+    def get_enabled_metrics(self) -> list[MetricConfig]:
         """Get all enabled metrics.
 
         Returns:

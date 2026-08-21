@@ -1,6 +1,8 @@
 """Difficulty metric implementation."""
 
-from typing import Callable, List
+from collections.abc import Callable
+from typing import ClassVar
+
 from .base import BaseMetric, MetricParameter, MetricScope, ScoreResponse
 from .phase import Phase, PhaseInput
 
@@ -19,7 +21,7 @@ class DifficultyMetric(BaseMetric):
     """
 
     # Maps instructions difficulty label to expected score range midpoint
-    DIFFICULTY_RANGES = {
+    DIFFICULTY_RANGES: ClassVar[dict[str, tuple[int, int, int]]] = {
         "easy": (0, 40, 20),  # (min, max, midpoint)
         "medium": (35, 65, 50),
         "hard": (60, 100, 80),
@@ -38,7 +40,7 @@ class DifficultyMetric(BaseMetric):
         return MetricScope.QUESTION_LEVEL
 
     @property
-    def parameters(self) -> List[MetricParameter]:
+    def parameters(self) -> list[MetricParameter]:
         return [
             MetricParameter(
                 name="rubric",
@@ -55,7 +57,7 @@ class DifficultyMetric(BaseMetric):
         ]
 
     @property
-    def phases(self) -> List[Phase]:
+    def phases(self) -> list[Phase]:
         return [Phase("score", ScoreResponse)]
 
     def get_prompt_builder(self, phase_name: str) -> Callable[[PhaseInput], str]:
@@ -93,7 +95,7 @@ class DifficultyMetric(BaseMetric):
         difficulty_note = ""
         if inp.instructions and inp.instructions.difficulty:
             requested = inp.instructions.difficulty
-            low, high, mid = self.DIFFICULTY_RANGES[str(requested)]
+            low, high, _mid = self.DIFFICULTY_RANGES[str(requested)]
             difficulty_note = (
                 f"\n**Instructions note**: The quiz was intended to be '{requested}' difficulty "
                 f"(expected score range: {low}–{high}). "

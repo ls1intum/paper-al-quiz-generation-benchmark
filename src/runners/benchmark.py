@@ -2,9 +2,8 @@
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 from ..evaluators.base import LLMProvider
 from ..evaluators.factory import LLMProviderFactory
@@ -12,11 +11,11 @@ from ..evaluators.ollama import OllamaProvider
 from ..metrics.base import BaseMetric, MetricScope
 from ..metrics.registry import MetricRegistry
 from ..models.config import BenchmarkConfig
+from ..models.instruction import QuizInstructions
 from ..models.quiz import Quiz, QuizQuestion
 from ..models.result import BenchmarkResult, EvaluationResult, MetricResult
 from ..utils.config_loader import ConfigLoader
 from ..utils.io import IOUtils
-from ..models.instruction import QuizInstructions
 
 
 class BenchmarkRunner:
@@ -24,8 +23,8 @@ class BenchmarkRunner:
     def __init__(self, config: BenchmarkConfig) -> None:
         self.config = config
         self.config_hash = ConfigLoader.hash_config(config)
-        self.metrics: Dict[str, BaseMetric] = {}
-        self.evaluators: Dict[str, LLMProvider] = {}
+        self.metrics: dict[str, BaseMetric] = {}
+        self.evaluators: dict[str, LLMProvider] = {}
         self.logger = logging.getLogger(__name__)
         self._init_evaluators()
         self._init_metrics()
@@ -55,12 +54,12 @@ class BenchmarkRunner:
                 metric = MetricRegistry.create(metric_config.name)
                 self.metrics[metric_config.name] = metric
                 self.logger.info("Initialized metric: %s v%s", metric_config.name, metric.version)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self.logger.warning("Failed to initialize metric %s: %s", metric_config.name, e)
 
     def run(
-        self, quizzes: Optional[List[Quiz]] = None, source_texts: Optional[Dict[str, str]] = None
-    ) -> List[BenchmarkResult]:
+        self, quizzes: list[Quiz] | None = None, source_texts: dict[str, str] | None = None
+    ) -> list[BenchmarkResult]:
         if quizzes is None:
             self.logger.info("Loading quizzes from %s...", self.config.input_output.quiz_directory)
             quizzes = IOUtils.load_all_quizzes(self.config.input_output.quiz_directory)
@@ -85,7 +84,7 @@ class BenchmarkRunner:
 
         return all_results
 
-    def _load_source_texts(self, quizzes: List[Quiz]) -> Dict[str, str]:
+    def _load_source_texts(self, quizzes: list[Quiz]) -> dict[str, str]:
         source_texts = {}
         source_dir = Path(self.config.input_output.source_directory)
         for quiz in quizzes:
@@ -101,7 +100,7 @@ class BenchmarkRunner:
                     else:
                         # Single file
                         source_texts[quiz.quiz_id] = IOUtils.load_source_text(str(source_path))
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     self.logger.warning("Failed to load source for %s: %s", quiz.quiz_id, e)
             else:
                 self.logger.warning("Source path not found: %s", source_path)
@@ -134,7 +133,7 @@ class BenchmarkRunner:
                     file_header = f"\n\n{'=' * 60}\n[Source: {file_path.name}]\n{'=' * 60}\n\n"
                     combined_text += file_header + file_content
                     loaded_files.append(file_path.name)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     self.logger.warning("Failed to load file %s: %s", file_path.name, e)
 
         if not loaded_files:
@@ -149,10 +148,10 @@ class BenchmarkRunner:
         metric: BaseMetric,
         evaluator: LLMProvider,
         quiz: Quiz,
-        source_text: Optional[str],
-        parameters: Dict,
-        instructions: Optional[QuizInstructions] = None,
-    ) -> Optional[Tuple[EvaluationResult, MetricResult]]:
+        source_text: str | None,
+        parameters: dict,
+        instructions: QuizInstructions | None = None,
+    ) -> tuple[EvaluationResult, MetricResult] | None:
         try:
             evaluator.reset_usage()
             result = metric.evaluate(
@@ -174,7 +173,7 @@ class BenchmarkRunner:
                 raw_response=result.raw_response,
                 usage=usage,
             )
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error("Error evaluating quiz %s: %s", quiz.quiz_id, e)
             return None
 
@@ -184,8 +183,8 @@ class BenchmarkRunner:
         result: EvaluationResult,
         evaluator: LLMProvider,
         quiz: Quiz,
-        parameters: Dict,
-    ) -> List[MetricResult]:
+        parameters: dict,
+    ) -> list[MetricResult]:
         """Split a quiz-level result into per-question rows, when the metric has them.
 
         Metrics that judge each question internally expose those judgements via
@@ -207,7 +206,7 @@ class BenchmarkRunner:
                 )
                 for question_id, score, raw_response in metric.expand_question_results(result)
             ]
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error("Error expanding %s for quiz %s: %s", metric.name, quiz.quiz_id, e)
             return []
 
@@ -217,10 +216,10 @@ class BenchmarkRunner:
         evaluator: LLMProvider,
         quiz: Quiz,
         question: QuizQuestion,
-        source_text: Optional[str],
-        parameters: Dict,
-        instructions: Optional[QuizInstructions] = None,
-    ) -> Optional[Tuple[MetricResult, Dict]]:
+        source_text: str | None,
+        parameters: dict,
+        instructions: QuizInstructions | None = None,
+    ) -> tuple[MetricResult, dict] | None:
         try:
             evaluator.reset_usage()
             result = metric.evaluate(
@@ -244,16 +243,16 @@ class BenchmarkRunner:
                 usage=usage,
             )
             return metric_result, result.metadata.get("phases", {})
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.logger.error("Error evaluating question %s: %s", question.question_id, e)
             return None
 
     @staticmethod
     def _check_difficulty_compliance(
         quiz_id: str,
-        metric_results: List[MetricResult],
-        instructions: Optional[QuizInstructions],
-    ) -> Optional[float]:
+        metric_results: list[MetricResult],
+        instructions: QuizInstructions | None,
+    ) -> float | None:
         """Aggregate per-question difficulty scores and check against the requested band.
 
         Per-question scores are never modified. If the mean falls outside the
@@ -307,10 +306,10 @@ class BenchmarkRunner:
     def _check_language_compliance(
         self,
         quiz: Quiz,
-        metric_results: List[MetricResult],
-        source_text: Optional[str],
-        instructions: Optional[QuizInstructions],
-    ) -> Optional[float]:
+        metric_results: list[MetricResult],
+        source_text: str | None,
+        instructions: QuizInstructions | None,
+    ) -> float | None:
         """Check the quiz against the requested language, once per quiz.
 
         Grammar is scored per question and in whatever language the item is
@@ -326,7 +325,7 @@ class BenchmarkRunner:
         if not instructions or not instructions.language:
             return None
 
-        by_evaluator: Dict[str, List[float]] = {}
+        by_evaluator: dict[str, list[float]] = {}
         for result in metric_results:
             if result.metric_name == "grammatical_correctness":
                 by_evaluator.setdefault(result.evaluator_model, []).append(result.score)
@@ -357,7 +356,7 @@ class BenchmarkRunner:
                         instructions=instructions,
                     )
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 self.logger.error(
                     "Error checking language compliance for quiz %s: %s", quiz.quiz_id, e
                 )
@@ -367,10 +366,10 @@ class BenchmarkRunner:
         return round(sum(adjusted_scores) / len(adjusted_scores), 1)
 
     def _evaluate_quiz(
-        self, quiz: Quiz, source_text: Optional[str], run_number: int
+        self, quiz: Quiz, source_text: str | None, run_number: int
     ) -> BenchmarkResult:
-        started_at = datetime.now()
-        metric_results: List[MetricResult] = []
+        started_at = datetime.now(tz=UTC)
+        metric_results: list[MetricResult] = []
         phase_details = []
 
         instructions = IOUtils.load_instructions(
@@ -395,7 +394,7 @@ class BenchmarkRunner:
                 self.logger.info("Running %s with %s...", metric_config.name, evaluator_name)
 
                 if metric.scope == MetricScope.QUESTION_LEVEL:
-                    question_results: List[Optional[MetricResult]] = []
+                    question_results: list[MetricResult | None] = []
                     for question in quiz.questions:
                         q_evaluated = self._evaluate_question(
                             metric,
@@ -469,7 +468,7 @@ class BenchmarkRunner:
             quiz, metric_results, source_text, instructions
         )
 
-        completed_at = datetime.now()
+        completed_at = datetime.now(tz=UTC)
 
         return BenchmarkResult(
             benchmark_id=str(uuid.uuid4()),

@@ -3,7 +3,7 @@
 import json
 import os
 from collections import defaultdict
-from typing import Any, Dict, List, Optional
+from typing import Any
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
@@ -19,8 +19,8 @@ class OllamaProvider(OpenAICompatibleProvider):
         model: str,
         temperature: float = 0.0,
         max_tokens: int = 500,
-        base_url: Optional[str] = None,
-        api_key: Optional[str] = None,
+        base_url: str | None = None,
+        api_key: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize Ollama provider with local defaults."""
@@ -63,7 +63,7 @@ class OllamaProvider(OpenAICompatibleProvider):
         return stripped
 
     @classmethod
-    def preflight(cls, evaluators: Dict[str, EvaluatorConfig]) -> None:
+    def preflight(cls, evaluators: dict[str, EvaluatorConfig]) -> None:
         """Fail early for Ollama configuration/server/model issues."""
         ollama_evaluators = {
             name: cfg for name, cfg in evaluators.items() if cfg.provider == "ollama"
@@ -74,7 +74,7 @@ class OllamaProvider(OpenAICompatibleProvider):
         endpoint_env = os.getenv("OLLAMA_ENDPOINT") or os.getenv("CUSTOM_LLM_ENDPOINT")
         api_key = os.getenv("OLLAMA_API_KEY") or os.getenv("CUSTOM_LLM_API_KEY") or "not-required"
 
-        grouped_models: Dict[str, List[str]] = defaultdict(list)
+        grouped_models: dict[str, list[str]] = defaultdict(list)
         unresolved = []
 
         for eval_name, cfg in ollama_evaluators.items():
@@ -115,7 +115,7 @@ class OllamaProvider(OpenAICompatibleProvider):
                     )
 
     @classmethod
-    def _fetch_available_model_ids(cls, base_url: str, api_key: str, timeout: int = 5) -> List[str]:
+    def _fetch_available_model_ids(cls, base_url: str, api_key: str, timeout: int = 5) -> list[str]:
         """Fetch available model names from native Ollama /api/tags."""
         native_base = cls._to_native_base_url(base_url)
         tags_url = f"{native_base}/api/tags"
@@ -143,7 +143,7 @@ class OllamaProvider(OpenAICompatibleProvider):
         return sorted(model_names)
 
     @classmethod
-    def _pull_missing_models(cls, base_url: str, api_key: str, missing_models: List[str]) -> None:
+    def _pull_missing_models(cls, base_url: str, api_key: str, missing_models: list[str]) -> None:
         """Attempt pulling missing models from the Ollama server."""
         native_base = cls._to_native_base_url(base_url)
         pull_url = f"{native_base}/api/pull"

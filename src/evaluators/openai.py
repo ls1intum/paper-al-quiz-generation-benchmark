@@ -1,11 +1,10 @@
 """OpenAI provider implementation."""
 
 import os
-from typing import Any, Dict, Optional, Type
+from typing import Any
 
 from langchain_openai import ChatOpenAI
-from pydantic import BaseModel
-from pydantic import SecretStr
+from pydantic import BaseModel, SecretStr
 
 from .base import LLMProvider
 
@@ -49,8 +48,8 @@ class OpenAIProvider(LLMProvider):
     def generate(
         self,
         prompt: str,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         **kwargs: Any,
     ) -> str:
         """Generate response using OpenAI.
@@ -88,11 +87,11 @@ class OpenAIProvider(LLMProvider):
     def generate_structured(
         self,
         prompt: str,
-        schema: Type[BaseModel],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        schema: type[BaseModel],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate a schema-validated structured response using OpenAI."""
         if temperature is not None or max_tokens is not None:
             temp = temperature if temperature is not None else self.temperature

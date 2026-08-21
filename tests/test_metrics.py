@@ -97,7 +97,7 @@ def test_difficulty_phase_builds_prompt():
 def test_difficulty_param_validation():
     """DifficultyMetric should reject invalid param types and unknown params."""
     metric = DifficultyMetric()
-    with pytest.raises(ValueError, match="should be of type str"):
+    with pytest.raises(TypeError, match="should be of type str"):
         metric.validate_params(rubric=123)
     with pytest.raises(ValueError, match="Unknown parameter"):
         metric.validate_params(unknown_param="x")
@@ -291,7 +291,7 @@ def test_coverage_evaluate_requires_source_text():
 def test_coverage_param_validation():
     """CoverageMetric should validate granularity parameter type."""
     metric = CoverageMetric()
-    with pytest.raises(ValueError, match="should be of type str"):
+    with pytest.raises(TypeError, match="should be of type str"):
         metric.validate_params(granularity=10)
 
 

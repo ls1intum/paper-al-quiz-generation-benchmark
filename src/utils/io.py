@@ -2,14 +2,14 @@
 
 import json
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
-from pypdf import PdfReader
-from typing import List, Optional
 
-from ..models.quiz import Quiz, QuizQuestion, QuestionType
-from ..models.result import BenchmarkResult, AggregatedResults
+from pypdf import PdfReader
+
 from ..models.instruction import QuizInstructions
+from ..models.quiz import QuestionType, Quiz, QuizQuestion
+from ..models.result import AggregatedResults, BenchmarkResult
 
 
 class IOUtils:
@@ -56,7 +56,7 @@ class IOUtils:
         if created_at:
             created_at = datetime.fromisoformat(created_at)
         else:
-            created_at = datetime.now()
+            created_at = datetime.now(tz=UTC)
 
         quiz = Quiz(
             quiz_id=quiz_dict["quiz_id"],
@@ -71,7 +71,7 @@ class IOUtils:
         return quiz
 
     @staticmethod
-    def load_all_quizzes(quiz_directory: str) -> List[Quiz]:
+    def load_all_quizzes(quiz_directory: str) -> list[Quiz]:
         """Load all quizzes from a directory.
 
         Args:
@@ -94,7 +94,7 @@ class IOUtils:
             try:
                 quiz = IOUtils.load_quiz(str(quiz_file))
                 quizzes.append(quiz)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning("Failed to load %s: %s", quiz_file, e)
 
         return quizzes
@@ -157,7 +157,7 @@ class IOUtils:
                     page_text = page.extract_text()
                     if page_text:
                         text_content.append(page_text)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     logger.warning(
                         "Failed to extract text from page %d of %s: %s",
                         page_num,
@@ -173,7 +173,7 @@ class IOUtils:
             raise ValueError(f"Failed to read PDF file {source_path}: {e}") from e
 
     @staticmethod
-    def load_instructions(quiz: Quiz, instructions_dir: str) -> Optional[QuizInstructions]:
+    def load_instructions(quiz: Quiz, instructions_dir: str) -> QuizInstructions | None:
         logger = logging.getLogger(__name__)
         if not quiz.instructions:
             return None
@@ -188,7 +188,7 @@ class IOUtils:
         try:
             with open(instructions_file, "r", encoding="utf-8") as f:
                 return QuizInstructions.model_validate_json(f.read())
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             logger.warning(
                 "Failed to parse instructions file '%s': %s; proceeding without instructions",
                 quiz.instructions,
@@ -197,7 +197,7 @@ class IOUtils:
             return None
 
     @staticmethod
-    def save_results(results: List[BenchmarkResult], output_path: str, pretty: bool = True) -> None:
+    def save_results(results: list[BenchmarkResult], output_path: str, pretty: bool = True) -> None:
         """Save benchmark results to JSON file.
 
         Args:

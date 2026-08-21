@@ -11,8 +11,9 @@ still hand over its key.
 """
 
 import json
+from collections.abc import Callable
 from statistics import median
-from typing import Any, Callable, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -32,14 +33,14 @@ LENGTH_OUTLIER_RATIO = 1.5
 LENGTH_OUTLIER_MIN_DELTA = 20
 
 
-def analyze_length_signal(question: QuizQuestion) -> Dict[str, Any]:
+def analyze_length_signal(question: QuizQuestion) -> dict[str, Any]:
     """Flag the keyed option as a length outlier against its distractors.
 
     Conservative on purpose: the key must be both proportionally and absolutely
     longer than the typical distractor before this reports anything. Returns a
     structured signal for the prompt rather than a verdict.
     """
-    signal: Dict[str, Any] = {
+    signal: dict[str, Any] = {
         "keyed_option_is_outlier": False,
         "keyed_lengths": [],
         "median_distractor_length": None,
@@ -85,15 +86,15 @@ class CueingJudgeResponse(BaseModel):
 
     cue_present: bool
     severity: Literal["none", "minor", "strong"]
-    cue_types: List[str] = Field(default_factory=list)
-    key_revealed_by: List[str] = Field(default_factory=list)
+    cue_types: list[str] = Field(default_factory=list)
+    key_revealed_by: list[str] = Field(default_factory=list)
     rationale: str
 
 
 class CueingResponse(CueingJudgeResponse):
     """Final output: the verdict, the deterministic length signal, and the score."""
 
-    length_signal: Dict[str, Any] = Field(default_factory=dict)
+    length_signal: dict[str, Any] = Field(default_factory=dict)
     score: float = Field(ge=0, le=100)
 
 
@@ -117,7 +118,7 @@ class AbsenceOfCueingMetric(BaseMetric):
         return MetricScope.QUESTION_LEVEL
 
     @property
-    def phases(self) -> List[Phase]:
+    def phases(self) -> list[Phase]:
         return [
             Phase("judge", CueingJudgeResponse),
             Phase("finalize", CueingResponse, processor=self._finalize),
@@ -179,7 +180,7 @@ Respond with ONLY a JSON object matching this schema:
 }}"""
 
     @staticmethod
-    def _finalize(inp: PhaseInput) -> Dict[str, Any]:
+    def _finalize(inp: PhaseInput) -> dict[str, Any]:
         """Derive the score and reconcile severity with the detection verdict."""
         if inp.question is None:
             raise ValueError("absence_of_cueing finalize phase requires a question")
@@ -211,7 +212,7 @@ Respond with ONLY a JSON object matching this schema:
             "score": 0.0 if cue_present else 100.0,
         }
 
-    def format_insights(self, raw_response: str, quiz_id: str) -> Optional[str]:
+    def format_insights(self, raw_response: str, quiz_id: str) -> str | None:
         """Extract qualitative insights from the metric's raw response for display."""
         try:
             clean_json = raw_response.replace("```json", "").replace("```", "").strip()
@@ -241,4 +242,4 @@ Respond with ONLY a JSON object matching this schema:
             return "\n".join(lines)
 
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
-            return f"Could not parse absence of cueing insights: {str(e)}"
+            return f"Could not parse absence of cueing insights: {e!s}"

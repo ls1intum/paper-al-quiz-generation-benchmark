@@ -1,8 +1,11 @@
 """Coverage metric implementation."""
 
 import json
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import Any
+
 from pydantic import BaseModel, Field, field_validator
+
 from .base import BaseMetric, MetricParameter, MetricScope
 from .phase import Phase, PhaseInput, PhaseOutput
 
@@ -39,20 +42,20 @@ class CoverageMetric(BaseMetric):
     """
 
     class SourceTopicsResponse(BaseModel):
-        topics: List[str] = Field(default_factory=list)
-        critical_concepts: List[str] = Field(default_factory=list)
+        topics: list[str] = Field(default_factory=list)
+        critical_concepts: list[str] = Field(default_factory=list)
 
     class QuestionSummaryResponse(BaseModel):
-        topics: List[str] = Field(default_factory=list)
+        topics: list[str] = Field(default_factory=list)
         cognitive_level_label: str  # recall | understanding | application
         cognitive_level_score: int = Field(ge=1, le=3)
         reasoning: str
 
     class OverallCoverageResponse(BaseModel):
-        topics_in_source: List[str] = Field(default_factory=list)
-        topics_covered: List[str] = Field(default_factory=list)
-        critical_concepts: List[str] = Field(default_factory=list)
-        critical_covered: List[str] = Field(default_factory=list)
+        topics_in_source: list[str] = Field(default_factory=list)
+        topics_covered: list[str] = Field(default_factory=list)
+        critical_concepts: list[str] = Field(default_factory=list)
+        critical_covered: list[str] = Field(default_factory=list)
         breadth_reasoning: str
         depth_reasoning: str
         balance_reasoning: str
@@ -84,7 +87,7 @@ class CoverageMetric(BaseMetric):
         return MetricScope.QUIZ_LEVEL
 
     @property
-    def parameters(self) -> List[MetricParameter]:
+    def parameters(self) -> list[MetricParameter]:
         return [
             MetricParameter(
                 name="granularity",
@@ -95,7 +98,7 @@ class CoverageMetric(BaseMetric):
         ]
 
     @property
-    def phases(self) -> List[Phase]:
+    def phases(self) -> list[Phase]:
         """Three-stage coverage evaluation pipeline."""
         return [
             Phase("extract", self.SourceTopicsResponse),
@@ -104,7 +107,7 @@ class CoverageMetric(BaseMetric):
         ]
 
     @staticmethod
-    def _get_weights(granularity: str) -> Dict[str, float]:
+    def _get_weights(granularity: str) -> dict[str, float]:
         if granularity == "broad":
             return {"breadth": 40.0, "depth": 20.0, "balance": 20.0, "critical": 20.0}
         elif granularity == "detailed":
@@ -342,7 +345,7 @@ Respond with ONLY this JSON object:
 
         return round(score, 1)
 
-    def format_insights(self, raw_response: str, quiz_id: str) -> Optional[str]:
+    def format_insights(self, raw_response: str, quiz_id: str) -> str | None:
         """Format coverage reasoning phases into a human-readable insight block."""
         try:
             clean_json = raw_response.replace("```json", "").replace("```", "").strip()

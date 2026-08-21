@@ -1,6 +1,6 @@
 """Registry for metric discovery and instantiation."""
 
-from typing import Dict, List, Optional, Type
+from typing import ClassVar
 
 from .base import BaseMetric
 
@@ -11,10 +11,10 @@ class MetricRegistry:
     Provides a central place to register and retrieve metric implementations.
     """
 
-    _metrics: Dict[str, Type[BaseMetric]] = {}
+    _metrics: ClassVar[dict[str, type[BaseMetric]]] = {}
 
     @classmethod
-    def register(cls, metric_class: Type[BaseMetric]) -> None:
+    def register(cls, metric_class: type[BaseMetric]) -> None:
         """Register a metric class.
 
         Args:
@@ -24,7 +24,7 @@ class MetricRegistry:
             ValueError: If metric_class doesn't inherit from BaseMetric
         """
         if not issubclass(metric_class, BaseMetric):
-            raise ValueError("metric_class must inherit from BaseMetric")
+            raise TypeError("metric_class must inherit from BaseMetric")
 
         # Instantiate temporarily to get the name
         instance = metric_class()
@@ -33,7 +33,7 @@ class MetricRegistry:
         cls._metrics[metric_name] = metric_class
 
     @classmethod
-    def get(cls, metric_name: str) -> Optional[Type[BaseMetric]]:
+    def get(cls, metric_name: str) -> type[BaseMetric] | None:
         """Get a metric class by name.
 
         Args:
@@ -66,7 +66,7 @@ class MetricRegistry:
         return metric_class()
 
     @classmethod
-    def list_metrics(cls) -> List[str]:
+    def list_metrics(cls) -> list[str]:
         """List all registered metric names.
 
         Returns:

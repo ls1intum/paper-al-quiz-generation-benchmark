@@ -10,7 +10,8 @@ anchoring). The deterministic finalize phase compares the two. Items with no
 stated intended level are reported as not applicable.
 """
 
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -30,7 +31,7 @@ MATCH_SCORES = {
 NOT_APPLICABLE_SCORE = 100.0
 
 
-def get_bloom_intended(question: QuizQuestion) -> Optional[str]:
+def get_bloom_intended(question: QuizQuestion) -> str | None:
     """Return the item's stated intended Bloom level, or None when absent.
 
     An absent key, an explicit null, and a whitespace-only string all mean the
@@ -58,7 +59,7 @@ class CognitiveLevelJudgeResponse(BaseModel):
 class CognitiveLevelResponse(CognitiveLevelJudgeResponse):
     """Final output: assigned level, comparison with intended, and score."""
 
-    bloom_intended: Optional[str] = None
+    bloom_intended: str | None = None
     match: str
     applicable: bool
     score: float = Field(ge=0, le=100)
@@ -84,7 +85,7 @@ class CognitiveLevelMetric(BaseMetric):
         return MetricScope.QUESTION_LEVEL
 
     @property
-    def phases(self) -> List[Phase]:
+    def phases(self) -> list[Phase]:
         return [
             Phase("judge", CognitiveLevelJudgeResponse),
             Phase("finalize", CognitiveLevelResponse, processor=self._finalize),
@@ -134,7 +135,7 @@ Respond with ONLY a JSON object matching this schema:
 }}"""
 
     @staticmethod
-    def _finalize(inp: PhaseInput) -> Dict[str, Any]:
+    def _finalize(inp: PhaseInput) -> dict[str, Any]:
         """Compare the judge's level with the intended level, or mark not applicable."""
         if inp.question is None:
             raise ValueError("cognitive_level finalize phase requires a question")

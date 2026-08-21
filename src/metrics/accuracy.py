@@ -1,5 +1,6 @@
 import json
-from typing import Callable, List, Optional
+from collections.abc import Callable
+
 from pydantic import BaseModel
 
 from .base import BaseMetric, MetricScope
@@ -23,7 +24,7 @@ class FactualAccuracyMetric(BaseMetric):
         bias_and_distortion: str
         source_alignment: str
         objectivity: str
-        major_errors_found: List[str]
+        major_errors_found: list[str]
         score: float
 
     @property
@@ -39,7 +40,7 @@ class FactualAccuracyMetric(BaseMetric):
         return MetricScope.QUESTION_LEVEL
 
     @property
-    def phases(self) -> List[Phase]:
+    def phases(self) -> list[Phase]:
         # Using the new structured response instead of the default ScoreResponse
         return [Phase("score", self.FactualAccuracyResponse)]
 
@@ -113,7 +114,7 @@ Respond with ONLY a JSON object matching this schema:
             raise ValueError(f"Score must be between 0 and 100, got {score}")
         return round(score, 1)
 
-    def format_insights(self, raw_response: str, quiz_id: str) -> Optional[str]:
+    def format_insights(self, raw_response: str, quiz_id: str) -> str | None:
         """Extract qualitative insights from the metric's raw response for display."""
         try:
             clean_json = raw_response.replace("```json", "").replace("```", "").strip()
@@ -146,4 +147,4 @@ Respond with ONLY a JSON object matching this schema:
             return "\n".join(lines)
 
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
-            return f"Could not parse factual accuracy insights: {str(e)}"
+            return f"Could not parse factual accuracy insights: {e!s}"
