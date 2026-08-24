@@ -19,6 +19,7 @@ from ..utils.io import IOUtils
 
 logger = logging.getLogger(__name__)
 
+
 class BenchmarkRunner:
 
     def __init__(self, config: BenchmarkConfig) -> None:
