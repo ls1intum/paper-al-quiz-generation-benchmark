@@ -280,12 +280,14 @@ class BenchmarkRunner:
         in_band = low <= mean_difficulty <= high
 
         if in_band:
-            print(
-                f"\n[Difficulty Compliance — {quiz_id}]"
-                f"\n  Requested : {instructions.difficulty} (band {low}–{high})"
-                f"\n  Mean score: {mean_difficulty}  ✓ within band"
-                f"\n  Questions : {len(difficulty_scores)} scored"
-                f"\n  Adjusted  : {mean_difficulty} (no penalty)"
+            self.logger.debug(
+                "\n[Difficulty Compliance — %s]"
+                "\n  Requested : %s (band %s–%s)"
+                "\n  Mean score: %s  ✓ within band"
+                "\n  Questions : %s scored"
+                "\n  Adjusted  : %s (no penalty)",
+                quiz_id, instructions.difficulty, low, high,
+                mean_difficulty, len(difficulty_scores), mean_difficulty,
             )
             return mean_difficulty
 
@@ -294,14 +296,17 @@ class BenchmarkRunner:
         penalty = round(min(distance * 0.5, 30.0), 1)
         adjusted = round(max(0.0, min(100.0, mean_difficulty - penalty)), 1)
 
-        print(
-            f"\n[Difficulty Compliance — {quiz_id}]"
-            f"\n  Requested : {instructions.difficulty} (band {low}–{high})"
-            f"\n  Mean score: {mean_difficulty}  ✗ outside band by {distance:.1f} pts"
-            f"\n  Penalty   : -{penalty} → adjusted mean = {adjusted}"
-            f"\n  Questions : {len(difficulty_scores)} scored"
-            f"\n  Note      : Quiz overall difficulty does not match the "
-            f"'{instructions.difficulty}' instruction."
+        self.logger.debug(
+            "\n[Difficulty Compliance — %s]"
+            "\n  Requested : %s (band %s–%s)"
+            "\n  Mean score: %s  ✗ outside band by %.1f pts"
+            "\n  Penalty   : -%s → adjusted mean = %s"
+            "\n  Questions : %s scored"
+            "\n  Note      : Quiz overall difficulty does not match the "
+            "'%s' instruction.",
+            quiz_id, instructions.difficulty, low, high,
+            mean_difficulty, distance, penalty, adjusted,
+            len(difficulty_scores), instructions.difficulty,
         )
         return adjusted
 
