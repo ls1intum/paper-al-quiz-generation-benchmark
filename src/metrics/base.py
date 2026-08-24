@@ -1,11 +1,14 @@
 """Base metric interface."""
 
 import json
+import logging
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 from pydantic import BaseModel, Field
 
@@ -203,10 +206,15 @@ class BaseMetric(ABC):
 
         if low <= raw_score <= high:
             # Already in band — no adjustment needed
-            print(
-                f"\n[Difficulty Band Check — {self.name}]\n"
-                f"  Requested: {requested_difficulty} ({low}–{high})\n"
-                f"  Raw score: {raw_score} — within band, no adjustment."
+            logger.debug(
+                "\n[Difficulty Band Check — %s]\n"
+                "  Requested: %s (%s–%s)\n"
+                "  Raw score: %s — within band, no adjustment.",
+                self.name,
+                requested_difficulty,
+                low,
+                high,
+                raw_score,
             )
             return raw_score
 
@@ -215,11 +223,19 @@ class BaseMetric(ABC):
         penalty = round(min(distance * 0.5, 30.0), 1)  # cap penalty at 30pts
         adjusted = round(max(0.0, min(100.0, raw_score - penalty)), 1)
 
-        print(
-            f"\n[Difficulty Band Check — {self.name}]\n"
-            f"  Requested: {requested_difficulty} ({low}–{high})\n"
-            f"  Raw score: {raw_score} — outside band by {distance:.1f} pts\n"
-            f"  Penalty:   -{penalty} → {adjusted}"
+        logger.debug(
+            "\n[Difficulty Band Check — %s]\n"
+            "  Requested: %s (%s–%s)\n"
+            "  Raw score: %s — outside band by %.1f pts\n"
+            "  Penalty:   -%s → %s",
+            self.name,
+            requested_difficulty,
+            low,
+            high,
+            raw_score,
+            distance,
+            penalty,
+            adjusted,
         )
         return adjusted
 
@@ -350,11 +366,17 @@ Respond with ONLY this JSON object:
         adjusted = raw_score + adjustment
         final = round(max(0.0, min(100.0, adjusted)), 1)
 
-        print(
-            f"\n[Instruction Adjustment — {self.name}]\n"
-            f"  Relevant:   {relevant}\n"
-            f"  Adjustment: {adjustment:+.2f} ({raw_score:.1f} → {final:.1f})\n"
-            f"  Reasoning:  {reasoning}"
+        logger.debug(
+            "\n[Instruction Adjustment — %s]\n"
+            "  Relevant:   %s\n"
+            "  Adjustment: %+.2f (%.1f → %.1f)\n"
+            "  Reasoning:  %s",
+            self.name,
+            relevant,
+            adjustment,
+            raw_score,
+            final,
+            reasoning,
         )
 
         return final

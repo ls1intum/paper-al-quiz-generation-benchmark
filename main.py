@@ -237,8 +237,8 @@ def main() -> int:
             else:
                 summary_str = summary
 
-            # Print the FULL summary (Statistics + Reasoning)
-            logger.info("\n%s", summary_str)
+            # Print stats-only to CLI; full summary goes to file
+            logger.info("\n%s", summary)
 
             # Save summary to text file
             summary_file = run_dir / "summary.txt"

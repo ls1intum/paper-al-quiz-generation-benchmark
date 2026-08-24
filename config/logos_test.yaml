@@ -1,0 +1,101 @@
+benchmark:
+  name: "logos_test"
+  version: "1.0.0"
+  runs: 1
+
+evaluators:
+  qwen38_27b:
+    provider: "openai_compatible"
+    model: "Qwen/Qwen3.8-27B"
+    base_url: "https://logos.aet.cit.tum.de/v1"
+    temperature: 1.0
+    max_tokens: 2000
+  qwen36_35b:
+    provider: "openai_compatible"
+    model: "Qwen/Qwen3.6-35B-A3B"
+    base_url: "https://logos.aet.cit.tum.de/v1"
+    temperature: 1.0
+    max_tokens: 2000
+  llama33_70b:
+    provider: "openai_compatible"
+    model: "RedHatAI/Llama-3.3-70B-Instruct-quantized.w4a16"
+    base_url: "https://logos.aet.cit.tum.de/v1"
+    temperature: 1.0
+    max_tokens: 2000
+  gptoss120b:
+    provider: "openai_compatible"
+    model: "openai/gpt-oss-120b"
+    base_url: "https://logos.aet.cit.tum.de/v1"
+    temperature: 1.0
+    max_tokens: 8000
+  gemma3_12b:
+    provider: "openai_compatible"
+    model: "google/gemma-3-12b-it"
+    base_url: "https://logos.aet.cit.tum.de/v1"
+    temperature: 1.0
+    max_tokens: 2000
+  gemma3_4b:
+    provider: "openai_compatible"
+    model: "google/gemma-3-4b-it"
+    base_url: "https://logos.aet.cit.tum.de/v1"
+    temperature: 1.0
+    max_tokens: 2000
+  llama31_8b:
+    provider: "openai_compatible"
+    model: "meta-llama/Llama-3.1-8B-Instruct"
+    base_url: "https://logos.aet.cit.tum.de/v1"
+    temperature: 1.0
+    max_tokens: 2000
+  phi4reason:
+    provider: "openai_compatible"
+    model: "microsoft/Phi-4-reasoning"
+    base_url: "https://logos.aet.cit.tum.de/v1"
+    temperature: 1.0
+    max_tokens: 8000
+
+metrics:
+  - name: "accuracy"
+    version: "1.1"
+    evaluators: ["qwen38_27b", "qwen36_35b", "llama33_70b", "gptoss120b", "gemma3_12b", "gemma3_4b", "llama31_8b", "phi4reason"]
+    enabled: true
+  - name: "answer_key_correctness"
+    version: "1.0"
+    evaluators: ["qwen38_27b", "qwen36_35b", "llama33_70b", "gptoss120b", "gemma3_12b", "gemma3_4b", "llama31_8b", "phi4reason"]
+    enabled: true
+  - name: "objective_alignment"
+    version: "1.0"
+    evaluators: ["qwen38_27b", "qwen36_35b", "llama33_70b", "gptoss120b", "gemma3_12b", "gemma3_4b", "llama31_8b", "phi4reason"]
+    enabled: true
+  - name: "cognitive_level"
+    version: "1.0"
+    evaluators: ["qwen38_27b", "qwen36_35b", "llama33_70b", "gptoss120b", "gemma3_12b", "gemma3_4b", "llama31_8b", "phi4reason"]
+    enabled: true
+  - name: "clarity"
+    version: "2.0"
+    evaluators: ["qwen38_27b", "qwen36_35b", "llama33_70b", "gptoss120b", "gemma3_12b", "gemma3_4b", "llama31_8b", "phi4reason"]
+    enabled: true
+  - name: "distractor_quality"
+    version: "2.0"
+    evaluators: ["qwen38_27b", "qwen36_35b", "llama33_70b", "gptoss120b", "gemma3_12b", "gemma3_4b", "llama31_8b", "phi4reason"]
+    enabled: true
+  - name: "homogeneous_options"
+    version: "2.0"
+    evaluators: ["qwen38_27b", "qwen36_35b", "llama33_70b", "gptoss120b", "gemma3_12b", "gemma3_4b", "llama31_8b", "phi4reason"]
+    enabled: true
+  - name: "absence_of_cueing"
+    version: "1.0"
+    evaluators: ["qwen38_27b", "qwen36_35b", "llama33_70b", "gptoss120b", "gemma3_12b", "gemma3_4b", "llama31_8b", "phi4reason"]
+    enabled: true
+  - name: "grammatical_correctness"
+    version: "2.0"
+    evaluators: ["qwen38_27b", "qwen36_35b", "llama33_70b", "gptoss120b", "gemma3_12b", "gemma3_4b", "llama31_8b", "phi4reason"]
+    enabled: true
+
+inputs:
+  quiz_directory: "data/quizzes/example_quiz.json"
+  source_directory: "data/inputs"
+  instructions_directory: "data/instructions"
+
+outputs:
+  results_directory: "data/results/logos_test"
+  aggregate: true
