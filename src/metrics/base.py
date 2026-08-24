@@ -210,7 +210,11 @@ class BaseMetric(ABC):
                 "\n[Difficulty Band Check — %s]\n"
                 "  Requested: %s (%s–%s)\n"
                 "  Raw score: %s — within band, no adjustment.",
-                self.name, requested_difficulty, low, high, raw_score,
+                self.name,
+                requested_difficulty,
+                low,
+                high,
+                raw_score,
             )
             return raw_score
 
@@ -224,7 +228,14 @@ class BaseMetric(ABC):
             "  Requested: %s (%s–%s)\n"
             "  Raw score: %s — outside band by %.1f pts\n"
             "  Penalty:   -%s → %s",
-            self.name, requested_difficulty, low, high, raw_score, distance, penalty, adjusted,
+            self.name,
+            requested_difficulty,
+            low,
+            high,
+            raw_score,
+            distance,
+            penalty,
+            adjusted,
         )
         return adjusted
 
@@ -360,7 +371,12 @@ Respond with ONLY this JSON object:
             "  Relevant:   %s\n"
             "  Adjustment: %+.2f (%.1f → %.1f)\n"
             "  Reasoning:  %s",
-            self.name, relevant, adjustment, raw_score, final, reasoning,
+            self.name,
+            relevant,
+            adjustment,
+            raw_score,
+            final,
+            reasoning,
         )
 
         return final

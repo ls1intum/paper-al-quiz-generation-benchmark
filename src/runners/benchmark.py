@@ -17,6 +17,7 @@ from ..models.result import BenchmarkResult, EvaluationResult, MetricResult
 from ..utils.config_loader import ConfigLoader
 from ..utils.io import IOUtils
 
+logger = logging.getLogger(__name__)
 
 class BenchmarkRunner:
 
@@ -280,14 +281,19 @@ class BenchmarkRunner:
         in_band = low <= mean_difficulty <= high
 
         if in_band:
-            self.logger.debug(
+            logger.debug(
                 "\n[Difficulty Compliance — %s]"
                 "\n  Requested : %s (band %s–%s)"
                 "\n  Mean score: %s  ✓ within band"
                 "\n  Questions : %s scored"
                 "\n  Adjusted  : %s (no penalty)",
-                quiz_id, instructions.difficulty, low, high,
-                mean_difficulty, len(difficulty_scores), mean_difficulty,
+                quiz_id,
+                instructions.difficulty,
+                low,
+                high,
+                mean_difficulty,
+                len(difficulty_scores),
+                mean_difficulty,
             )
             return mean_difficulty
 
@@ -296,7 +302,7 @@ class BenchmarkRunner:
         penalty = round(min(distance * 0.5, 30.0), 1)
         adjusted = round(max(0.0, min(100.0, mean_difficulty - penalty)), 1)
 
-        self.logger.debug(
+        logger.debug(
             "\n[Difficulty Compliance — %s]"
             "\n  Requested : %s (band %s–%s)"
             "\n  Mean score: %s  ✗ outside band by %.1f pts"
@@ -304,9 +310,16 @@ class BenchmarkRunner:
             "\n  Questions : %s scored"
             "\n  Note      : Quiz overall difficulty does not match the "
             "'%s' instruction.",
-            quiz_id, instructions.difficulty, low, high,
-            mean_difficulty, distance, penalty, adjusted,
-            len(difficulty_scores), instructions.difficulty,
+            quiz_id,
+            instructions.difficulty,
+            low,
+            high,
+            mean_difficulty,
+            distance,
+            penalty,
+            adjusted,
+            len(difficulty_scores),
+            instructions.difficulty,
         )
         return adjusted
 
