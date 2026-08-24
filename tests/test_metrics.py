@@ -1,5 +1,7 @@
 """Tests for metric implementations."""
 
+import json
+
 import pytest
 
 from src.metrics.difficulty import DifficultyMetric
@@ -10,7 +12,22 @@ from src.metrics.base import ScoreResponse
 from src.metrics.homogeneous_options import HomogeneousOptionsMetric
 from src.metrics.phase import Phase, PhaseInput, PhaseOutput
 from src.metrics.accuracy import FactualAccuracyMetric
+from src.metrics.answer_key_correctness import (
+    AnswerKeyCorrectnessMetric,
+    detect_catch_all_options,
+)
+from src.metrics.objective_alignment import (
+    ObjectiveAlignmentMetric,
+    get_learning_objective,
+)
+from src.metrics.absence_of_cueing import (
+    AbsenceOfCueingMetric,
+    analyze_length_signal,
+)
+from src.metrics.grammatic import GrammaticalCorrectnessMetric
+from src.metrics.cognitive_level import CognitiveLevelMetric, get_bloom_intended
 from src.models.quiz import QuizQuestion, QuestionType, Quiz
+from src.models.result import EvaluationResult
 from tests.conftest import MockLLMProvider
 
 
@@ -42,7 +59,7 @@ def make_phase_input(metric, phase_name, **kwargs) -> PhaseInput:
 
 
 @pytest.mark.parametrize("score", [42.0, 88.0, 85.5])
-@pytest.mark.parametrize("metric_cls", [DifficultyMetric, ClarityMetric, DistractorQualityMetric, FactualAccuracyMetric])
+@pytest.mark.parametrize("metric_cls", [DifficultyMetric, FactualAccuracyMetric])
 def test_simple_metric_parse_score_success(metric_cls, score):
     """Single-stage metrics should parse a PhaseOutput with a valid score."""
     metric = metric_cls()
@@ -51,7 +68,7 @@ def test_simple_metric_parse_score_success(metric_cls, score):
 
 
 @pytest.mark.parametrize("score", [-1, 101])
-@pytest.mark.parametrize("metric_cls", [DifficultyMetric, ClarityMetric, DistractorQualityMetric, FactualAccuracyMetric])
+@pytest.mark.parametrize("metric_cls", [DifficultyMetric, FactualAccuracyMetric])
 def test_simple_metric_parse_score_failure(metric_cls, score):
     """Single-stage metrics should reject out-of-range scores."""
     metric = metric_cls()
@@ -80,7 +97,7 @@ def test_difficulty_phase_builds_prompt():
 def test_difficulty_param_validation():
     """DifficultyMetric should reject invalid param types and unknown params."""
     metric = DifficultyMetric()
-    with pytest.raises(ValueError, match="should be of type str"):
+    with pytest.raises(TypeError, match="should be of type str"):
         metric.validate_params(rubric=123)
     with pytest.raises(ValueError, match="Unknown parameter"):
         metric.validate_params(unknown_param="x")
@@ -89,7 +106,7 @@ def test_difficulty_param_validation():
 def test_clarity_phase_requires_question():
     """Clarity prompt builder should raise ValueError when question is missing."""
     metric = ClarityMetric()
-    inp = make_phase_input(metric, "score")
+    inp = make_phase_input(metric, "judge")
     with pytest.raises(ValueError, match="requires a question"):
         inp.prompt_builder(inp)
 
@@ -97,10 +114,37 @@ def test_clarity_phase_requires_question():
 def test_clarity_phase_builds_prompt():
     """Clarity prompt builder should return a non-empty string."""
     metric = ClarityMetric()
-    inp = make_phase_input(metric, "score", question=make_question())
+    inp = make_phase_input(metric, "judge", question=make_question())
     prompt = inp.prompt_builder(inp)
     assert isinstance(prompt, str)
     assert len(prompt) > 0
+    assert "Negative Phrasing" in prompt  # P2-3: negation check
+
+
+def test_clarity_finalize_maps_verdicts():
+    """Each clarity verdict maps to the correct score."""
+    from src.metrics.clarity import CLARITY_SCORES, ClarityMetric as _CM
+
+    metric = _CM()
+    for level, expected_score in CLARITY_SCORES.items():
+        inp = PhaseInput(
+            prompt_builder=None,
+            question=make_question(),
+            accumulated={
+                "judge": PhaseOutput(
+                    phase_name="judge",
+                    data={
+                        "clarity_level": level,
+                        "question_clarity_issues": [],
+                        "option_clarity_issues": [],
+                        "contains_negation": False,
+                        "rationale": "test",
+                    },
+                )
+            },
+        )
+        result = metric.phases[-1].process(inp, llm_client=None)
+        assert result["score"] == expected_score
 
 
 def test_coverage_parse_score_success():
@@ -247,8 +291,9 @@ def test_coverage_evaluate_requires_source_text():
 def test_coverage_param_validation():
     """CoverageMetric should validate granularity parameter type."""
     metric = CoverageMetric()
-    with pytest.raises(ValueError, match="should be of type str"):
+    with pytest.raises(TypeError, match="should be of type str"):
         metric.validate_params(granularity=10)
+
 
 def test_distractor_quality_analyze_phase_requires_question():
     """Distractor quality analyze prompt builder should raise ValueError when question is missing."""
@@ -257,12 +302,16 @@ def test_distractor_quality_analyze_phase_requires_question():
     with pytest.raises(ValueError, match="distractor_quality analyze phase requires a question"):
         inp.prompt_builder(inp)
 
-def test_distractor_quality_analyze_phase_requires_source_text():
-    """Distractor quality analyze prompt builder should raise ValueError when source_text is missing."""
+
+def test_distractor_quality_analyze_phase_source_optional():
+    """P0-2b: analyze phase no longer raises when source_text is None."""
     metric = DistractorQualityMetric()
     inp = make_phase_input(metric, "analyze", question=make_question())
-    with pytest.raises(ValueError, match="distractor_quality analyze phase requires source_text"):
-        inp.prompt_builder(inp)
+    prompt = inp.prompt_builder(inp)
+    assert isinstance(prompt, str)
+    assert "Source Material:" not in prompt
+    assert "KNOWLEDGE ALIGNMENT" in prompt
+
 
 def test_distractor_quality_analyze_phase_builds_prompt():
     """Distractor quality analyze prompt builder should return a non-empty string."""
@@ -271,17 +320,20 @@ def test_distractor_quality_analyze_phase_builds_prompt():
     prompt = inp.prompt_builder(inp)
     assert isinstance(prompt, str)
     assert len(prompt) > 0
+    assert "Source Material:" in prompt
+    assert "SOURCE ALIGNMENT" in prompt
 
-def test_distractor_quality_score_phase_requires_analyze_output():
-    """Distractor quality score prompt builder should raise ValueError when analyze output is missing."""
+
+def test_distractor_quality_judge_phase_requires_analyze_output():
+    """Distractor quality judge prompt builder should raise ValueError when analyze output is missing."""
     metric = DistractorQualityMetric()
-    # Missing 'accumulated' entirely
-    inp = make_phase_input(metric, "score")
+    inp = make_phase_input(metric, "judge")
     with pytest.raises(ValueError, match="requires 'analyze' phase output in accumulated"):
         inp.prompt_builder(inp)
 
-def test_distractor_quality_score_phase_builds_prompt():
-    """Distractor quality score prompt builder should return a non-empty string."""
+
+def test_distractor_quality_judge_phase_builds_prompt():
+    """Distractor quality judge prompt builder should return a non-empty string."""
     metric = DistractorQualityMetric()
     analyze_output = PhaseOutput(
         phase_name="analyze",
@@ -291,16 +343,39 @@ def test_distractor_quality_score_phase_builds_prompt():
             "discrimination_analysis": "test",
             "collective_analysis": "test",
             "difficulty_calibration": "test",
-        }
+            "source_grounded": True,
+        },
     )
-    inp = make_phase_input(
-        metric,
-        "score",
-        accumulated={"analyze": analyze_output}
-    )
+    inp = make_phase_input(metric, "judge", accumulated={"analyze": analyze_output})
     prompt = inp.prompt_builder(inp)
     assert isinstance(prompt, str)
     assert len(prompt) > 0
+
+
+def test_distractor_quality_finalize_maps_verdicts():
+    """Each distractor quality verdict maps to the correct score."""
+    from src.metrics.distractor import QUALITY_SCORES
+
+    metric = DistractorQualityMetric()
+    for level, expected_score in QUALITY_SCORES.items():
+        inp = PhaseInput(
+            prompt_builder=None,
+            question=make_question(),
+            accumulated={
+                "judge": PhaseOutput(
+                    phase_name="judge",
+                    data={
+                        "quality_level": level,
+                        "deduction_summary": "test",
+                        "rationale": "test",
+                    },
+                )
+            },
+        )
+        result = metric.phases[-1].process(inp, llm_client=None)
+        assert result["score"] == expected_score
+
+
 def test_homogeneous_options_parse_score_success():
     """HomogeneousOptionsMetric should extract score from aggregate output."""
     metric = HomogeneousOptionsMetric()
@@ -438,11 +513,7 @@ def test_homogeneous_options_aggregate_phase_computes_result():
                     {
                         "question_id": "q1",
                         "applicable": True,
-                        "grammatical_parallelism_score": 90.0,
-                        "content_type_homogeneity_score": 80.0,
-                        "format_consistency_score": 100.0,
-                        "question_score": 87.5,
-                        "severity": "none",
+                        "homogeneity_level": "good",
                         "issues": [],
                         "rationale": "parallel numeric values",
                     }
@@ -452,7 +523,7 @@ def test_homogeneous_options_aggregate_phase_computes_result():
     }
     inp = PhaseInput(prompt_builder=None, quiz=make_quiz(), accumulated=accumulated)
     result = metric.phases[-1].process(inp, llm_client=None)
-    assert result["score"] == 87.5
+    assert result["score"] == 66.7
     assert result["num_questions_applicable"] == 1
     assert "Aggregated 1 applicable questions" in result["aggregation_reasoning"]
 
@@ -496,11 +567,7 @@ def test_homogeneous_options_evaluate_end_to_end():
             {
                 "question_id": "q1",
                 "applicable": True,
-                "grammatical_parallelism_score": 95.0,
-                "content_type_homogeneity_score": 95.0,
-                "format_consistency_score": 100.0,
-                "question_score": 95.5,
-                "severity": "none",
+                "homogeneity_level": "excellent",
                 "issues": [],
                 "rationale": "All options are parallel.",
             },
@@ -508,5 +575,848 @@ def test_homogeneous_options_evaluate_end_to_end():
     )
 
     result = metric.evaluate(quiz=make_quiz(), llm_client=mock_llm)
-    assert result.score == 95.5
-    assert '"score": 95.5' in result.raw_response
+    assert result.score == 100.0
+    assert '"score": 100.0' in result.raw_response
+
+
+# ── answer_key_correctness ───────────────────────────────────────────────── #
+
+
+def _judge(key_correct: bool, **overrides) -> dict:
+    """A judge-phase response; overrides fill in the diagnostic sub-fields."""
+    return {
+        "key_correct": key_correct,
+        "defensible_correct_options": overrides.get("defensible", []),
+        "misclassified_options": overrides.get("misclassified", []),
+        "issue_flags": overrides.get("flags", []),
+        "rationale": overrides.get("rationale", "mock rationale"),
+    }
+
+
+def _evaluate_key(question, judge_response) -> tuple:
+    """Run the metric over one question, returning (EvaluationResult, parsed raw_response)."""
+    metric = AnswerKeyCorrectnessMetric()
+    mock_llm = MockLLMProvider(model="mock-model", responses=[judge_response])
+    result = metric.evaluate(question=question, llm_client=mock_llm)
+    return result, json.loads(result.raw_response)
+
+
+def test_answer_key_prompt_requires_question():
+    """Judge prompt builder should raise ValueError when question is missing."""
+    metric = AnswerKeyCorrectnessMetric()
+    inp = make_phase_input(metric, "judge")
+    with pytest.raises(ValueError, match="requires a question"):
+        inp.prompt_builder(inp)
+
+
+def test_answer_key_prompt_includes_options_and_key():
+    """Judge prompt should present every option and the marked key."""
+    metric = AnswerKeyCorrectnessMetric()
+    inp = make_phase_input(metric, "judge", question=make_question())
+    prompt = inp.prompt_builder(inp)
+
+    for option in make_question().options:
+        assert option in prompt
+    assert "Marked Correct Answer (key): 4" in prompt
+    assert "single_choice" in prompt
+
+
+def test_answer_key_prompt_without_source_asks_for_expert_knowledge():
+    """Missing source_text must not render as 'None' (see accuracy.py:60)."""
+    metric = AnswerKeyCorrectnessMetric()
+    inp = make_phase_input(metric, "judge", question=make_question())
+    prompt = inp.prompt_builder(inp)
+
+    assert "Source Material: None" not in prompt
+    assert "general expert knowledge" in prompt
+
+
+@pytest.mark.parametrize(
+    "options,expected",
+    [
+        (["Paris", "All of the above"], ["All of the above"]),
+        (["Keine der genannten", "Berlin"], ["Keine der genannten"]),
+        (["(Alle oben genannten)"], ["(Alle oben genannten)"]),
+        (["None of these statements is true"], ["None of these statements is true"]),
+        # Must NOT overflag ordinary domain prose.
+        (["A list of all listed items"], []),
+        (["All answers are stored in a hash map"], []),
+        (["The method returns all answers"], []),
+    ],
+)
+def test_detect_catch_all_options(options, expected):
+    """Catch-all detection covers English and German without flagging domain text."""
+    assert detect_catch_all_options(options) == expected
+
+
+def test_answer_key_correct_single_choice_scores_100():
+    """A correctly keyed single_choice item passes with no flags."""
+    result, data = _evaluate_key(make_question(), _judge(True, defensible=["4"]))
+
+    assert result.score == 100.0
+    assert data["key_correct"] is True
+    assert data["issue_flags"] == []
+    assert data["catch_all_options"] == []
+
+
+def test_answer_key_multiple_choice_omitted_correct_option():
+    """An unkeyed but defensible option flags multiple_defensible and fails."""
+    question = QuizQuestion(
+        question_id="q_mc",
+        question_type=QuestionType.MULTIPLE_CHOICE,
+        question_text="Which are prime?",
+        options=["2", "3", "4"],
+        correct_answer=["2"],
+    )
+    result, data = _evaluate_key(
+        question,
+        _judge(False, defensible=["2", "3"], misclassified=["3"], flags=["multiple_defensible"]),
+    )
+
+    assert result.score == 0.0
+    assert data["issue_flags"] == ["multiple_defensible"]
+    assert data["misclassified_options"] == ["3"]
+
+
+def test_answer_key_wrong_keyed_option():
+    """A keyed option that is actually incorrect flags keyed_answer_wrong."""
+    question = QuizQuestion(
+        question_id="q_wrong",
+        question_type=QuestionType.SINGLE_CHOICE,
+        question_text="What is 2+2?",
+        options=["2", "3", "4", "5"],
+        correct_answer="5",
+    )
+    result, data = _evaluate_key(
+        question, _judge(False, defensible=["4"], misclassified=["5"], flags=["keyed_answer_wrong"])
+    )
+
+    assert result.score == 0.0
+    assert data["issue_flags"] == ["keyed_answer_wrong"]
+
+
+def test_answer_key_catch_all_overrides_a_passing_judge():
+    """A catch-all option fails the item even when the judge said the key is fine."""
+    question = QuizQuestion(
+        question_id="q_catch_all",
+        question_type=QuestionType.SINGLE_CHOICE,
+        question_text="Which apply?",
+        options=["Speed", "Cost", "All of the above"],
+        correct_answer="All of the above",
+    )
+    result, data = _evaluate_key(question, _judge(True, defensible=["All of the above"]))
+
+    assert result.score == 0.0
+    assert data["key_correct"] is False
+    assert data["issue_flags"] == ["catch_all_present"]
+    assert data["catch_all_options"] == ["All of the above"]
+
+
+def test_answer_key_empty_key_does_not_crash():
+    """An item with no marked answer evaluates to a failing result, not an exception."""
+    question = QuizQuestion(
+        question_id="q_empty_key",
+        question_type=QuestionType.MULTIPLE_CHOICE,
+        question_text="Which statements hold?",
+        options=["A", "B", "C"],
+        correct_answer=[],
+    )
+    result, data = _evaluate_key(question, _judge(True, defensible=[]))
+
+    assert result.score == 0.0
+    assert data["key_correct"] is False
+    assert "no_correct_option" in data["issue_flags"]
+
+
+def test_answer_key_raw_response_carries_diagnostics():
+    """raw_response must expose the full diagnostic payload, not just a score."""
+    result, _ = _evaluate_key(make_question(), _judge(True, defensible=["4"]))
+
+    for field in (
+        "key_correct",
+        "defensible_correct_options",
+        "misclassified_options",
+        "issue_flags",
+        "catch_all_options",
+        "rationale",
+        "score",
+    ):
+        assert f'"{field}"' in result.raw_response
+
+
+def test_answer_key_unknown_judge_flags_are_dropped():
+    """Flags outside the four known issue flags never reach the output."""
+    _, data = _evaluate_key(
+        make_question(), _judge(False, flags=["multiple_defensible", "ambiguous_key", "nonsense"])
+    )
+
+    assert data["issue_flags"] == ["multiple_defensible"]
+
+
+# ── objective_alignment ──────────────────────────────────────────────────── #
+
+OBJECTIVE = "Streams — Du verstehst das Konzept von Streams und kannst sie anwenden."
+
+
+def make_question_with_objective(objective=OBJECTIVE) -> QuizQuestion:
+    metadata = {"topic": "Streams", "domain": "java"}
+    if objective is not None:
+        metadata["learning_objective"] = objective
+    return QuizQuestion(
+        question_id="q_lo",
+        question_type=QuestionType.SINGLE_CHOICE,
+        question_text="Which call turns a List into a Stream?",
+        options=["list.stream()", "list.iterator()", "list.toArray()", "list.size()"],
+        correct_answer="list.stream()",
+        metadata=metadata,
+    )
+
+
+def _judge_alignment(level: str, **overrides) -> dict:
+    return {
+        "alignment_level": level,
+        "matched_objective_aspects": overrides.get("matched", ["applying streams"]),
+        "missing_or_misaligned_aspects": overrides.get("missing", []),
+        "rationale": overrides.get("rationale", "mock rationale"),
+    }
+
+
+def _evaluate_alignment(question, judge_response) -> tuple:
+    metric = ObjectiveAlignmentMetric()
+    mock_llm = MockLLMProvider(model="mock-model", responses=[judge_response])
+    result = metric.evaluate(question=question, llm_client=mock_llm)
+    return result, json.loads(result.raw_response)
+
+
+def test_objective_alignment_prompt_requires_question():
+    metric = ObjectiveAlignmentMetric()
+    inp = make_phase_input(metric, "judge")
+    with pytest.raises(ValueError, match="requires a question"):
+        inp.prompt_builder(inp)
+
+
+def test_objective_alignment_prompt_includes_objective_and_item():
+    """The objective must appear verbatim, alongside the options and the marked answer."""
+    metric = ObjectiveAlignmentMetric()
+    question = make_question_with_objective()
+    inp = make_phase_input(metric, "judge", question=question)
+    prompt = inp.prompt_builder(inp)
+
+    assert OBJECTIVE in prompt
+    for option in question.options:
+        assert option in prompt
+    assert "Marked Correct Answer: list.stream()" in prompt
+    assert "Source Material: None" not in prompt
+
+
+@pytest.mark.parametrize(
+    "metadata,expected",
+    [
+        ({}, None),
+        ({"learning_objective": None}, None),
+        ({"learning_objective": ""}, None),
+        ({"learning_objective": "   "}, None),
+        ({"learning_objective": "  Streams  "}, "Streams"),
+    ],
+)
+def test_get_learning_objective(metadata, expected):
+    """An absent key, a null, and a whitespace-only string all mean 'no objective'."""
+    question = QuizQuestion(
+        question_id="q",
+        question_type=QuestionType.SINGLE_CHOICE,
+        question_text="t",
+        options=["a", "b"],
+        correct_answer="a",
+        metadata=metadata,
+    )
+    assert get_learning_objective(question) == expected
+
+
+@pytest.mark.parametrize(
+    "level,expected_score",
+    [("direct", 100.0), ("partial", 66.7), ("weak", 33.3), ("none", 0.0)],
+)
+def test_objective_alignment_level_determines_score(level, expected_score):
+    """The score is derived from the level, never supplied by the judge."""
+    result, data = _evaluate_alignment(make_question_with_objective(), _judge_alignment(level))
+
+    assert result.score == expected_score
+    assert data["alignment_level"] == level
+    assert data["applicable"] is True
+
+
+def test_objective_alignment_direct_echoes_objective():
+    result, data = _evaluate_alignment(make_question_with_objective(), _judge_alignment("direct"))
+
+    assert result.score == 100.0
+    assert data["learning_objective"] == OBJECTIVE
+    assert data["matched_objective_aspects"] == ["applying streams"]
+
+
+def test_objective_alignment_weak_preserved_in_raw_response():
+    """A weak verdict keeps its level and its evidence in raw_response."""
+    result, data = _evaluate_alignment(
+        make_question_with_objective(),
+        _judge_alignment("weak", matched=["stream vocabulary"], missing=["applying streams"]),
+    )
+
+    assert '"alignment_level": "weak"' in result.raw_response
+    assert result.score == 33.3
+    assert data["missing_or_misaligned_aspects"] == ["applying streams"]
+
+
+def test_objective_alignment_missing_objective_is_not_applicable():
+    """An item with no objective is excluded, whatever the judge answered."""
+    question = make_question_with_objective(objective=None)
+    # The judge is fed a contradicting "direct" verdict; it must be discarded.
+    result, data = _evaluate_alignment(question, _judge_alignment("direct"))
+
+    assert data["applicable"] is False
+    assert data["alignment_level"] == "not_applicable"
+    assert data["learning_objective"] is None
+    assert data["matched_objective_aspects"] == []
+    assert result.score == 100.0
+
+
+def test_objective_alignment_blank_objective_is_not_applicable():
+    """A whitespace-only objective is treated the same as an absent one."""
+    _, data = _evaluate_alignment(
+        make_question_with_objective(objective="   "), _judge_alignment("direct")
+    )
+
+    assert data["applicable"] is False
+    assert data["alignment_level"] == "not_applicable"
+
+
+def test_objective_alignment_raw_response_carries_diagnostics():
+    result, _ = _evaluate_alignment(make_question_with_objective(), _judge_alignment("partial"))
+
+    for field in (
+        "applicable",
+        "alignment_level",
+        "learning_objective",
+        "matched_objective_aspects",
+        "missing_or_misaligned_aspects",
+        "rationale",
+        "score",
+    ):
+        assert f'"{field}"' in result.raw_response
+
+
+# ── homogeneous_options per-question expansion ───────────────────────────── #
+
+
+def _homogeneity_result(*entries) -> EvaluationResult:
+    return EvaluationResult(
+        score=90.0,
+        raw_response="{}",
+        metadata={"phases": {"score_question": {"results": list(entries)}}},
+    )
+
+
+def _question_score(
+    question_id="q1", applicable=True, score=66.7, homogeneity_level="good", issues=None
+):
+    return {
+        "question_id": question_id,
+        "applicable": applicable,
+        "homogeneity_level": homogeneity_level,
+        "issues": issues if issues is not None else [],
+        "rationale": "mock rationale",
+    }
+
+
+def test_expand_question_results_default_is_empty():
+    """Metrics with no per-question breakdown give the runner nothing extra."""
+    result = EvaluationResult(score=50.0, raw_response="{}", metadata={})
+    assert FactualAccuracyMetric().expand_question_results(result) == []
+
+
+def test_homogeneous_options_expands_one_row_per_question():
+    metric = HomogeneousOptionsMetric()
+    rows = metric.expand_question_results(
+        _homogeneity_result(
+            _question_score("q1", homogeneity_level="good"),
+            _question_score("q2", homogeneity_level="fair", issues=["length_outlier"]),
+        )
+    )
+
+    assert [(qid, score) for qid, score, _ in rows] == [("q1", 66.7), ("q2", 33.3)]
+
+
+def test_homogeneous_options_expanded_raw_response_carries_diagnostics():
+    metric = HomogeneousOptionsMetric()
+    rows = metric.expand_question_results(
+        _homogeneity_result(
+            _question_score("q1", homogeneity_level="good", issues=["length_outlier"])
+        )
+    )
+
+    data = json.loads(rows[0][2])
+    assert data["homogeneity_level"] == "good"
+    assert data["issues"] == ["length_outlier"]
+    assert data["rationale"] == "mock rationale"
+    assert data["applicable"] is True
+
+
+def test_homogeneous_options_expands_not_applicable_questions():
+    """True/false items keep their existing excluded-but-present behaviour."""
+    metric = HomogeneousOptionsMetric()
+    rows = metric.expand_question_results(
+        _homogeneity_result(
+            _question_score(
+                "q_tf", applicable=False, homogeneity_level="excellent", issues=["not_applicable"]
+            )
+        )
+    )
+
+    assert len(rows) == 1
+    assert rows[0][1] == 100.0
+    assert json.loads(rows[0][2])["applicable"] is False
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        {},
+        {"phases": {}},
+        {"phases": {"score_question": {"results": []}}},
+        {"phases": {"score_question": "not a dict"}},
+    ],
+)
+def test_homogeneous_options_expansion_tolerates_missing_phase(metadata):
+    """A malformed run yields no rows instead of raising, so the aggregate survives."""
+    result = EvaluationResult(score=90.0, raw_response="{}", metadata=metadata)
+    assert HomogeneousOptionsMetric().expand_question_results(result) == []
+
+
+def test_homogeneous_options_expansion_skips_entries_without_question_id():
+    metric = HomogeneousOptionsMetric()
+    entry = _question_score("q1")
+    del entry["question_id"]
+    rows = metric.expand_question_results(_homogeneity_result(entry, _question_score("q2")))
+
+    assert [qid for qid, _, _ in rows] == ["q2"]
+
+
+# ── absence_of_cueing ────────────────────────────────────────────────────── #
+
+LONG_KEY = "Because the compiler performs escape analysis and elides the allocation entirely"
+
+
+def make_cueing_question(options=None, correct_answer=None, question_type=None) -> QuizQuestion:
+    return QuizQuestion(
+        question_id="q_cue",
+        question_type=question_type or QuestionType.SINGLE_CHOICE,
+        question_text="Why is the object not heap-allocated?",
+        options=options if options is not None else ["It is", "Unclear", LONG_KEY, "No reason"],
+        correct_answer=LONG_KEY if correct_answer is None else correct_answer,
+    )
+
+
+def _judge_cueing(cue_present, severity, **overrides) -> dict:
+    return {
+        "cue_present": cue_present,
+        "severity": severity,
+        "cue_types": overrides.get("cue_types", []),
+        "key_revealed_by": overrides.get("key_revealed_by", []),
+        "rationale": overrides.get("rationale", "mock rationale"),
+    }
+
+
+def _evaluate_cueing(question, judge_response) -> tuple:
+    metric = AbsenceOfCueingMetric()
+    mock_llm = MockLLMProvider(model="mock-model", responses=[judge_response])
+    result = metric.evaluate(question=question, llm_client=mock_llm)
+    return result, json.loads(result.raw_response)
+
+
+def test_cueing_prompt_requires_question():
+    metric = AbsenceOfCueingMetric()
+    inp = make_phase_input(metric, "judge")
+    with pytest.raises(ValueError, match="requires a question"):
+        inp.prompt_builder(inp)
+
+
+def test_cueing_prompt_includes_options_key_and_length_signal():
+    metric = AbsenceOfCueingMetric()
+    question = make_cueing_question()
+    inp = make_phase_input(metric, "judge", question=question)
+    prompt = inp.prompt_builder(inp)
+
+    for option in question.options:
+        assert option in prompt
+    assert f"Marked Correct Answer (key): {LONG_KEY}" in prompt
+    assert '"keyed_option_is_outlier": true' in prompt
+
+
+def test_length_signal_flags_a_clear_keyed_outlier():
+    signal = analyze_length_signal(make_cueing_question())
+    assert signal["keyed_option_is_outlier"] is True
+
+
+@pytest.mark.parametrize(
+    "options,correct_answer",
+    [
+        # Ordinary variation between similarly sized options.
+        (["alpha", "bravo", "charlie", "delta"], "charlie"),
+        # Proportionally longer but well under the absolute character floor.
+        (["red", "orange yellow", "blue", "green"], "orange yellow"),
+    ],
+)
+def test_length_signal_ignores_normal_differences(options, correct_answer):
+    """The heuristic stays conservative: both thresholds must trip together."""
+    question = make_cueing_question(options=options, correct_answer=correct_answer)
+    assert analyze_length_signal(question)["keyed_option_is_outlier"] is False
+
+
+def test_length_signal_skips_true_false():
+    question = make_cueing_question(
+        options=["True", "False"], correct_answer="True", question_type=QuestionType.TRUE_FALSE
+    )
+    signal = analyze_length_signal(question)
+
+    assert signal["keyed_option_is_outlier"] is False
+    assert "true/false" in signal["note"]
+
+
+def test_length_signal_handles_empty_key():
+    """An item with no marked answer must not blow up the length comparison."""
+    question = make_cueing_question(
+        options=["a", "b"], correct_answer=[], question_type=QuestionType.MULTIPLE_CHOICE
+    )
+    signal = analyze_length_signal(question)
+
+    assert signal["keyed_option_is_outlier"] is False
+    assert signal["keyed_lengths"] == []
+
+
+def test_cueing_absent_scores_100():
+    result, data = _evaluate_cueing(make_cueing_question(), _judge_cueing(False, "none"))
+
+    assert result.score == 100.0
+    assert data["cue_present"] is False
+    assert data["severity"] == "none"
+    assert data["cue_types"] == []
+
+
+def test_cueing_length_cue_preserves_type_and_fails():
+    result, data = _evaluate_cueing(
+        make_cueing_question(),
+        _judge_cueing(True, "strong", cue_types=["length"], key_revealed_by=["longest option"]),
+    )
+
+    assert result.score == 0.0
+    assert data["cue_types"] == ["length"]
+    assert data["severity"] == "strong"
+    assert data["key_revealed_by"] == ["longest option"]
+
+
+def test_cueing_unknown_types_are_dropped():
+    """Types outside the known vocabulary never reach the output."""
+    _, data = _evaluate_cueing(
+        make_cueing_question(),
+        _judge_cueing(True, "minor", cue_types=["grammatical", "specificity", "vibes"]),
+    )
+
+    assert data["cue_types"] == ["grammatical"]
+
+
+@pytest.mark.parametrize(
+    "cue_present,judge_severity,expected_severity",
+    [
+        # "a cue is present" and "severity none" cannot both hold.
+        (True, "none", "minor"),
+        (False, "strong", "none"),
+        (True, "strong", "strong"),
+        (False, "none", "none"),
+    ],
+)
+def test_cueing_severity_is_reconciled_with_the_verdict(
+    cue_present, judge_severity, expected_severity
+):
+    _, data = _evaluate_cueing(
+        make_cueing_question(), _judge_cueing(cue_present, judge_severity, cue_types=["semantic"])
+    )
+
+    assert data["severity"] == expected_severity
+    # A no-cue verdict carries no cue types, whatever the judge listed.
+    assert bool(data["cue_types"]) is cue_present
+
+
+def test_cueing_raw_response_carries_diagnostics():
+    result, _ = _evaluate_cueing(
+        make_cueing_question(), _judge_cueing(True, "minor", cue_types=["convergence"])
+    )
+
+    for field in (
+        "cue_present",
+        "severity",
+        "cue_types",
+        "key_revealed_by",
+        "rationale",
+        "length_signal",
+        "score",
+    ):
+        assert f'"{field}"' in result.raw_response
+
+
+# ── grammatical_correctness ──────────────────────────────────────────────── #
+
+
+def _judge_grammar(severity, **overrides) -> dict:
+    return {
+        "severity": severity,
+        "grammar_issues": overrides.get("grammar", []),
+        "spelling_issues": overrides.get("spelling", []),
+        "punctuation_issues": overrides.get("punctuation", []),
+        "rationale": overrides.get("rationale", "mock rationale"),
+    }
+
+
+def _evaluate_grammar(question, judge_response, **params) -> tuple:
+    metric = GrammaticalCorrectnessMetric()
+    mock_llm = MockLLMProvider(model="mock-model", responses=[judge_response])
+    result = metric.evaluate(question=question, llm_client=mock_llm, **params)
+    return result, json.loads(result.raw_response)
+
+
+def test_grammar_is_question_level():
+    """The whole point of the conversion: one score per item, not per quiz."""
+    from src.metrics.base import MetricScope
+
+    assert GrammaticalCorrectnessMetric().scope == MetricScope.QUESTION_LEVEL
+
+
+def test_grammar_prompt_requires_question():
+    metric = GrammaticalCorrectnessMetric()
+    inp = make_phase_input(metric, "judge")
+    with pytest.raises(ValueError, match="requires a question"):
+        inp.prompt_builder(inp)
+
+
+def test_grammar_prompt_includes_stem_options_and_key():
+    metric = GrammaticalCorrectnessMetric()
+    question = make_question()
+    inp = make_phase_input(metric, "judge", question=question)
+    prompt = inp.prompt_builder(inp)
+
+    assert question.question_text in prompt
+    for option in question.options:
+        assert option in prompt
+    assert "Marked Correct Answer: 4" in prompt
+
+
+def test_grammar_prompt_excludes_other_questions():
+    """A per-item prompt must not carry its neighbours along."""
+    metric = GrammaticalCorrectnessMetric()
+    other = QuizQuestion(
+        question_id="q2",
+        question_type=QuestionType.TRUE_FALSE,
+        question_text="Python is a snake.",
+        options=["True", "False"],
+        correct_answer="True",
+    )
+    quiz = Quiz(
+        quiz_id="quiz_1",
+        title="Test Quiz",
+        source_material="source.md",
+        questions=[make_question(), other],
+    )
+    inp = make_phase_input(metric, "judge", question=make_question(), quiz=quiz)
+    prompt = inp.prompt_builder(inp)
+
+    assert make_question().question_text in prompt
+    assert other.question_text not in prompt
+
+
+@pytest.mark.parametrize(
+    "severity,expected_score",
+    [("none", 100.0), ("minor", 66.7), ("major", 33.3), ("critical", 0.0)],
+)
+def test_grammar_severity_determines_score(severity, expected_score):
+    """The score is derived from the severity, never supplied by the judge."""
+    result, data = _evaluate_grammar(make_question(), _judge_grammar(severity))
+
+    assert result.score == expected_score
+    assert data["severity"] == severity
+
+
+def test_grammar_issue_lists_survive_into_raw_response():
+    result, data = _evaluate_grammar(
+        make_question(),
+        _judge_grammar(
+            "major",
+            grammar=["subject-verb disagreement in option 2"],
+            spelling=["'recieve' in the stem"],
+            punctuation=["missing terminal period"],
+        ),
+    )
+
+    assert data["grammar_issues"] == ["subject-verb disagreement in option 2"]
+    assert data["spelling_issues"] == ["'recieve' in the stem"]
+    assert data["punctuation_issues"] == ["missing terminal period"]
+    for field in ("severity", "rationale", "score"):
+        assert f'"{field}"' in result.raw_response
+
+
+def test_grammar_language_parameter_reaches_the_prompt():
+    metric = GrammaticalCorrectnessMetric()
+    inp = make_phase_input(metric, "judge", question=make_question(), params={"language": "German"})
+
+    assert "Language: German" in inp.prompt_builder(inp)
+
+
+def test_grammar_language_defaults_to_english():
+    metric = GrammaticalCorrectnessMetric()
+    inp = make_phase_input(metric, "judge", question=make_question())
+
+    assert "Language: English" in inp.prompt_builder(inp)
+
+
+def test_grammar_rejects_the_removed_error_weights_parameter():
+    """error_weights guided a continuous deduction; the severity levels replaced it."""
+    metric = GrammaticalCorrectnessMetric()
+    with pytest.raises(ValueError, match="Unknown parameter"):
+        metric.validate_params(error_weights={"critical": 1.0})
+
+
+# ── cognitive_level ──────────────────────────────────────────────────────── #
+
+
+def _make_question_with_bloom(bloom_intended=None) -> QuizQuestion:
+    metadata = {}
+    if bloom_intended is not None:
+        metadata["bloom_intended"] = bloom_intended
+    return QuizQuestion(
+        question_id="q_bloom",
+        question_type=QuestionType.SINGLE_CHOICE,
+        question_text="What is polymorphism?",
+        options=["A", "B", "C", "D"],
+        correct_answer="A",
+        metadata=metadata,
+    )
+
+
+def test_cognitive_level_prompt_requires_question():
+    metric = CognitiveLevelMetric()
+    inp = make_phase_input(metric, "judge")
+    with pytest.raises(ValueError, match="requires a question"):
+        inp.prompt_builder(inp)
+
+
+def test_cognitive_level_prompt_builds():
+    metric = CognitiveLevelMetric()
+    inp = make_phase_input(metric, "judge", question=_make_question_with_bloom("APPLY"))
+    prompt = inp.prompt_builder(inp)
+    assert "REMEMBER" in prompt
+    assert "CREATE" in prompt
+    # Must NOT show the intended level (avoid anchoring)
+    assert (
+        "APPLY" not in prompt or "APPLY:" in prompt
+    )  # APPLY appears in level list, not as intended
+
+
+def test_cognitive_level_finalize_matches():
+    metric = CognitiveLevelMetric()
+    question = _make_question_with_bloom("UNDERSTAND")
+    inp = PhaseInput(
+        prompt_builder=None,
+        question=question,
+        accumulated={
+            "judge": PhaseOutput(
+                phase_name="judge",
+                data={"assigned_level": "UNDERSTAND", "rationale": "test"},
+            )
+        },
+    )
+    result = metric.phases[-1].process(inp, llm_client=None)
+    assert result["match"] == "matches"
+    assert result["score"] == 100.0
+    assert result["applicable"] is True
+
+
+def test_cognitive_level_finalize_below():
+    metric = CognitiveLevelMetric()
+    question = _make_question_with_bloom("ANALYZE")
+    inp = PhaseInput(
+        prompt_builder=None,
+        question=question,
+        accumulated={
+            "judge": PhaseOutput(
+                phase_name="judge",
+                data={"assigned_level": "REMEMBER", "rationale": "test"},
+            )
+        },
+    )
+    result = metric.phases[-1].process(inp, llm_client=None)
+    assert result["match"] == "below"
+    assert result["score"] == 0.0
+
+
+def test_cognitive_level_finalize_above():
+    metric = CognitiveLevelMetric()
+    question = _make_question_with_bloom("UNDERSTAND")
+    inp = PhaseInput(
+        prompt_builder=None,
+        question=question,
+        accumulated={
+            "judge": PhaseOutput(
+                phase_name="judge",
+                data={"assigned_level": "EVALUATE", "rationale": "test"},
+            )
+        },
+    )
+    result = metric.phases[-1].process(inp, llm_client=None)
+    assert result["match"] == "above"
+    assert result["score"] == 66.7
+
+
+def test_cognitive_level_finalize_not_applicable():
+    """Items without bloom_intended → applicable=False."""
+    metric = CognitiveLevelMetric()
+    question = _make_question_with_bloom()  # no bloom_intended
+    inp = PhaseInput(
+        prompt_builder=None,
+        question=question,
+        accumulated={
+            "judge": PhaseOutput(
+                phase_name="judge",
+                data={"assigned_level": "APPLY", "rationale": "test"},
+            )
+        },
+    )
+    result = metric.phases[-1].process(inp, llm_client=None)
+    assert result["applicable"] is False
+    assert result["match"] == "not_applicable"
+    assert result["score"] == 100.0
+
+
+def test_get_bloom_intended_normalizes():
+    q = _make_question_with_bloom("apply")
+    assert get_bloom_intended(q) == "APPLY"
+
+
+def test_get_bloom_intended_rejects_invalid():
+    q = _make_question_with_bloom("INVENT")
+    assert get_bloom_intended(q) is None
+
+
+# ── accuracy source guard (P2-2) ────────────────────────────────────────── #
+
+
+def test_accuracy_source_none_does_not_inject_literal_none():
+    """P2-2: source_text=None must not render as 'Source Material: None'."""
+    metric = FactualAccuracyMetric()
+    inp = make_phase_input(metric, "score", question=make_question())
+    prompt = inp.prompt_builder(inp)
+    assert "Source Material: None" not in prompt
+    assert "expert knowledge" in prompt
+
+
+def test_accuracy_source_present_includes_material():
+    metric = FactualAccuracyMetric()
+    inp = make_phase_input(metric, "score", question=make_question(), source_text="Some content")
+    prompt = inp.prompt_builder(inp)
+    assert "Source Material:" in prompt
+    assert "Some content" in prompt

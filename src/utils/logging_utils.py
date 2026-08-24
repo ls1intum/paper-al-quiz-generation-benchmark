@@ -2,10 +2,9 @@
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 
-def setup_logging(debug: bool = False, log_file: Optional[Path] = None) -> None:
+def setup_logging(debug: bool = False, log_file: Path | None = None) -> None:
     """Configure console/file logging for benchmark runs.
 
     Args:

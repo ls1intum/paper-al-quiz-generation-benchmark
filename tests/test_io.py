@@ -42,6 +42,7 @@ def test_load_quiz_and_all_quizzes(tmp_path):
     assert len(quizzes_single) == 1
     assert quizzes_single[0].quiz_id == "quiz_1"
 
+
 def test_load_all_quizzes_skips_invalid(tmp_path):
     quiz_dir = tmp_path / "quizzes"
     quiz_dir.mkdir()
@@ -70,18 +71,22 @@ def test_load_all_quizzes_skips_invalid(tmp_path):
     assert len(quizzes) == 1
     assert quizzes[0].quiz_id == "quiz_valid"
 
+
 def test_load_quiz_file_not_found(tmp_path):
     with pytest.raises(FileNotFoundError):
         IOUtils.load_quiz(str(tmp_path / "nonexistent.json"))
+
 
 def test_load_all_quizzes_directory_not_found(tmp_path):
     with pytest.raises(FileNotFoundError):
         IOUtils.load_all_quizzes(str(tmp_path / "nonexistent"))
 
+
 def test_load_source_text_markdown(tmp_path):
     source_path = tmp_path / "source.md"
     source_path.write_text("hello")
     assert IOUtils.load_source_text(str(source_path)) == "hello"
+
 
 def test_load_source_text_unsupported_format(tmp_path):
     source_path = tmp_path / "source.txt"
@@ -89,9 +94,11 @@ def test_load_source_text_unsupported_format(tmp_path):
     with pytest.raises(ValueError, match="Unsupported file format"):
         IOUtils.load_source_text(str(source_path))
 
+
 def test_load_source_text_file_not_found(tmp_path):
     with pytest.raises(FileNotFoundError):
         IOUtils.load_source_text(str(tmp_path / "nonexistent.md"))
+
 
 def test_save_results_and_aggregated_results(tmp_path):
     question = QuizQuestion(
@@ -164,3 +171,43 @@ def test_save_results_and_aggregated_results(tmp_path):
     saved_agg = json.loads(agg_path.read_text())
     assert saved_agg["benchmark_config_name"] == "test"
     assert "difficulty_mock" in saved_agg["aggregations"]
+    assert saved_agg["aggregations"]["difficulty_mock"]["n_applicable"] == 0
+    assert saved_agg["aggregations"]["difficulty_mock"]["n_total"] == 0
+
+
+def test_save_results_parses_raw_response_and_includes_usage(tmp_path):
+    """raw_response must be a dict (not double-encoded string) and usage must be present."""
+    metric_result = MetricResult(
+        metric_name="clarity",
+        metric_version="1.0",
+        score=80.0,
+        evaluator_model="mock",
+        quiz_id="quiz_1",
+        question_id="q1",
+        raw_response='{"clarity_level": "good", "score": 80.0}',
+        usage={"prompt_tokens": 100, "completion_tokens": 25},
+    )
+
+    result = BenchmarkResult(
+        benchmark_id="bench_1",
+        benchmark_version="1.0",
+        config_hash="hash",
+        quiz_id="quiz_1",
+        run_number=1,
+        metrics=[metric_result],
+        started_at=datetime.now(),
+        completed_at=datetime.now(),
+    )
+
+    output_path = tmp_path / "results.json"
+    IOUtils.save_results([result], str(output_path))
+
+    saved = json.loads(output_path.read_text())
+    saved_metric = saved[0]["metrics"][0]
+
+    # raw_response should be a dict, not a JSON string
+    assert isinstance(saved_metric["raw_response"], dict)
+    assert saved_metric["raw_response"]["clarity_level"] == "good"
+
+    # usage must be serialized
+    assert saved_metric["usage"] == {"prompt_tokens": 100, "completion_tokens": 25}

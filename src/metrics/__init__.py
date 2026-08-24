@@ -1,25 +1,33 @@
 """Metrics for evaluating quiz quality."""
 
-from .base import BaseMetric, MetricScope, MetricParameter
-from .registry import MetricRegistry
-from .difficulty import DifficultyMetric
-from .coverage import CoverageMetric
-from .clarity import ClarityMetric
-from .grammatic import GrammaticalCorrectnessMetric
-from .distractor import DistractorQualityMetric
-from .homogeneous_options import HomogeneousOptionsMetric
+from .absence_of_cueing import AbsenceOfCueingMetric
 from .accuracy import FactualAccuracyMetric
+from .answer_key_correctness import AnswerKeyCorrectnessMetric
+from .base import BaseMetric, MetricParameter, MetricScope
+from .clarity import ClarityMetric
+from .cognitive_level import CognitiveLevelMetric
+from .coverage import CoverageMetric
+from .difficulty import DifficultyMetric
+from .distractor import DistractorQualityMetric
+from .grammatic import GrammaticalCorrectnessMetric
+from .homogeneous_options import HomogeneousOptionsMetric
+from .objective_alignment import ObjectiveAlignmentMetric
+from .registry import MetricRegistry
 
 __all__ = [
+    "AbsenceOfCueingMetric",
+    "AnswerKeyCorrectnessMetric",
     "BaseMetric",
-    "MetricScope",
+    "ClarityMetric",
+    "CognitiveLevelMetric",
+    "CoverageMetric",
+    "DifficultyMetric",
+    "DistractorQualityMetric",
+    "FactualAccuracyMetric",
+    "GrammaticalCorrectnessMetric",
+    "HomogeneousOptionsMetric",
     "MetricParameter",
     "MetricRegistry",
-    "DifficultyMetric",
-    "CoverageMetric",
-    "ClarityMetric",
-    "GrammaticalCorrectnessMetric",
-    "DistractorQualityMetric",
-    "HomogeneousOptionsMetric",
-    "FactualAccuracyMetric",
+    "MetricScope",
+    "ObjectiveAlignmentMetric",
 ]

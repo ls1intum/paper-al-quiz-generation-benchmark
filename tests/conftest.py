@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from typing import Any, Dict, Iterable, List, Optional, Type
 
 import pytest
@@ -17,6 +18,11 @@ from src.metrics.coverage import CoverageMetric
 from src.metrics.clarity import ClarityMetric
 from src.metrics.homogeneous_options import HomogeneousOptionsMetric
 from src.metrics.accuracy import FactualAccuracyMetric
+from src.metrics.answer_key_correctness import AnswerKeyCorrectnessMetric
+from src.metrics.objective_alignment import ObjectiveAlignmentMetric
+from src.metrics.absence_of_cueing import AbsenceOfCueingMetric
+from src.metrics.grammatic import GrammaticalCorrectnessMetric
+from src.metrics.cognitive_level import CognitiveLevelMetric
 from src.models.config import BenchmarkConfig, EvaluatorConfig, InputOutputConfig, MetricConfig
 from src.models.quiz import Quiz, QuizQuestion, QuestionType
 
@@ -24,11 +30,9 @@ from src.models.quiz import Quiz, QuizQuestion, QuestionType
 class MockLLMProvider(LLMProvider):
     """Deterministic mock LLM provider for tests.
 
-    Prompt-sniffing detects which coverage phase is running:
-      - extract: prompt contains '"critical_concepts"' and 'must-know'
-      - map:     prompt contains '"cognitive_level_score"'
-      - score:   prompt contains '"final_score"'
-    All other calls fall back to a deterministic hash-based score.
+    Prompt-sniffing detects which phase is running by inspecting
+    JSON key names the prompt asks the LLM to return. All other calls
+    fall back to a deterministic hash-based score.
     """
 
     def __init__(
@@ -79,6 +83,109 @@ class MockLLMProvider(LLMProvider):
         }
 
     @staticmethod
+    def _answer_key_response() -> Dict[str, Any]:
+        return {
+            "key_correct": True,
+            "defensible_correct_options": ["4"],
+            "misclassified_options": [],
+            "issue_flags": [],
+            "rationale": "Mock answer-key verdict",
+        }
+
+    @staticmethod
+    def _objective_alignment_response() -> Dict[str, Any]:
+        return {
+            "alignment_level": "direct",
+            "matched_objective_aspects": ["mock aspect"],
+            "missing_or_misaligned_aspects": [],
+            "rationale": "Mock alignment verdict",
+        }
+
+    @staticmethod
+    def _grammar_response() -> Dict[str, Any]:
+        return {
+            "severity": "none",
+            "grammar_issues": [],
+            "spelling_issues": [],
+            "punctuation_issues": [],
+            "rationale": "Mock grammar verdict",
+        }
+
+    @staticmethod
+    def _cueing_response() -> Dict[str, Any]:
+        return {
+            "cue_present": False,
+            "severity": "none",
+            "cue_types": [],
+            "key_revealed_by": [],
+            "rationale": "Mock cueing verdict",
+        }
+
+    @staticmethod
+    def _clarity_judge_response() -> Dict[str, Any]:
+        return {
+            "clarity_level": "excellent",
+            "question_clarity_issues": [],
+            "option_clarity_issues": [],
+            "contains_negation": False,
+            "rationale": "Mock clarity verdict",
+        }
+
+    @staticmethod
+    def _distractor_analyze_response() -> Dict[str, Any]:
+        return {
+            "plausibility_analysis": "mock",
+            "misconception_analysis": "mock",
+            "discrimination_analysis": "mock",
+            "collective_analysis": "mock",
+            "difficulty_calibration": "mock",
+            "source_grounded": True,
+        }
+
+    @staticmethod
+    def _distractor_judge_response() -> Dict[str, Any]:
+        return {
+            "quality_level": "good",
+            "deduction_summary": "No issues.",
+            "rationale": "Mock distractor verdict",
+        }
+
+    @staticmethod
+    def _cognitive_level_response() -> Dict[str, Any]:
+        return {
+            "assigned_level": "UNDERSTAND",
+            "rationale": "Mock cognitive level assignment",
+        }
+
+    @staticmethod
+    def _question_id_from_prompt(prompt: str) -> str:
+        """Echo back the question id the prompt asked about, so fan-out phases align."""
+        match = re.search(r"Question ID: (\S+)", prompt)
+        return match.group(1) if match else "q1"
+
+    @classmethod
+    def _homogeneous_analyze_response(cls, prompt: str) -> Dict[str, Any]:
+        return {
+            "question_id": cls._question_id_from_prompt(prompt),
+            "applicable": True,
+            "exclusion_reason": None,
+            "option_analyses": [],
+            "dominant_grammatical_pattern": "noun_phrase",
+            "dominant_content_type": "concept_term",
+            "structural_outliers": [],
+        }
+
+    @classmethod
+    def _homogeneous_score_response(cls, prompt: str) -> Dict[str, Any]:
+        return {
+            "question_id": cls._question_id_from_prompt(prompt),
+            "applicable": True,
+            "homogeneity_level": "excellent",
+            "issues": [],
+            "rationale": "Mock homogeneity verdict",
+        }
+
+    @staticmethod
     def _detect_coverage_phase(prompt: str) -> Optional[str]:
         """Identify which coverage phase produced this prompt by inspecting
         the JSON key names the prompt asks the LLM to return."""
@@ -88,6 +195,53 @@ class MockLLMProvider(LLMProvider):
             return "map"
         if '"final_score"' in prompt:
             return "score"
+        return None
+
+    def _sniff_response(self, prompt: str) -> Optional[Dict[str, Any]]:
+        """Detect the phase from prompt content and return the appropriate mock response."""
+        if '"key_correct"' in prompt:
+            return self._answer_key_response()
+
+        if '"alignment_level"' in prompt:
+            return self._objective_alignment_response()
+
+        if '"cue_present"' in prompt:
+            return self._cueing_response()
+
+        if '"grammar_issues"' in prompt:
+            return self._grammar_response()
+
+        # clarity judge (verdict-based)
+        if '"clarity_level"' in prompt:
+            return self._clarity_judge_response()
+
+        # distractor judge (verdict-based)
+        if '"quality_level"' in prompt:
+            return self._distractor_judge_response()
+
+        # distractor analyze
+        if '"plausibility_analysis"' in prompt and '"source_grounded"' in prompt:
+            return self._distractor_analyze_response()
+
+        # cognitive_level judge
+        if '"assigned_level"' in prompt and "Bloom" in prompt:
+            return self._cognitive_level_response()
+
+        # homogeneous options phases
+        if '"dominant_grammatical_pattern"' in prompt:
+            return self._homogeneous_analyze_response(prompt)
+
+        if '"homogeneity_level"' in prompt:
+            return self._homogeneous_score_response(prompt)
+
+        phase = self._detect_coverage_phase(prompt)
+        if phase == "extract":
+            return self._coverage_extract_response()
+        if phase == "map":
+            return self._coverage_map_response()
+        if phase == "score":
+            return self._coverage_score_response()
+
         return None
 
     def generate(
@@ -103,13 +257,9 @@ class MockLLMProvider(LLMProvider):
             next_response = self._responses.pop(0)
             return next_response if isinstance(next_response, str) else json.dumps(next_response)
 
-        phase = self._detect_coverage_phase(prompt)
-        if phase == "extract":
-            return json.dumps(self._coverage_extract_response())
-        if phase == "map":
-            return json.dumps(self._coverage_map_response())
-        if phase == "score":
-            return json.dumps(self._coverage_score_response())
+        sniffed = self._sniff_response(prompt)
+        if sniffed is not None:
+            return json.dumps(sniffed)
 
         digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
         return str(int(digest, 16) % 101)
@@ -127,13 +277,9 @@ class MockLLMProvider(LLMProvider):
                 return {"score": 0}
             return self._responses.pop(0)
 
-        phase = self._detect_coverage_phase(prompt)
-        if phase == "extract":
-            return self._coverage_extract_response()
-        if phase == "map":
-            return self._coverage_map_response()
-        if phase == "score":
-            return self._coverage_score_response()
+        sniffed = self._sniff_response(prompt)
+        if sniffed is not None:
+            return sniffed
 
         digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
         return {"score": float(int(digest, 16) % 101)}
@@ -147,6 +293,11 @@ def registered_metrics() -> Iterable[str]:
     MetricRegistry.register(ClarityMetric)
     MetricRegistry.register(HomogeneousOptionsMetric)
     MetricRegistry.register(FactualAccuracyMetric)
+    MetricRegistry.register(AnswerKeyCorrectnessMetric)
+    MetricRegistry.register(ObjectiveAlignmentMetric)
+    MetricRegistry.register(AbsenceOfCueingMetric)
+    MetricRegistry.register(GrammaticalCorrectnessMetric)
+    MetricRegistry.register(CognitiveLevelMetric)
     yield MetricRegistry.list_metrics()
     MetricRegistry.clear()
 

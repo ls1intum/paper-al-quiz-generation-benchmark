@@ -1,24 +1,54 @@
 """Grammatical Correctness metric implementation."""
 
-from typing import Callable, Dict, List
-from ..models.quiz import Quiz
-from .base import BaseMetric, MetricParameter, MetricScope, ScoreResponse
+import json
+from collections.abc import Callable
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from .base import BaseMetric, MetricParameter, MetricScope
 from .phase import Phase, PhaseInput
+
+# The four severity levels, best to worst, evenly spaced. No midpoint: an item
+# either reads cleanly or it does not, and "somewhere in between" is not a
+# useful verdict about prose.
+SEVERITY_SCORES = {
+    "none": 100.0,
+    "minor": 66.7,
+    "major": 33.3,
+    "critical": 0.0,
+}
+
+
+class GrammarJudgeResponse(BaseModel):
+    """The judge's severity verdict and the issues behind it. Carries no score."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    severity: Literal["none", "minor", "major", "critical"]
+    grammar_issues: list[str] = Field(default_factory=list)
+    spelling_issues: list[str] = Field(default_factory=list)
+    punctuation_issues: list[str] = Field(default_factory=list)
+    rationale: str
+
+
+class GrammaticalCorrectnessResponse(GrammarJudgeResponse):
+    """Final output: the judge's severity plus the score derived from it."""
+
+    score: float = Field(ge=0, le=100)
 
 
 class GrammaticalCorrectnessMetric(BaseMetric):
-    """Evaluates the grammatical correctness of a quiz.
+    """Evaluates the grammatical correctness of a single quiz item.
 
-    Uses a single-stage pipeline:
-    1. score: scores grammar, spelling, punctuation, and sentence structure
-       across all questions in the quiz.
+    Scores the stem and every option together: one broken option makes the item
+    worse regardless of how clean the rest reads. The judge picks a severity and
+    the score follows from it, so a verdict and its number cannot disagree.
 
-    Instructions integration:
-    - language: The raw score is always computed based on the quiz's actual
-      language. Any language mismatch with instructions.language is handled
-      exclusively in the post-score instruction adjustment phase to avoid
-      double-penalization.
-    - custom_prompt: handled entirely in BaseMetric.evaluate().
+    Grammar is always assessed in the language the item is actually written in.
+    A well-written German item scores well even if English was requested --
+    language mismatch is an instruction-compliance question, handled separately,
+    and folding it in here would conflate two different failures.
     """
 
     @property
@@ -27,21 +57,15 @@ class GrammaticalCorrectnessMetric(BaseMetric):
 
     @property
     def version(self) -> str:
-        return "1.3"
+        return "2.0"
 
     @property
     def scope(self) -> MetricScope:
-        return MetricScope.QUIZ_LEVEL
+        return MetricScope.QUESTION_LEVEL
 
     @property
-    def parameters(self) -> List[MetricParameter]:
+    def parameters(self) -> list[MetricParameter]:
         return [
-            MetricParameter(
-                name="error_weights",
-                param_type=dict,
-                default={"critical": 1.0, "major": 0.5, "minor": 0.2},
-                description="Weights for different error severity levels",
-            ),
             MetricParameter(
                 name="language",
                 param_type=str,
@@ -51,124 +75,120 @@ class GrammaticalCorrectnessMetric(BaseMetric):
         ]
 
     @property
-    def phases(self) -> List[Phase]:
-        return [Phase("score", ScoreResponse)]
+    def phases(self) -> list[Phase]:
+        return [
+            Phase("judge", GrammarJudgeResponse),
+            Phase("finalize", GrammaticalCorrectnessResponse, processor=self._finalize),
+        ]
 
     def get_prompt_builder(self, phase_name: str) -> Callable[[PhaseInput], str]:
-        builders = {"score": self._build_score_prompt}
+        builders = {"judge": self._build_judge_prompt}
         if phase_name not in builders:
             raise ValueError(f"Unknown phase '{phase_name}' for metric '{self.name}'")
         return builders[phase_name]
 
-    def _build_score_prompt(self, inp: PhaseInput) -> str:
-        if inp.quiz is None:
-            raise ValueError("grammatical_correctness score phase requires a quiz")
+    def _build_judge_prompt(self, inp: PhaseInput) -> str:
+        if inp.question is None:
+            raise ValueError("grammatical_correctness judge phase requires a question")
 
-        error_weights: Dict = self.get_param_value("error_weights", **inp.params)
-
-        # Always evaluate grammar in the quiz's actual language, not the requested
-        # language from instructions. Language mismatch is handled exclusively in
-        # the post-score instruction adjustment phase (BaseMetric.adjust_score_for_custom_prompt)
-        # to prevent double-penalization.
+        question = inp.question
         language = self.get_param_value("language", **inp.params)
+        options_text = "\n".join(f"{i}. {option}" for i, option in enumerate(question.options, 1))
 
-        quiz_content = self._format_quiz_for_prompt(inp.quiz)
-
-        return f"""You are evaluating the grammatical correctness of quiz content.
+        return f"""You are evaluating the grammatical correctness of a single quiz item.
 
 Language: {language}
 
-Error Severity Levels (for your reference):
-- Critical (weight {error_weights['critical']}): Errors that make the text incomprehensible or change meaning
-- Major (weight {error_weights['major']}): Clear grammatical errors that disrupt reading flow
-- Minor (weight {error_weights['minor']}): Small issues like minor punctuation or capitalization
+**Item**:
+Question Type: {question.question_type.value}
+Stem: {question.question_text}
+Options:
+{options_text}
+Marked Correct Answer: {question.correct_answer}
 
-{quiz_content}
+**What to evaluate** -- the stem AND every option, not just the stem:
+1. Grammar: subject-verb agreement, tense, article usage (a/an/the), pronoun agreement, sentence structure.
+2. Spelling: misspellings, typos, character errors. Technical terms must be spelled correctly.
+3. Punctuation: commas, periods, question marks, apostrophes, quotation marks, punctuation in lists.
+4. Capitalization: sentence case, proper nouns, consistency across options.
+5. Sentence structure: complete sentences, no fragments or run-ons, parallel construction in lists.
+6. Technical writing: consistent formatting, professional tone, appropriate terminology.
+7. Terminology consistency, where an inconsistency affects grammar or readability.
 
-Provide a grammatical correctness score from 0 to 100, where:
-- 0-20: Severe Issues (multiple major grammar errors, incomprehensible)
-- 21-40: Significant Issues (several errors affecting clarity)
-- 41-60: Moderate Issues (noticeable errors but understandable)
-- 61-80: Minor Issues (few small errors, typos, or punctuation)
-- 81-100: Excellent (no grammatical errors, professional quality)
+**Guidelines**:
+- Apply the standard grammar rules of {language}. Judge the item in the language it is actually written in, even if that is not {language} -- do not deduct for the language itself being different.
+- An error in any option counts, not only errors in the stem.
+- Judge the writing, not the content: a factually wrong but well-written item has no grammar problem.
 
-Evaluate these aspects:
+**Severity**:
+- "none": no errors; professional quality throughout.
+- "minor": small issues only -- a typo, a missing comma, inconsistent capitalization.
+- "major": clear grammatical errors that disrupt reading flow.
+- "critical": errors that obscure the meaning or make the item hard to understand.
 
-1. Grammar:
-   - Subject-verb agreement
-   - Proper tense usage
-   - Correct article usage (a/an/the)
-   - Pronoun agreement and clarity
-   - Proper sentence structure
+List the specific issues you found in the matching category. Leave a list empty when that category is clean.
 
-2. Spelling:
-   - Correct spelling of all words
-   - Proper capitalization
-   - No typos or character errors
-
-3. Punctuation:
-   - Correct use of commas, periods, question marks
-   - Proper use of apostrophes and quotation marks
-   - Appropriate punctuation for lists
-
-4. Sentence Structure:
-   - Complete sentences (no fragments or run-ons)
-   - Clear and logical structure
-   - Parallel construction in lists
-
-5. Technical Writing Standards:
-   - Consistent formatting
-   - Professional tone maintained
-   - Appropriate technical terminology
-
-Guidelines:
-- Evaluate ALL parts: question text AND all answer options
-- A single error in any option affects the score
-- Technical terms should be spelled correctly
-- Consider standard grammar rules for {language}
-- Deduct points proportionally to severity and frequency
-
-Respond with ONLY a JSON object in this format:
-{{"score": <number between 0 and 100>}}"""
+Respond with ONLY a JSON object matching this schema:
+{{
+  "severity": "none" | "minor" | "major" | "critical",
+  "grammar_issues": ["specific issue", ...],
+  "spelling_issues": ["specific issue", ...],
+  "punctuation_issues": ["specific issue", ...],
+  "rationale": "<reasoning>"
+}}"""
 
     @staticmethod
-    def _format_quiz_for_prompt(quiz: Quiz) -> str:
-        """Format quiz content into a structured string for the LLM prompt."""
-        formatted = "--- CONTENT TO REVIEW START ---\n"
-        formatted += f"CONTEXT: Quiz Title: {quiz.title}\n"
+    def _finalize(inp: PhaseInput) -> dict[str, Any]:
+        """Derive the score from the judge's severity level."""
+        judge_output = inp.accumulated.get("judge")
+        if judge_output is None:
+            raise ValueError("finalize phase requires output from judge phase")
 
-        if hasattr(quiz, "metadata") and quiz.metadata:
-            audience = quiz.metadata.get("target_audience", "General")
-            formatted += f"CONTEXT: Target Audience: {audience}\n"
-            if "learning_objectives" in quiz.metadata:
-                objs = quiz.metadata["learning_objectives"]
-                formatted += f"CONTEXT: Learning Objectives: {', '.join(objs)}\n"
+        judged = judge_output.data
+        severity = judged["severity"]
 
-        formatted += "\n" + "=" * 40 + "\n\n"
+        return {
+            "severity": severity,
+            "grammar_issues": judged.get("grammar_issues", []),
+            "spelling_issues": judged.get("spelling_issues", []),
+            "punctuation_issues": judged.get("punctuation_issues", []),
+            "rationale": judged.get("rationale", ""),
+            "score": SEVERITY_SCORES[severity],
+        }
 
-        for idx, question in enumerate(quiz.questions, 1):
-            formatted += f"### ITEM {idx} (ID: {question.question_id})\n"
-            formatted += f"**Question Text:**\n{question.question_text}\n\n"
-            formatted += "**Options:**\n"
-            for opt_idx, option in enumerate(question.options, 1):
-                formatted += f"  {opt_idx}. {option}\n"
+    def format_insights(self, raw_response: str, quiz_id: str) -> str | None:
+        """Extract qualitative insights from the metric's raw response for display."""
+        try:
+            clean_json = raw_response.replace("```json", "").replace("```", "").strip()
+            data = json.loads(clean_json)
 
-            formatted += "\n**Correct Answer(s):** "
-            if isinstance(question.correct_answer, list):
-                formatted += ", ".join(question.correct_answer)
-            else:
-                formatted += str(question.correct_answer)
-            formatted += "\n"
+            severity = data.get("severity")
+            if severity is None:
+                return None
 
-            if hasattr(question, "source_reference") and question.source_reference:
-                formatted += f"**Reference:** {question.source_reference}\n"
+            lines = [
+                f"\n[Question ID: {quiz_id}] Grammatical Correctness:",
+                "-" * 50,
+                f"Severity: {severity}",
+                f"Score:    {data.get('score')}/100",
+            ]
 
-            if hasattr(question, "metadata") and question.metadata:
-                formatted += "**Metadata Tags:** "
-                tags = [f"{k}={v}" for k, v in question.metadata.items()]
-                formatted += ", ".join(tags) + "\n"
+            for label, key in (
+                ("Grammar", "grammar_issues"),
+                ("Spelling", "spelling_issues"),
+                ("Punctuation", "punctuation_issues"),
+            ):
+                issues = data.get(key, [])
+                if issues:
+                    lines.append(f"{label}:")
+                    for issue in issues:
+                        lines.append(f"  - {issue}")
+                else:
+                    lines.append(f"{label}: None")
 
-            formatted += "_" * 40 + "\n\n"
+            lines.append(f"Rationale: {data.get('rationale')}")
+            lines.append("-" * 50)
+            return "\n".join(lines)
 
-        formatted += "--- CONTENT TO REVIEW END ---"
-        return formatted
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+            return f"Could not parse grammatical correctness insights: {e!s}"

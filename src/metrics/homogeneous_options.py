@@ -1,12 +1,21 @@
 """Homogeneous options metric implementation."""
 
+import json
+from collections.abc import Callable
 from statistics import median
-from typing import Callable, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..models.result import EvaluationResult
 from .base import BaseMetric, MetricScope
 from .phase import Phase, PhaseInput, PhaseOutput
+
+HOMOGENEITY_SCORES = {
+    "excellent": 100.0,
+    "good": 66.7,
+    "fair": 33.3,
+    "poor": 0.0,
+}
 
 
 class OptionAnalysis(BaseModel):
@@ -27,11 +36,11 @@ class AnalyzeOptionsResponse(BaseModel):
 
     question_id: str
     applicable: bool
-    exclusion_reason: Optional[str] = None
-    option_analyses: List[OptionAnalysis] = Field(default_factory=list)
+    exclusion_reason: str | None = None
+    option_analyses: list[OptionAnalysis] = Field(default_factory=list)
     dominant_grammatical_pattern: str = ""
     dominant_content_type: str = ""
-    structural_outliers: List[str] = Field(default_factory=list)
+    structural_outliers: list[str] = Field(default_factory=list)
 
 
 class QuestionHomogeneityScoreResponse(BaseModel):
@@ -39,12 +48,8 @@ class QuestionHomogeneityScoreResponse(BaseModel):
 
     question_id: str
     applicable: bool
-    grammatical_parallelism_score: float = Field(ge=0, le=100)
-    content_type_homogeneity_score: float = Field(ge=0, le=100)
-    format_consistency_score: float = Field(ge=0, le=100)
-    question_score: float = Field(ge=0, le=100)
-    severity: str
-    issues: List[str] = Field(default_factory=list)
+    homogeneity_level: str = "excellent"
+    issues: list[str] = Field(default_factory=list)
     rationale: str
 
 
@@ -61,7 +66,7 @@ class QuestionScoreSummary(BaseModel):
     question_id: str
     applicable: bool
     score: float = Field(ge=0, le=100)
-    severity: str
+    homogeneity_level: str
 
 
 class AggregateHomogeneityResponse(BaseModel):
@@ -74,8 +79,8 @@ class AggregateHomogeneityResponse(BaseModel):
     median_question_score: float = Field(ge=0, le=100)
     major_violation_rate: float = Field(ge=0, le=1)
     perfect_homogeneity_rate: float = Field(ge=0, le=1)
-    issue_distribution: List[IssueCount] = Field(default_factory=list)
-    question_scores: List[QuestionScoreSummary] = Field(default_factory=list)
+    issue_distribution: list[IssueCount] = Field(default_factory=list)
+    question_scores: list[QuestionScoreSummary] = Field(default_factory=list)
     aggregation_reasoning: str
     score: float = Field(ge=0, le=100)
 
@@ -89,14 +94,14 @@ class HomogeneousOptionsMetric(BaseMetric):
 
     @property
     def version(self) -> str:
-        return "1.0"
+        return "2.0"
 
     @property
     def scope(self) -> MetricScope:
         return MetricScope.QUIZ_LEVEL
 
     @property
-    def phases(self) -> List[Phase]:
+    def phases(self) -> list[Phase]:
         return [
             Phase("analyze_options", AnalyzeOptionsResponse, fan_out=True),
             Phase("score_question", QuestionHomogeneityScoreResponse, fan_out=True),
@@ -187,37 +192,33 @@ Question: {inp.question.question_text}
 Structured Analysis:
 {analysis}
 
-Scoring rubric:
-- grammatical_parallelism_score: Are all options parallel in grammatical form?
-- content_type_homogeneity_score: Are all options the same kind of thing?
-- format_consistency_score: Are there avoidable formatting, punctuation, or length inconsistencies?
+**Verdict definitions**:
+- "excellent": All options share the same grammatical form and content type.
+               No formatting, punctuation, or length inconsistencies. Perfect parallelism.
+- "good":      Minor inconsistencies in one dimension (e.g., slight length variation),
+               but overall structure is parallel and professional.
+- "fair":      Noticeable heterogeneity — mixed grammatical forms or content types,
+               but options are still classifiable and not misleading.
+- "poor":      Severe heterogeneity — options mix fundamentally different structures
+               (e.g., code with prose, single words with full sentences).
 
-Weighting:
-question_score = 0.45 * grammatical_parallelism_score
-               + 0.45 * content_type_homogeneity_score
-               + 0.10 * format_consistency_score
-
-Severity:
-- none: question_score >= 85
-- minor: 60 <= question_score < 85
-- major: question_score < 60
+Evaluate across these three dimensions, then pick the verdict that best fits:
+- Grammatical parallelism: Are all options parallel in grammatical form?
+- Content type homogeneity: Are all options the same kind of thing?
+- Format consistency: Are there avoidable formatting, punctuation, or length inconsistencies?
 
 Issue labels should be short machine-readable strings such as:
 mixed_sentence_and_phrase, mixed_code_and_prose, mixed_definition_and_example,
 mixed_numeric_and_textual, length_outlier, punctuation_outlier, not_applicable.
 
-If the question is not applicable, return applicable=false, set all sub-scores and question_score to 100,
-severity to "none", and include "not_applicable" in issues.
+If the question is not applicable, return applicable=false, homogeneity_level="excellent",
+and include "not_applicable" in issues.
 
 Respond with ONLY a JSON object in this format:
 {{
   "question_id": "{inp.question.question_id}",
   "applicable": true,
-  "grammatical_parallelism_score": 90,
-  "content_type_homogeneity_score": 85,
-  "format_consistency_score": 95,
-  "question_score": 89.0,
-  "severity": "none",
+  "homogeneity_level": "excellent" | "good" | "fair" | "poor",
   "issues": ["length_outlier"],
   "rationale": "brief explanation"
 }}"""
@@ -236,7 +237,12 @@ Respond with ONLY a JSON object in this format:
 
         total_questions = inp.quiz.num_questions
         applicable_results = [r for r in results if r.get("applicable")]
-        applicable_scores = [float(r["question_score"]) for r in applicable_results]
+
+        # Map verdict to score for each applicable question
+        applicable_scores = [
+            HOMOGENEITY_SCORES.get(r.get("homogeneity_level", "excellent"), 100.0)
+            for r in applicable_results
+        ]
 
         num_applicable = len(applicable_results)
         num_excluded = total_questions - num_applicable
@@ -245,13 +251,12 @@ Respond with ONLY a JSON object in this format:
         )
         median_question_score = median(applicable_scores) if applicable_scores else 100.0
         major_violation_rate = (
-            sum(1 for r in applicable_results if r.get("severity") == "major") / num_applicable
+            sum(1 for s in applicable_scores if s <= 33.3) / num_applicable
             if applicable_results
             else 0.0
         )
         perfect_homogeneity_rate = (
-            sum(1 for r in applicable_results if float(r.get("question_score", 0)) >= 95)
-            / num_applicable
+            sum(1 for s in applicable_scores if s >= 95) / num_applicable
             if applicable_results
             else 0.0
         )
@@ -264,8 +269,8 @@ Respond with ONLY a JSON object in this format:
             QuestionScoreSummary(
                 question_id=r.get("question_id"),
                 applicable=bool(r.get("applicable")),
-                score=float(r.get("question_score", 100)),
-                severity=str(r.get("severity")),
+                score=HOMOGENEITY_SCORES.get(r.get("homogeneity_level", "excellent"), 100.0),
+                homogeneity_level=r.get("homogeneity_level", "excellent"),
             ).model_dump()
             for r in results
         ]
@@ -298,10 +303,29 @@ Respond with ONLY a JSON object in this format:
             "score": round(computed_score, 2),
         }
 
+    def expand_question_results(self, result: EvaluationResult) -> list[tuple[str, float, str]]:
+        """Hand back the per-question scores this metric already produced."""
+        phases = result.metadata.get("phases", {})
+        scoring = phases.get("score_question")
+        if not isinstance(scoring, dict):
+            return []
+
+        rows = []
+        for entry in scoring.get("results", []):
+            if not isinstance(entry, dict):
+                continue
+            question_id = entry.get("question_id")
+            if not question_id:
+                continue
+            level = entry.get("homogeneity_level", "excellent")
+            score = HOMOGENEITY_SCORES.get(level, 100.0)
+            rows.append((str(question_id), score, json.dumps(entry, ensure_ascii=True)))
+        return rows
+
     @staticmethod
     def _get_question_result(
-        phase_output: Optional[PhaseOutput], question_id: str
-    ) -> Optional[dict[str, object]]:
+        phase_output: PhaseOutput | None, question_id: str
+    ) -> dict[str, object] | None:
         if phase_output is None:
             return None
 

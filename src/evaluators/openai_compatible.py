@@ -1,11 +1,10 @@
 """OpenAI-compatible provider for local/open-source models."""
 
 import os
-from typing import Any, Dict, Optional, Type
+from typing import Any
 
 from langchain_openai import ChatOpenAI
-from pydantic import BaseModel
-from pydantic import SecretStr
+from pydantic import BaseModel, SecretStr
 
 from .base import LLMProvider
 
@@ -18,8 +17,8 @@ class OpenAICompatibleProvider(LLMProvider):
         model: str,
         temperature: float = 0.0,
         max_tokens: int = 500,
-        base_url: Optional[str] = None,
-        api_key: Optional[str] = None,
+        base_url: str | None = None,
+        api_key: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize OpenAI-compatible provider.
@@ -59,8 +58,8 @@ class OpenAICompatibleProvider(LLMProvider):
     def generate(
         self,
         prompt: str,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         **kwargs: Any,
     ) -> str:
         """Generate response using OpenAI-compatible endpoint.
@@ -90,6 +89,7 @@ class OpenAICompatibleProvider(LLMProvider):
         else:
             response = self.llm.invoke(prompt)
 
+        self._record_usage(response)
         content = response.content
         if isinstance(content, str):
             return content
@@ -98,11 +98,11 @@ class OpenAICompatibleProvider(LLMProvider):
     def generate_structured(
         self,
         prompt: str,
-        schema: Type[BaseModel],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        schema: type[BaseModel],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate a schema-validated structured response from a compatible endpoint."""
         if temperature is not None or max_tokens is not None:
             temp = temperature if temperature is not None else self.temperature
@@ -115,10 +115,12 @@ class OpenAICompatibleProvider(LLMProvider):
                 max_completion_tokens=tokens,
                 **{**self.additional_params, **kwargs},
             )
-            response = llm.with_structured_output(schema).invoke(prompt)
+            result = llm.with_structured_output(schema, include_raw=True).invoke(prompt)
         else:
-            response = self.llm.with_structured_output(schema).invoke(prompt)
+            result = self.llm.with_structured_output(schema, include_raw=True).invoke(prompt)
 
+        self._record_usage(result["raw"])
+        response = result["parsed"]
         if isinstance(response, BaseModel):
             return response.model_dump()
         if isinstance(response, dict):

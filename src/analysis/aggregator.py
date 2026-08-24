@@ -1,8 +1,9 @@
 """Results aggregation module."""
 
+import json
 import statistics
 from collections import defaultdict
-from typing import Dict, List, Optional, Tuple, TypedDict, Union
+from typing import TypedDict
 
 import numpy as np
 import pingouin as pg
@@ -12,22 +13,37 @@ from ..models.result import (
     AggregatedResults,
     BenchmarkResult,
     MetricAggregation,
+    MetricResult,
 )
 
 
 class CeilingEffectResult(TypedDict):
     has_ceiling_effect: bool
-    affected_rater_indices: List[int]
-    rater_std_devs: List[float]
+    affected_rater_indices: list[int]
+    rater_std_devs: list[float]
+
+
+_METRICS_WITH_APPLICABLE = {"objective_alignment", "homogeneous_options", "cognitive_level"}
 
 
 class ResultsAggregator:
     """Aggregates benchmark results across multiple runs."""
 
     @staticmethod
+    def _is_applicable(result: MetricResult) -> bool:
+        """Check whether a MetricResult is applicable (should be included in aggregation)."""
+        if result.metric_name not in _METRICS_WITH_APPLICABLE:
+            return True
+        try:
+            data = json.loads(result.raw_response or "")
+            return bool(data.get("applicable", True))
+        except (json.JSONDecodeError, TypeError, AttributeError):
+            return True
+
+    @staticmethod
     def bootstrap_confidence_interval(
-        data: List[float], ci: float = 0.95, n_bootstrap: int = 10000
-    ) -> Tuple[float, float]:
+        data: list[float], ci: float = 0.95, n_bootstrap: int = 10000
+    ) -> tuple[float, float]:
         """Calculate bootstrap confidence interval for a given dataset.
 
         Args:
@@ -64,7 +80,7 @@ class ResultsAggregator:
         return float(lower_bound), float(upper_bound)
 
     @staticmethod
-    def aggregate(results: List[BenchmarkResult], benchmark_name: str) -> AggregatedResults:
+    def aggregate(results: list[BenchmarkResult], benchmark_name: str) -> AggregatedResults:
         """Aggregate results from multiple benchmark runs.
 
         Args:
@@ -79,14 +95,22 @@ class ResultsAggregator:
 
         # Extract metadata
         benchmark_version = results[0].benchmark_version
-        quiz_ids = list(set(r.quiz_id for r in results))
-        total_runs = len(set(r.run_number for r in results))
+        quiz_ids = list({r.quiz_id for r in results})
+        total_runs = len({r.run_number for r in results})
 
         # Group metric results by (metric_name, evaluator_model, quiz_id, question_id)
-        grouped_scores: Dict[tuple, List[float]] = defaultdict(list)
+        # P1-3: exclude inapplicable items so they don't inflate means
+        grouped_scores: dict[tuple, list[float]] = defaultdict(list)
+        total_counts: dict[tuple, int] = defaultdict(int)
+        applicable_counts: dict[tuple, int] = defaultdict(int)
 
         for result in results:
             for metric in result.metrics:
+                count_key = (metric.metric_name, metric.evaluator_model)
+                total_counts[count_key] += 1
+                if not ResultsAggregator._is_applicable(metric):
+                    continue
+                applicable_counts[count_key] += 1
                 key = (
                     metric.metric_name,
                     metric.evaluator_model,
@@ -99,9 +123,9 @@ class ResultsAggregator:
         aggregations = {}
 
         # Group by (metric_name, evaluator_model) for overall stats
-        overall_groups: Dict[tuple, List[float]] = defaultdict(list)
+        overall_groups: dict[tuple, list[float]] = defaultdict(list)
         for key, scores in grouped_scores.items():
-            metric_name, evaluator_model, quiz_id, question_id = key
+            metric_name, evaluator_model, _quiz_id, _question_id = key
             overall_groups[(metric_name, evaluator_model)].extend(scores)
 
         for (metric_name, evaluator_model), all_scores in overall_groups.items():
@@ -119,11 +143,13 @@ class ResultsAggregator:
                 per_run_scores=all_scores,
                 ci_lower=ci_lower,
                 ci_upper=ci_upper,
+                n_applicable=applicable_counts[(metric_name, evaluator_model)],
+                n_total=total_counts[(metric_name, evaluator_model)],
             )
 
         # Calculate inter-rater reliability for each metric
         inter_rater_reliability = {}
-        all_metrics = set(agg.metric_name for agg in aggregations.values())
+        all_metrics = {agg.metric_name for agg in aggregations.values()}
         for metric_name in all_metrics:
             irr = ResultsAggregator.calculate_inter_rater_reliability(results, metric_name)
             inter_rater_reliability[metric_name] = irr
@@ -138,7 +164,7 @@ class ResultsAggregator:
         )
 
     @staticmethod
-    def aggregate_by_quiz(results: List[BenchmarkResult]) -> Dict[str, AggregatedResults]:
+    def aggregate_by_quiz(results: list[BenchmarkResult]) -> dict[str, AggregatedResults]:
         """Aggregate results separately for each quiz.
 
         Args:
@@ -148,7 +174,7 @@ class ResultsAggregator:
             Dict mapping quiz_id to AggregatedResults
         """
         # Group results by quiz
-        by_quiz: Dict[str, List[BenchmarkResult]] = defaultdict(list)
+        by_quiz: dict[str, list[BenchmarkResult]] = defaultdict(list)
         for result in results:
             by_quiz[result.quiz_id].append(result)
 
@@ -163,8 +189,8 @@ class ResultsAggregator:
 
     @staticmethod
     def aggregate_by_metric(
-        results: List[BenchmarkResult], metric_name: str
-    ) -> Dict[str, MetricAggregation]:
+        results: list[BenchmarkResult], metric_name: str
+    ) -> dict[str, MetricAggregation]:
         """Aggregate results for a specific metric across all evaluators.
 
         Args:
@@ -175,11 +201,11 @@ class ResultsAggregator:
             Dict mapping evaluator_model to MetricAggregation
         """
         # Group by evaluator
-        by_evaluator: Dict[str, List[float]] = defaultdict(list)
+        by_evaluator: dict[str, list[float]] = defaultdict(list)
 
         for result in results:
             for metric in result.metrics:
-                if metric.metric_name == metric_name:
+                if metric.metric_name == metric_name and ResultsAggregator._is_applicable(metric):
                     by_evaluator[metric.evaluator_model].append(metric.score)
 
         # Calculate aggregations
@@ -204,8 +230,8 @@ class ResultsAggregator:
 
     @staticmethod
     def compare_evaluators(
-        results: List[BenchmarkResult], metric_name: str
-    ) -> Dict[str, Dict[str, float]]:
+        results: list[BenchmarkResult], metric_name: str
+    ) -> dict[str, dict[str, float]]:
         """Compare different evaluators for a specific metric.
 
         Args:
@@ -235,7 +261,7 @@ class ResultsAggregator:
     @staticmethod
     def _paired_columns(
         reliability_array: np.ndarray,
-    ) -> List[Tuple[np.ndarray, np.ndarray]]:
+    ) -> list[tuple[np.ndarray, np.ndarray]]:
         """Return all valid (rater_i, rater_j) column pairs with no NaNs.
 
         For each pair of raters we keep only the items where *both* raters
@@ -252,7 +278,7 @@ class ResultsAggregator:
         return pairs
 
     @staticmethod
-    def compute_mad(reliability_array: np.ndarray) -> Optional[float]:
+    def compute_mad(reliability_array: np.ndarray) -> float | None:
         """Mean Absolute Deviation averaged across all rater pairs.
 
         Operates on the same scale as the original scores (0-100 here), so
@@ -273,7 +299,7 @@ class ResultsAggregator:
         return float(np.mean(pair_mads))
 
     @staticmethod
-    def compute_spearman(reliability_array: np.ndarray) -> Optional[Dict[str, float]]:
+    def compute_spearman(reliability_array: np.ndarray) -> dict[str, float] | None:
         """Spearman rank correlation averaged across all rater pairs.
 
         Unlike ICC and MAD, Spearman's ρ is insensitive to systematic bias
@@ -324,8 +350,8 @@ class ResultsAggregator:
                 - affected_rater_indices (list of int)
                 - rater_std_devs (list of float, one per rater)
         """
-        rater_stds: List[float] = []
-        affected: List[int] = []
+        rater_stds: list[float] = []
+        affected: list[int] = []
 
         for i, row in enumerate(reliability_array):
             valid = row[~np.isnan(row)]
@@ -342,9 +368,9 @@ class ResultsAggregator:
 
     @staticmethod
     def _compute_reliability_status(
-        icc: Optional[float],
-        mad: Optional[float],
-        spearman_rho: Optional[float],
+        icc: float | None,
+        mad: float | None,
+        spearman_rho: float | None,
     ) -> str:
         """Compute a summary reliability status based on primary metrics.
 
@@ -367,8 +393,8 @@ class ResultsAggregator:
 
     @staticmethod
     def calculate_inter_rater_reliability(
-        results: List[BenchmarkResult], metric_name: str
-    ) -> Dict[str, Union[str, float, int, List[str], None]]:
+        results: list[BenchmarkResult], metric_name: str
+    ) -> dict[str, str | float | int | list[str] | None]:
         """Calculate inter-rater reliability metrics for a specific metric.
 
         Primary metrics (robust to systematic bias and ceiling effects):
@@ -379,7 +405,7 @@ class ResultsAggregator:
         # Step 1: Track all unique evaluators and items
         evaluators = set()
         items = set()
-        lookup: Dict[str, Dict[Tuple[int, str, Optional[str]], float]] = defaultdict(dict)
+        lookup: dict[str, dict[tuple[int, str, str | None], float]] = defaultdict(dict)
 
         for result in results:
             for metric in result.metrics:
@@ -389,8 +415,8 @@ class ResultsAggregator:
                     items.add(item_key)
                     lookup[metric.evaluator_model][item_key] = metric.score
 
-        evaluators_list = sorted(list(evaluators))
-        items_list = sorted(list(items))
+        evaluators_list = sorted(evaluators)
+        items_list = sorted(items)
 
         if len(evaluators_list) < 2 or not items_list:
             return {
@@ -456,7 +482,7 @@ class ResultsAggregator:
         }
 
     @staticmethod
-    def compute_icc(reliability_array: np.ndarray) -> Optional[Dict[str, float]]:
+    def compute_icc(reliability_array: np.ndarray) -> dict[str, float] | None:
         """Calculate Intraclass Correlation Coefficient (ICC) from a pre-aligned reliability matrix.
 
         Uses ICC(2, 1): two-way mixed effects model with absolute agreement, single measurement.

@@ -7,29 +7,56 @@ sidebar_position: 4
 
 ### 1. Alignment with Learning Objectives
 
-**Purpose**: Verify questions accurately assess intended learning outcomes and match instructional goals.
+**Metric name**: `objective_alignment`
+
+**Purpose**: Measure how directly each item assesses the learning objective stated for it. The
+stated objective is the reference value — an item can be well written, factually sound, and
+on-topic for the course and still score low here, because the only thing being measured is
+whether it assesses *that* objective.
 
 **References**: Haladyna et al. [10], Sireci [17]
 
-**Scope**: Question-level
+**Scope**: Question-level — one result per question, with `question_id` populated.
 
-**Parameters**:
-- `learning_objectives`: Source of objectives ("auto_extract", "provided", or list)
-- `alignment_threshold`: Minimum acceptable alignment score (default: 70)
+**Required input**: `question.metadata.learning_objective`. This is per-question, not per-quiz:
+a quiz-level objective list cannot serve a question set drawn from several quizzes. The metric
+never invents an objective when the field is missing.
 
-**Evaluation Criteria**:
-- Direct assessment of stated objectives
-- Coverage of key concepts
-- Appropriate depth and breadth
+**Scoring**: the judge picks one of four levels and the score follows from it, so a verdict and
+its number can never disagree. There is deliberately no midpoint.
+
+| Level | Score | Meaning |
+|---|---|---|
+| `direct` | `100.0` | Assesses the stated objective head-on, at the concept or skill level it describes. |
+| `partial` | `66.7` | Assesses part of the objective, or assesses it at a shallower level than stated. |
+| `weak` | `33.3` | Related only through a prerequisite, surface vocabulary, or a tangential concept. |
+| `none` | `0.0` | Does not assess the stated objective at all. |
+
+**Items without an objective**: reported as `applicable: false` with
+`alignment_level: "not_applicable"` and a score of `100.0`. They are excluded from the measure,
+not judged to be perfect.
+
+:::warning
+`applicable: false` items score `100.0`, so **filter on `applicable` before averaging**. A naive
+mean over all items counts every objective-less item as a perfect score.
+:::
+
+**Relationship to `coverage`**: `coverage` is a quiz-level measure of how well a quiz covers its
+*source material*. It is a content-coverage measure, not an objective-alignment one — the two
+answer different questions and neither substitutes for the other.
+
+**Output** (`raw_response`):
+- `applicable`, `alignment_level`, `score`
+- `learning_objective` — the objective the item was judged against
+- `matched_objective_aspects` — which parts of the objective the item assesses
+- `missing_or_misaligned_aspects` — what it leaves untested or tests in a different direction
+- `rationale`
 
 **Example Configuration**:
 ```yaml
-- name: "alignment"
+- name: "objective_alignment"
   version: "1.0"
   evaluators: ["gpt4"]
-  parameters:
-    learning_objectives: "auto_extract"
-    alignment_threshold: 75
 ```
 
 ---
@@ -97,26 +124,57 @@ sidebar_position: 4
 
 ### 4. Answer Key Correctness
 
-**Purpose**: Verify exactly one option is unambiguously correct (or clearly best) while all distractors are unambiguously incorrect.
+**Metric name**: `answer_key_correctness`
+
+**Purpose**: Verify the marked answer key is correct and unambiguous — exactly one option is
+unambiguously correct (or, for multiple choice, the keyed set is exactly the correct set) while
+all distractors are unambiguously incorrect, and no catch-all option is present.
 
 **References**: Haladyna et al. [10], Haladyna & Rodriguez [11]
 
-**Scope**: Question-level
+**Scope**: Question-level — one result per question, with `question_id` populated.
 
-**Evaluation Criteria**:
-- One clearly correct answer
-- All distractors are definitively incorrect
-- No ambiguity in correctness
-- Correct answer is verifiable from source material
+**Scoring**: **Binary** — `100.0` when the key is correct and unambiguous, `0.0` otherwise.
+Unlike the other metrics this one is not an ordinal: a key is either defensible or it is not, and
+there is no useful middle ground to score. Averaging the metric across a quiz therefore reads
+directly as the share of items with a sound answer key, and the issue flags say why the rest
+failed.
+
+**Rules by question type**:
+- `single_choice` / `true_false`: exactly one option is unambiguously correct, and it is the keyed one.
+- `multiple_choice`: the keyed **set** must equal the unambiguously-correct **set** — every keyed
+  option is correct **and** no unkeyed option is also defensible.
+
+**Issue flags** (reported in `raw_response`, empty when the key is sound):
+
+| Flag | Meaning |
+|---|---|
+| `multiple_defensible` | An unkeyed option is also defensible — the key omits a correct option. |
+| `keyed_answer_wrong` | A keyed option is actually incorrect. |
+| `no_correct_option` | None of the options is correct. |
+| `catch_all_present` | An "all/none of the above" style option appears. |
+
+**Deterministic checks** (applied after the judge, so they hold regardless of the judge model):
+- **Catch-all detection** — options opening with an "all of the above" / "none of the above"
+  phrase, in English or German, fail the criterion even when technically correct. Detection is
+  pure Python, so the same items are flagged by every judge model.
+- **Empty key** — an item with no marked answer (`correct_answer: []`) is evaluated normally and
+  flagged `no_correct_option` rather than crashing the run.
+
+**Source material**: optional. When a source is available it is supplied as supporting context;
+when it is absent the judge reasons from general expert knowledge and the item wording.
+
+**Output** (`raw_response`):
+- `key_correct` — the Yes/No verdict
+- `defensible_correct_options` — the full set the judge considers correct
+- `misclassified_options` — which options are keyed wrongly
+- `issue_flags`, `catch_all_options`, `rationale`, `score`
 
 **Example Configuration**:
 ```yaml
-- name: "answer_correctness"
+- name: "answer_key_correctness"
   version: "1.0"
   evaluators: ["gpt4"]
-  parameters:
-    verify_source: true
-    require_unambiguous: true
 ```
 
 ---
@@ -221,13 +279,25 @@ The metric produces structured analysis and scoring output:
 
 **References**: Haladyna et al. [10], Downing [8], Applegate et al. [18]
 
-**Scope**: Quiz-level, with per-question analysis and quiz-level aggregation
+**Scope**: Registered quiz-level, but **reported per question** — the metric judges every
+question separately and emits one result per question, each with `question_id` populated.
+Scores are joinable by `(quiz_id, question_id)` without parsing nested JSON.
 
 **Implementation Notes**:
-- The metric runs in three phases: per-question option analysis, per-question scoring, and quiz-level aggregation.
+- The metric runs in three phases: per-question option analysis, per-question scoring, and a quiz-level aggregation computed in Python with no extra model call.
 - For each applicable question, answer choices are classified by grammatical form, content type, and formatting signals before being scored.
-- The final quiz-level score combines the per-question scores and applies a small penalty when major heterogeneity issues recur across a quiz.
-- True/false questions are treated as not applicable and are excluded from the aggregate denominator.
+- Because each question is judged independently, prompt size does not grow with the number of questions in a quiz.
+- The per-question rows replace the quiz-level aggregate in the results file. Emitting both under one metric name would pool item scores with a quiz-level summary in every downstream average. The quiz-level figures — mean question score, major-violation rate, issue distribution — are recomputable from the per-question rows, which carry score, severity and issues.
+- True/false questions are treated as not applicable: they still produce a row, with `applicable: false`, a score of `100.0`, and `not_applicable` among the issues.
+
+**Output** (`raw_response`, one object per question):
+- `question_score`, `severity` (`none` / `minor` / `major`), `issues`, `rationale`
+- `applicable`, plus the three sub-scores (grammatical parallelism, content-type homogeneity, format consistency)
+
+:::warning
+Not-applicable questions score `100.0`, so **filter on `applicable` before averaging** — otherwise
+every true/false item counts as perfectly homogeneous.
+:::
 
 **Evaluation Criteria**:
 - Parallel grammatical structure across answer choices
@@ -248,58 +318,118 @@ The metric produces structured analysis and scoring output:
 
 ### 7. Absence of Cueing
 
-**Purpose**: Detect grammatical, semantic, or structural clues that inadvertently reveal the correct answer.
+**Metric name**: `absence_of_cueing`
+
+**Purpose**: Detect clues in how an item is written that let a respondent pick the key without
+knowing the subject. Factual correctness is explicitly out of scope — an item can be perfectly
+accurate and still hand over its answer.
 
 **References**: Downing [8], Haladyna et al. [10]
 
-**Scope**: Question-level
+**Scope**: Question-level — one result per question, with `question_id` populated.
 
-**Common Cues to Detect**:
-- Grammatical inconsistencies (e.g., "an" before consonant)
-- Length differences (correct answer often longest)
-- Specificity differences (correct answer more detailed)
-- Absolute terms ("always", "never") in distractors
-- Verbal associations between stem and correct answer
-- Convergence cues (correct answer includes elements of all options)
+**Scoring**: **Binary** — `100.0` when no cue is present, `0.0` when one is. This is a detection
+measure, not a matter of degree: either the item gives the answer away or it does not. `severity`
+(`none` / `minor` / `strong`) is reported alongside as a descriptive field, so a three-level
+analysis stays possible later without re-running the judge.
+
+**Cue types** (reported in `raw_response`, empty when no cue is found):
+
+| Type | Meaning |
+|---|---|
+| `grammatical` | Article, number, or tense agreement with the stem fits only the key. |
+| `semantic` | Stem wording or a distinctive term is echoed only in the key. |
+| `length` | The key is conspicuously longer, shorter, or more qualified than the distractors. |
+| `convergence` | The key combines elements repeated across distractors, or option overlap logically implies it. |
+| `other` | Any other construction clue — a uniquely detailed or hedged key, distractors weakened by absolute terms. Specifics go in `rationale`. |
+
+**Deterministic length signal**: option lengths are measured in Python before the model is
+called and passed into the prompt. The key is reported as an outlier only when it is both at
+least 1.5× the median distractor length **and** at least 20 characters longer — both thresholds
+must trip. The signal is **advisory**: a key can be legitimately longer without giving anything
+away, so the judge weighs it rather than deferring to it. True/false items are skipped, since
+their options are fixed.
+
+**Consistency rules** (applied after the judge, so they hold regardless of the model):
+- A cue reported with severity `none` is raised to `minor` — the two cannot both be true.
+- A no-cue verdict carries no cue types and no `key_revealed_by` entries, whatever the judge listed.
+- Cue types outside the five above are dropped, keeping the vocabulary safe to aggregate over.
+
+**Boundary with Homogeneous Options**: non-parallel options are not automatically cueing. A
+homogeneity break that does not point at the key belongs to `homogeneous_options`; this metric
+reports a cue only when something singles the key out. Grammatical cues necessarily break
+homogeneity too and are reported by both.
+
+**Source material**: not required. Cueing is judged from the item's construction alone.
+
+**Output** (`raw_response`):
+- `cue_present`, `severity`, `score`
+- `cue_types` — which of the five apply
+- `key_revealed_by` — the specific wording or feature that gives it away
+- `length_signal` — the deterministic measurement, including `keyed_option_is_outlier`
+- `rationale`
 
 **Example Configuration**:
 ```yaml
-- name: "cueing_absence"
+- name: "absence_of_cueing"
   version: "1.0"
   evaluators: ["gpt4"]
-  parameters:
-    check_grammar: true
-    check_length: true
-    check_specificity: true
-    check_absolutes: true
-    check_associations: true
 ```
 
 ---
 
 ### 8. Grammatical Correctness
 
-**Purpose**: Ensure both stem and options are grammatically correct and properly punctuated.
+**Metric name**: `grammatical_correctness`
+
+**Purpose**: Verify that an item's stem and all of its options are grammatically correct, well
+spelled, and properly punctuated.
 
 **References**: Haladyna et al. [10], Haladyna & Rodriguez [11]
 
-**Scope**: Question-level
+**Scope**: Question-level — one result per question, with `question_id` populated. The stem and
+every option are judged together: one broken option makes the item worse however clean the rest
+reads.
 
-**Evaluation Criteria**:
-- Proper grammar in stem
-- Proper grammar in all options
-- Correct punctuation
-- Subject-verb agreement
-- Consistent tense usage
+**Scoring**: the judge picks one of four severity levels and the score follows from it, so a
+verdict and its number can never disagree. There is deliberately no midpoint.
+
+| Severity | Score | Meaning |
+|---|---|---|
+| `none` | `100.0` | No errors; professional quality throughout. |
+| `minor` | `66.7` | Small issues only — a typo, a missing comma, inconsistent capitalization. |
+| `major` | `33.3` | Clear grammatical errors that disrupt reading flow. |
+| `critical` | `0.0` | Errors that obscure the meaning or make the item hard to understand. |
+
+**Evaluation Criteria**: grammar (agreement, tense, articles, pronouns, sentence structure),
+spelling, punctuation, capitalization, complete-sentence structure and parallel construction,
+technical-writing standards, and terminology consistency where it affects readability.
+
+**Parameters**:
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `language` | `"English"` | Which language's grammar rules to apply. |
+
+**Language mismatch is not a grammar defect.** Items are always judged in the language they are
+actually written in — a well-written German item scores `none` even when English was requested.
+Whether the quiz matches a requested language is an *instruction compliance* question about the
+quiz as a whole, so it is checked once per quiz and reported separately as
+`adjusted_grammar` in the run metadata. Per-item scores are never modified by it, which keeps
+them meaning one thing: how well the item is written.
+
+**Output** (`raw_response`):
+- `severity`, `score`
+- `grammar_issues`, `spelling_issues`, `punctuation_issues` — the specific problems found, empty when that category is clean
+- `rationale`
 
 **Example Configuration**:
 ```yaml
-- name: "grammar"
-  version: "1.0"
+- name: "grammatical_correctness"
+  version: "2.0"
   evaluators: ["gpt4"]
   parameters:
-    strict_mode: true
-    check_punctuation: true
+    language: "English"
 ```
 
 ---

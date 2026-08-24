@@ -1,7 +1,7 @@
 """Base LLM provider interface."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Optional, Type
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -32,13 +32,14 @@ class LLMProvider(ABC):
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.additional_params = kwargs
+        self._usage_log: list[dict[str, int]] = []
 
     @abstractmethod
     def generate(
         self,
         prompt: str,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         **kwargs: Any,
     ) -> str:
         """Generate a response from the LLM.
@@ -55,17 +56,16 @@ class LLMProvider(ABC):
         Raises:
             Exception: If generation fails
         """
-        pass
 
     @abstractmethod
     def generate_structured(
         self,
         prompt: str,
-        schema: Type[BaseModel],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        schema: type[BaseModel],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generate a schema-validated structured response from the LLM.
 
         Args:
@@ -81,7 +81,26 @@ class LLMProvider(ABC):
         Raises:
             Exception: If generation or schema validation fails
         """
-        pass
+
+    def reset_usage(self) -> None:
+        self._usage_log.clear()
+
+    def get_accumulated_usage(self) -> dict[str, int]:
+        total = {"prompt_tokens": 0, "completion_tokens": 0}
+        for entry in self._usage_log:
+            total["prompt_tokens"] += entry.get("prompt_tokens", 0)
+            total["completion_tokens"] += entry.get("completion_tokens", 0)
+        return total
+
+    def _record_usage(self, response: Any) -> None:
+        usage = getattr(response, "usage_metadata", None)
+        if usage:
+            self._usage_log.append(
+                {
+                    "prompt_tokens": usage.get("input_tokens", 0),
+                    "completion_tokens": usage.get("output_tokens", 0),
+                }
+            )
 
     @property
     def model_name(self) -> str:

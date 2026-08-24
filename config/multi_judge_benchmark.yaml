@@ -54,6 +54,11 @@ metrics:
     evaluators: ["qwen", "openai-gpt"]
     enabled: true
 
+  - name: "answer_key_correctness"
+    version: "1.0"
+    evaluators: ["qwen", "openai-gpt"]
+    enabled: true
+
   - name: "clarity"
     version: "1.0"
     evaluators: ["qwen", "openai-gpt"]
@@ -66,13 +71,23 @@ metrics:
       rubric: "bloom_taxonomy"
     enabled: true
 
+  - name: "absence_of_cueing"
+    version: "1.0"
+    evaluators: ["qwen", "openai-gpt"]
+    enabled: true
+
   - name: "distractor_quality"
     version: "1.0"
     evaluators: ["qwen", "openai-gpt"]
     enabled: true
 
-  - name: "grammatical_correctness"
+  - name: "objective_alignment"
     version: "1.0"
+    evaluators: ["qwen", "openai-gpt"]
+    enabled: true
+
+  - name: "grammatical_correctness"
+    version: "2.0"
     evaluators: ["qwen", "openai-gpt"]
     enabled: true
 

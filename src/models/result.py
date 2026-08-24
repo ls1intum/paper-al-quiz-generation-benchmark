@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 @dataclass
@@ -26,10 +26,11 @@ class MetricResult:
     score: float
     evaluator_model: str
     quiz_id: str
-    question_id: Optional[str] = None
-    parameters: Dict[str, Any] = field(default_factory=dict)
+    question_id: str | None = None
+    parameters: dict[str, Any] = field(default_factory=dict)
     evaluated_at: datetime = field(default_factory=datetime.now)
-    raw_response: Optional[str] = None
+    raw_response: str | None = None
+    usage: dict[str, int] | None = None
 
     def __post_init__(self) -> None:
         """Validate score range."""
@@ -49,7 +50,7 @@ class EvaluationResult:
 
     score: float
     raw_response: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.metadata is None:
@@ -77,17 +78,17 @@ class BenchmarkResult:
     config_hash: str
     quiz_id: str
     run_number: int
-    metrics: List[MetricResult]
+    metrics: list[MetricResult]
     started_at: datetime
     completed_at: datetime
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     @property
     def duration_seconds(self) -> float:
         """Calculate the duration of the benchmark run in seconds."""
         return (self.completed_at - self.started_at).total_seconds()
 
-    def get_results_by_metric(self, metric_name: str) -> List[MetricResult]:
+    def get_results_by_metric(self, metric_name: str) -> list[MetricResult]:
         """Get all results for a specific metric.
 
         Args:
@@ -124,9 +125,11 @@ class MetricAggregation:
     std_dev: float
     min: float
     max: float
-    per_run_scores: List[float]
+    per_run_scores: list[float]
     ci_lower: float = 0.0
     ci_upper: float = 0.0
+    n_applicable: int = 0
+    n_total: int = 0
     num_runs: int = field(init=False)
 
     def __post_init__(self) -> None:
@@ -151,16 +154,14 @@ class AggregatedResults:
 
     benchmark_config_name: str
     benchmark_version: str
-    quiz_ids: List[str]
+    quiz_ids: list[str]
     total_runs: int
-    aggregations: Dict[str, MetricAggregation]  # key: f"{metric_name}_{evaluator_model}"
-    inter_rater_reliability: Dict[str, Any] = field(default_factory=dict)
+    aggregations: dict[str, MetricAggregation]  # key: f"{metric_name}_{evaluator_model}"
+    inter_rater_reliability: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.now)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
-    def get_aggregation(
-        self, metric_name: str, evaluator_model: str
-    ) -> Optional[MetricAggregation]:
+    def get_aggregation(self, metric_name: str, evaluator_model: str) -> MetricAggregation | None:
         """Get aggregation for a specific metric and evaluator.
 
         Args:
@@ -173,18 +174,18 @@ class AggregatedResults:
         key = f"{metric_name}_{evaluator_model}"
         return self.aggregations.get(key)
 
-    def get_all_metrics(self) -> List[str]:
+    def get_all_metrics(self) -> list[str]:
         """Get list of all unique metric names.
 
         Returns:
             List of metric names
         """
-        return list(set(agg.metric_name for agg in self.aggregations.values()))
+        return list({agg.metric_name for agg in self.aggregations.values()})
 
-    def get_all_evaluators(self) -> List[str]:
+    def get_all_evaluators(self) -> list[str]:
         """Get list of all unique evaluator models.
 
         Returns:
             List of evaluator model names
         """
-        return list(set(agg.evaluator_model for agg in self.aggregations.values()))
+        return list({agg.evaluator_model for agg in self.aggregations.values()})

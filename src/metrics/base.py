@@ -2,14 +2,17 @@
 
 import json
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Optional
+
 from pydantic import BaseModel, Field
+
+from ..models.instruction import QuizInstructions
 from ..models.quiz import Quiz, QuizQuestion
 from ..models.result import EvaluationResult
 from .phase import Phase, PhaseInput, PhaseOutput
-from ..models.instruction import QuizInstructions
 
 
 class MetricScope(str, Enum):
@@ -109,12 +112,12 @@ class BaseMetric(ABC):
         pass
 
     @property
-    def parameters(self) -> List[MetricParameter]:
+    def parameters(self) -> list[MetricParameter]:
         return []
 
     @property
     @abstractmethod
-    def phases(self) -> List[Phase]:
+    def phases(self) -> list[Phase]:
         pass
 
     @abstractmethod
@@ -125,7 +128,7 @@ class BaseMetric(ABC):
     def interpret_custom_prompt(
         custom_prompt: str,
         llm_client: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Interpret free-text custom_prompt into a single clear directive.
 
         Called once at the start of evaluate() when instructions.custom_prompt
@@ -148,7 +151,7 @@ class BaseMetric(ABC):
             "Return a JSON object with a single key: 'interpreted_instruction'."
         )
 
-        result: Dict[str, Any] = llm_client.generate_structured(
+        result: dict[str, Any] = llm_client.generate_structured(
             prompt=prompt,
             schema=CustomPromptContext,
         )
@@ -159,19 +162,21 @@ class BaseMetric(ABC):
         """Return True if any instruction field is relevant to this metric.
 
         Structured fields are coupled to specific metrics:
-          language       → grammatical_correctness
-          difficulty     → difficulty
           question_types → clarity
           custom_prompt  → coverage only (topic/content focus is not relevant
                            to grammar, difficulty, or clarity metrics)
+
+        Two compliance checks are deliberately absent here because their metrics
+        score one question at a time: firing a per-question adjustment to answer
+        a question about the whole quiz would cost one call per item and could
+        reach different verdicts for items in the same quiz. The runner checks
+        both once per quiz instead, over the aggregated per-question scores --
+        `difficulty` against its requested band, and `language` through
+        adjust_score_for_custom_prompt.
         """
         if instructions.custom_prompt and self.name == "coverage":
             return True
-        if instructions.language and self.name == "grammatical_correctness":
-            return True
-        if instructions.question_types and self.name == "clarity":
-            return True
-        return False
+        return bool(instructions.question_types and self.name == "clarity")
 
     def adjust_difficulty_for_instructions(
         self,
@@ -222,8 +227,8 @@ class BaseMetric(ABC):
         self,
         raw_score: float,
         interpreted_instruction: str,
-        quiz: Optional[Quiz],
-        source_text: Optional[str],
+        quiz: Quiz | None,
+        source_text: str | None,
         llm_client: Any,
         instructions: Optional["QuizInstructions"] = None,
     ) -> float:
@@ -356,11 +361,11 @@ Respond with ONLY this JSON object:
 
     def evaluate(
         self,
-        question: Optional[QuizQuestion] = None,
-        quiz: Optional[Quiz] = None,
-        source_text: Optional[str] = None,
-        llm_client: Optional[Any] = None,
-        instructions: Optional[QuizInstructions] = None,
+        question: QuizQuestion | None = None,
+        quiz: Quiz | None = None,
+        source_text: str | None = None,
+        llm_client: Any | None = None,
+        instructions: QuizInstructions | None = None,
         **params: Any,
     ) -> EvaluationResult:
         """Evaluate and return a score by executing all declared phases in order.
@@ -393,7 +398,7 @@ Respond with ONLY this JSON object:
 
         self.validate_params(**params)
 
-        accumulated: Dict[str, PhaseOutput] = {}
+        accumulated: dict[str, PhaseOutput] = {}
 
         # ── Step 1: Interpret custom_prompt once before any phase runs ── #
         if instructions and instructions.custom_prompt:
@@ -494,9 +499,20 @@ Respond with ONLY this JSON object:
             raise ValueError(f"Score must be between 0 and 100, got {score}")
         return score
 
-    def format_insights(self, raw_response: str, quiz_id: str) -> Optional[str]:
+    def format_insights(self, raw_response: str, quiz_id: str) -> str | None:
         """Extract qualitative insights from a metric's raw response for display."""
         return None
+
+    def expand_question_results(self, result: EvaluationResult) -> list[tuple[str, float, str]]:
+        """Per-question rows a quiz-level metric scored internally.
+
+        Returns (question_id, score, raw_response) tuples. A metric that judges
+        each question separately but aggregates before reporting can hand those
+        judgements back here, so the runner emits one result per question
+        instead of one opaque quiz-level blob. Empty for metrics that have no
+        per-question breakdown to give.
+        """
+        return []
 
     def validate_params(self, **params: Any) -> None:
         """Validate provided parameters against metric's parameter definitions."""
@@ -512,7 +528,7 @@ Respond with ONLY this JSON object:
         for param_name, param_value in params.items():
             expected_param = expected_params[param_name]
             if not isinstance(param_value, expected_param.param_type):
-                raise ValueError(
+                raise TypeError(
                     f"Parameter '{param_name}' should be of type "
                     f"{expected_param.param_type.__name__}, "
                     f"got {type(param_value).__name__}"

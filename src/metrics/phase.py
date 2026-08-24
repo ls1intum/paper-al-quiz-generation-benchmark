@@ -1,12 +1,13 @@
 """Evaluation phase DTOs for the metric pipeline."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Optional, Type
+from typing import Any, Optional
 
 from pydantic import BaseModel
 
-from ..models.quiz import Quiz, QuizQuestion
 from ..models.instruction import QuizInstructions
+from ..models.quiz import Quiz, QuizQuestion
 
 
 @dataclass
@@ -23,12 +24,12 @@ class PhaseInput:
         accumulated: Outputs from all previously completed phases, keyed by phase name.
     """
 
-    prompt_builder: Optional[Callable[["PhaseInput"], str]]
-    source_text: Optional[str] = None
-    quiz: Optional[Quiz] = None
-    question: Optional[QuizQuestion] = None
-    params: Dict[str, Any] = field(default_factory=dict)
-    accumulated: Dict[str, "PhaseOutput"] = field(default_factory=dict)
+    prompt_builder: Callable[["PhaseInput"], str] | None
+    source_text: str | None = None
+    quiz: Quiz | None = None
+    question: QuizQuestion | None = None
+    params: dict[str, Any] = field(default_factory=dict)
+    accumulated: dict[str, "PhaseOutput"] = field(default_factory=dict)
     instructions: Optional["QuizInstructions"] = None
 
 
@@ -44,7 +45,7 @@ class PhaseOutput:
     """
 
     phase_name: str
-    data: Dict[str, Any]
+    data: dict[str, Any]
 
 
 @dataclass
@@ -66,11 +67,11 @@ class Phase:
     """
 
     name: str
-    output_schema: Type[BaseModel]
+    output_schema: type[BaseModel]
     fan_out: bool = False
-    processor: Optional[Callable[[PhaseInput], Dict[str, Any]]] = None
+    processor: Callable[[PhaseInput], dict[str, Any]] | None = None
 
-    def process(self, phase_input: PhaseInput, llm_client: Any) -> Dict[str, Any]:
+    def process(self, phase_input: PhaseInput, llm_client: Any) -> dict[str, Any]:
         """Run the phase and validate the result against output_schema."""
         if self.processor is not None:
             result = self.processor(phase_input)

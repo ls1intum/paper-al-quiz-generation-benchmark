@@ -7,6 +7,7 @@ import logging
 import re
 import sys
 from datetime import datetime
+from typing import Any
 from pathlib import Path
 
 from src.analysis.aggregator import ResultsAggregator
@@ -19,6 +20,10 @@ from src.metrics.clarity import ClarityMetric
 from src.metrics.distractor import DistractorQualityMetric
 from src.metrics.homogeneous_options import HomogeneousOptionsMetric
 from src.metrics.accuracy import FactualAccuracyMetric
+from src.metrics.answer_key_correctness import AnswerKeyCorrectnessMetric
+from src.metrics.objective_alignment import ObjectiveAlignmentMetric
+from src.metrics.absence_of_cueing import AbsenceOfCueingMetric
+from src.metrics.cognitive_level import CognitiveLevelMetric
 from src.runners.benchmark import BenchmarkRunner
 from src.utils.config_loader import ConfigLoader
 from src.utils.io import IOUtils
@@ -34,6 +39,10 @@ def register_metrics() -> None:
     MetricRegistry.register(DistractorQualityMetric)
     MetricRegistry.register(HomogeneousOptionsMetric)
     MetricRegistry.register(FactualAccuracyMetric)
+    MetricRegistry.register(AnswerKeyCorrectnessMetric)
+    MetricRegistry.register(ObjectiveAlignmentMetric)
+    MetricRegistry.register(AbsenceOfCueingMetric)
+    MetricRegistry.register(CognitiveLevelMetric)
 
 
 def main() -> int:
@@ -154,10 +163,33 @@ def main() -> int:
         results = runner.run()
         logger.info("Benchmark complete. Generated %s result objects.", len(results))
 
+        # Extract phase details before saving results (avoids duplication)
+        all_phase_details = []
+        for result in results:
+            details = result.metadata.pop("phase_details", [])
+            all_phase_details.extend(details)
+
         # Save individual results
         results_file = run_dir / "results.json"
         logger.info("Saving results to %s...", results_file)
         IOUtils.save_results(results, str(results_file))
+
+        # Save detailed phase data
+        if all_phase_details:
+            detailed_file = run_dir / "detailed_responses.json"
+            with open(detailed_file, "w", encoding="utf-8") as f:
+                json.dump(all_phase_details, f, indent=2)
+            logger.info("Detailed responses saved to %s", detailed_file)
+
+        # Token usage
+        usage_text = ResultsReporter.usage_summary(results)
+        logger.info(usage_text)
+        usage_data = ResultsReporter.usage_dict(results)
+        if usage_data:
+            usage_file = run_dir / "usage.json"
+            with open(usage_file, "w", encoding="utf-8") as f:
+                json.dump(usage_data, f, indent=2)
+            logger.info("Usage saved to %s", usage_file)
 
         # Aggregate and save if requested
         if not args.no_aggregate:
@@ -177,18 +209,18 @@ def main() -> int:
             found_insights = False
 
             # Helper to safely get attributes whether it's a dict or object
-            def safe_get(item, key, default=None):
+            def safe_get(item: Any, key: str, default: Any = None) -> Any:
                 if isinstance(item, dict):
                     return item.get(key, default)
                 return getattr(item, key, default)
 
             for result in results:
-                quiz_id = safe_get(result, 'quiz_id', 'Unknown Quiz')
-                metrics_list = safe_get(result, 'metrics', [])
+                quiz_id = safe_get(result, "quiz_id", "Unknown Quiz")
+                metrics_list = safe_get(result, "metrics", [])
 
                 for metric in metrics_list:
-                    metric_name = safe_get(metric, 'metric_name')
-                    raw_response = safe_get(metric, 'raw_response')
+                    metric_name = safe_get(metric, "metric_name")
+                    raw_response = safe_get(metric, "raw_response")
                     if metric_name and isinstance(raw_response, str):
                         try:
                             metric_instance = MetricRegistry.create(metric_name)

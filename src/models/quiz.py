@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 
 class QuestionType(str, Enum):
@@ -31,10 +31,10 @@ class QuizQuestion:
     question_id: str
     question_type: QuestionType
     question_text: str
-    options: List[str]
-    correct_answer: Union[str, List[str]]
-    source_reference: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    options: list[str]
+    correct_answer: str | list[str]
+    source_reference: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate question data after initialization."""
@@ -51,9 +51,8 @@ class QuizQuestion:
                 raise ValueError("Single choice and T/F questions must have string answer")
 
         # Validate true/false options
-        if self.question_type == QuestionType.TRUE_FALSE:
-            if self.options != ["True", "False"]:
-                raise ValueError("True/False questions must have options ['True', 'False']")
+        if self.question_type == QuestionType.TRUE_FALSE and self.options != ["True", "False"]:
+            raise ValueError("True/False questions must have options ['True', 'False']")
 
 
 @dataclass
@@ -72,12 +71,12 @@ class Quiz:
     quiz_id: str
     title: str
     source_material: str
-    questions: List[QuizQuestion]
-    instructions: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    questions: list[QuizQuestion]
+    instructions: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
     created_at: datetime = field(default_factory=datetime.now)
 
-    def get_question_by_id(self, question_id: str) -> Optional[QuizQuestion]:
+    def get_question_by_id(self, question_id: str) -> QuizQuestion | None:
         """Get a question by its ID.
 
         Args:
@@ -91,7 +90,7 @@ class Quiz:
                 return question
         return None
 
-    def get_questions_by_type(self, question_type: QuestionType) -> List[QuizQuestion]:
+    def get_questions_by_type(self, question_type: QuestionType) -> list[QuizQuestion]:
         """Get all questions of a specific type.
 
         Args:
