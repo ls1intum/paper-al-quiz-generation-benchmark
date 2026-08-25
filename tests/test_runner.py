@@ -1,11 +1,12 @@
 """Tests for benchmark runner orchestration."""
 
+import typing
 from datetime import datetime
 
 import pytest
 
-from src.runners.benchmark import BenchmarkRunner
 from src.models.config import MetricConfig
+from src.runners.benchmark import BenchmarkRunner
 
 
 def test_runner_produces_expected_results(
@@ -299,13 +300,15 @@ def test_runner_raises_when_metric_fails_every_question(
     runner = BenchmarkRunner(config)
 
     # Make the metric's evaluate() always raise
-    with patch.object(
-        runner.metrics["clarity"],
-        "evaluate",
-        side_effect=RuntimeError("boom"),
+    with (
+        patch.object(
+            runner.metrics["clarity"],
+            "evaluate",
+            side_effect=RuntimeError("boom"),
+        ),
+        pytest.raises(RuntimeError, match="failed for every question"),
     ):
-        with pytest.raises(RuntimeError, match="failed for every question"):
-            runner.run(quizzes=[sample_quiz], source_texts={"quiz_1": "text"})
+        runner.run(quizzes=[sample_quiz], source_texts={"quiz_1": "text"})
 
 
 def test_runner_tolerates_partial_question_failure(
@@ -374,7 +377,7 @@ def test_usage_accumulator():
 
     # Simulate two LLM calls
     class FakeMsg:
-        usage_metadata = {"input_tokens": 100, "output_tokens": 25}
+        usage_metadata: typing.ClassVar[dict] = {"input_tokens": 100, "output_tokens": 25}
 
     provider._record_usage(FakeMsg())
     provider._record_usage(FakeMsg())
@@ -417,3 +420,137 @@ def test_runner_populates_phase_details_on_metadata(
             assert "run_number" in entry
             assert "phases" in entry
             assert isinstance(entry["phases"], dict)
+
+
+def test_transient_503_is_retried():
+    """Transient 503 triggers retry and succeeds on second attempt."""
+    from unittest.mock import patch
+
+    from tests.conftest import MockLLMProvider
+
+    provider = MockLLMProvider(model="test")
+
+    class FakeAPIError(Exception):
+        status_code = 503
+
+    call_count = [0]
+
+    def fail_then_succeed(*args, **kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            raise FakeAPIError("Service Unavailable")
+        return "success"
+
+    with (
+        patch.object(provider, "_do_generate", side_effect=fail_then_succeed),
+        patch("src.evaluators.base.time.sleep") as mock_sleep,
+    ):
+        result = provider.generate("test prompt")
+
+    assert result == "success"
+    assert call_count[0] == 2
+    mock_sleep.assert_called_once()
+
+
+def test_non_transient_400_not_retried():
+    """Non-transient 400 propagates immediately without retry."""
+    from unittest.mock import patch
+
+    from tests.conftest import MockLLMProvider
+
+    provider = MockLLMProvider(model="test")
+
+    class FakeAPIError(Exception):
+        status_code = 400
+
+    with (
+        patch.object(provider, "_do_generate", side_effect=FakeAPIError("Bad Request")),
+        patch("src.evaluators.base.time.sleep") as mock_sleep,
+        pytest.raises(FakeAPIError),
+    ):
+        provider.generate("test prompt")
+
+    mock_sleep.assert_not_called()
+
+
+def test_transient_failure_reports_incomplete(
+    registered_metrics, mock_llm_provider, sample_config, sample_quiz
+):
+    """TransientLLMError marks the run as incomplete."""
+    from dataclasses import replace
+    from unittest.mock import patch
+
+    from src.evaluators.base import TransientLLMError
+
+    config = replace(
+        sample_config,
+        runs=1,
+        metrics=[
+            MetricConfig(
+                name="clarity",
+                version="2.0",
+                evaluators=["mock_eval"],
+                parameters={},
+                enabled=True,
+            )
+        ],
+    )
+    runner = BenchmarkRunner(config)
+
+    original_evaluate = runner.metrics["clarity"].evaluate
+    call_count = [0]
+
+    def fail_first(*args, **kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            raise TransientLLMError("timeout", original=TimeoutError(), attempts=4)
+        return original_evaluate(*args, **kwargs)
+
+    with patch.object(runner.metrics["clarity"], "evaluate", side_effect=fail_first):
+        runner.run(quizzes=[sample_quiz], source_texts={"quiz_1": "text"})
+
+    report = runner.get_completeness_report()
+    assert not report["complete"]
+    assert report["failed"] == 1
+    assert len(report["failed_cells"]) == 1
+    assert report["failed_cells"][0]["category"] == "transient"
+
+
+def test_skipped_error_does_not_fail_completeness(
+    registered_metrics, mock_llm_provider, sample_config, sample_quiz
+):
+    """A ValueError (e.g. distractor on true/false) is a skip, not a failure."""
+    from dataclasses import replace
+    from unittest.mock import patch
+
+    config = replace(
+        sample_config,
+        runs=1,
+        metrics=[
+            MetricConfig(
+                name="clarity",
+                version="2.0",
+                evaluators=["mock_eval"],
+                parameters={},
+                enabled=True,
+            )
+        ],
+    )
+    runner = BenchmarkRunner(config)
+
+    original_evaluate = runner.metrics["clarity"].evaluate
+    call_count = [0]
+
+    def skip_first(*args, **kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            raise ValueError("Not applicable for true/false")
+        return original_evaluate(*args, **kwargs)
+
+    with patch.object(runner.metrics["clarity"], "evaluate", side_effect=skip_first):
+        runner.run(quizzes=[sample_quiz], source_texts={"quiz_1": "text"})
+
+    report = runner.get_completeness_report()
+    assert report["complete"]
+    assert report["skipped"] == 1
+    assert len(report["skipped_cells"]) == 1

@@ -1,9 +1,26 @@
 """Base LLM provider interface."""
 
+import logging
+import random
+import time
 from abc import ABC, abstractmethod
-from typing import Any
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
+
+_T = TypeVar("_T")
+
+logger = logging.getLogger(__name__)
+
+
+class TransientLLMError(Exception):
+    """Raised when retries are exhausted on a transient LLM failure."""
+
+    def __init__(self, message: str, original: Exception, attempts: int) -> None:
+        super().__init__(message)
+        self.original = original
+        self.attempts = attempts
 
 
 class LLMProvider(ABC):
@@ -31,10 +48,45 @@ class LLMProvider(ABC):
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens
+        self.retry_max_attempts = kwargs.pop("retry_max_attempts", 4)
+        self.retry_base_delay = kwargs.pop("retry_base_delay", 30)
+        self.retry_max_delay = kwargs.pop("retry_max_delay", 300)
         self.additional_params = kwargs
         self._usage_log: list[dict[str, int]] = []
 
-    @abstractmethod
+    @staticmethod
+    def _is_transient_error(exc: Exception) -> bool:
+        status = getattr(exc, "status_code", None)
+        if status is not None and status in {408, 429, 500, 502, 503, 504}:
+            return True
+        return type(exc).__name__ in ("APIConnectionError", "APITimeoutError")
+
+    def _call_with_retry(self, fn: Callable[[], _T]) -> _T:
+        for attempt in range(1, self.retry_max_attempts + 1):
+            try:
+                return fn()
+            except Exception as exc:
+                if not self._is_transient_error(exc):
+                    raise
+                if attempt == self.retry_max_attempts:
+                    raise TransientLLMError(
+                        f"Transient failure after {attempt} attempts: {exc}",
+                        original=exc,
+                        attempts=attempt,
+                    ) from exc
+                delay = min(self.retry_base_delay * (2 ** (attempt - 1)), self.retry_max_delay)
+                jitter = random.uniform(0, delay * 0.25)
+                wait = delay + jitter
+                logger.warning(
+                    "Transient error (attempt %d/%d), retrying in %.1fs: %s",
+                    attempt,
+                    self.retry_max_attempts,
+                    wait,
+                    exc,
+                )
+                time.sleep(wait)
+        raise AssertionError("unreachable: retry_max_attempts must be >= 1")
+
     def generate(
         self,
         prompt: str,
@@ -42,22 +94,12 @@ class LLMProvider(ABC):
         max_tokens: int | None = None,
         **kwargs: Any,
     ) -> str:
-        """Generate a response from the LLM.
+        return self._call_with_retry(
+            lambda: self._do_generate(
+                prompt, temperature=temperature, max_tokens=max_tokens, **kwargs
+            )
+        )
 
-        Args:
-            prompt: The prompt to send to the LLM
-            temperature: Override default temperature
-            max_tokens: Override default max_tokens
-            **kwargs: Additional generation parameters
-
-        Returns:
-            The generated text response
-
-        Raises:
-            Exception: If generation fails
-        """
-
-    @abstractmethod
     def generate_structured(
         self,
         prompt: str,
@@ -66,21 +108,32 @@ class LLMProvider(ABC):
         max_tokens: int | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
-        """Generate a schema-validated structured response from the LLM.
+        return self._call_with_retry(
+            lambda: self._do_generate_structured(
+                prompt, schema, temperature=temperature, max_tokens=max_tokens, **kwargs
+            )
+        )
 
-        Args:
-            prompt: The prompt to send to the LLM
-            schema: Pydantic schema describing required response structure
-            temperature: Override default temperature
-            max_tokens: Override default max_tokens
-            **kwargs: Additional generation parameters
+    @abstractmethod
+    def _do_generate(
+        self,
+        prompt: str,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> str:
+        """Generate a response from the LLM."""
 
-        Returns:
-            Structured response as dictionary
-
-        Raises:
-            Exception: If generation or schema validation fails
-        """
+    @abstractmethod
+    def _do_generate_structured(
+        self,
+        prompt: str,
+        schema: type[BaseModel],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        """Generate a schema-validated structured response from the LLM."""
 
     def reset_usage(self) -> None:
         self._usage_log.clear()

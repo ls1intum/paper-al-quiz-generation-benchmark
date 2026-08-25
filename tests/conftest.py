@@ -5,26 +5,27 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from typing import Any, Dict, Iterable, List, Optional, Type
+from collections.abc import Iterable
+from typing import Any
 
 import pytest
 from pydantic import BaseModel
 
 from src.evaluators.base import LLMProvider
 from src.evaluators.factory import LLMProviderFactory
-from src.metrics.registry import MetricRegistry
-from src.metrics.difficulty import DifficultyMetric
-from src.metrics.coverage import CoverageMetric
-from src.metrics.clarity import ClarityMetric
-from src.metrics.homogeneous_options import HomogeneousOptionsMetric
+from src.metrics.absence_of_cueing import AbsenceOfCueingMetric
 from src.metrics.accuracy import FactualAccuracyMetric
 from src.metrics.answer_key_correctness import AnswerKeyCorrectnessMetric
-from src.metrics.objective_alignment import ObjectiveAlignmentMetric
-from src.metrics.absence_of_cueing import AbsenceOfCueingMetric
-from src.metrics.grammatic import GrammaticalCorrectnessMetric
+from src.metrics.clarity import ClarityMetric
 from src.metrics.cognitive_level import CognitiveLevelMetric
+from src.metrics.coverage import CoverageMetric
+from src.metrics.difficulty import DifficultyMetric
+from src.metrics.grammatic import GrammaticalCorrectnessMetric
+from src.metrics.homogeneous_options import HomogeneousOptionsMetric
+from src.metrics.objective_alignment import ObjectiveAlignmentMetric
+from src.metrics.registry import MetricRegistry
 from src.models.config import BenchmarkConfig, EvaluatorConfig, InputOutputConfig, MetricConfig
-from src.models.quiz import Quiz, QuizQuestion, QuestionType
+from src.models.quiz import QuestionType, Quiz, QuizQuestion
 
 
 class MockLLMProvider(LLMProvider):
@@ -40,21 +41,21 @@ class MockLLMProvider(LLMProvider):
         model: str,
         temperature: float = 0.0,
         max_tokens: int = 500,
-        responses: Optional[Iterable[Any]] = None,
+        responses: Iterable[Any] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(model, temperature, max_tokens, **kwargs)
         self._responses = list(responses) if responses is not None else None
 
     @staticmethod
-    def _coverage_extract_response() -> Dict[str, Any]:
+    def _coverage_extract_response() -> dict[str, Any]:
         return {
             "topics": ["functions", "data types", "control flow"],
             "critical_concepts": ["functions", "data types"],
         }
 
     @staticmethod
-    def _coverage_map_response() -> Dict[str, Any]:
+    def _coverage_map_response() -> dict[str, Any]:
         return {
             "topics": ["functions"],
             "cognitive_level_label": "understanding",
@@ -63,7 +64,7 @@ class MockLLMProvider(LLMProvider):
         }
 
     @staticmethod
-    def _coverage_score_response() -> Dict[str, Any]:
+    def _coverage_score_response() -> dict[str, Any]:
         return {
             "final_score": 73.0,
             "sub_scores": {
@@ -83,7 +84,7 @@ class MockLLMProvider(LLMProvider):
         }
 
     @staticmethod
-    def _answer_key_response() -> Dict[str, Any]:
+    def _answer_key_response() -> dict[str, Any]:
         return {
             "key_correct": True,
             "defensible_correct_options": ["4"],
@@ -93,7 +94,7 @@ class MockLLMProvider(LLMProvider):
         }
 
     @staticmethod
-    def _objective_alignment_response() -> Dict[str, Any]:
+    def _objective_alignment_response() -> dict[str, Any]:
         return {
             "alignment_level": "direct",
             "matched_objective_aspects": ["mock aspect"],
@@ -102,7 +103,7 @@ class MockLLMProvider(LLMProvider):
         }
 
     @staticmethod
-    def _grammar_response() -> Dict[str, Any]:
+    def _grammar_response() -> dict[str, Any]:
         return {
             "severity": "none",
             "grammar_issues": [],
@@ -112,7 +113,7 @@ class MockLLMProvider(LLMProvider):
         }
 
     @staticmethod
-    def _cueing_response() -> Dict[str, Any]:
+    def _cueing_response() -> dict[str, Any]:
         return {
             "cue_present": False,
             "severity": "none",
@@ -122,7 +123,7 @@ class MockLLMProvider(LLMProvider):
         }
 
     @staticmethod
-    def _clarity_judge_response() -> Dict[str, Any]:
+    def _clarity_judge_response() -> dict[str, Any]:
         return {
             "clarity_level": "excellent",
             "question_clarity_issues": [],
@@ -132,7 +133,7 @@ class MockLLMProvider(LLMProvider):
         }
 
     @staticmethod
-    def _distractor_analyze_response() -> Dict[str, Any]:
+    def _distractor_analyze_response() -> dict[str, Any]:
         return {
             "plausibility_analysis": "mock",
             "misconception_analysis": "mock",
@@ -143,7 +144,7 @@ class MockLLMProvider(LLMProvider):
         }
 
     @staticmethod
-    def _distractor_judge_response() -> Dict[str, Any]:
+    def _distractor_judge_response() -> dict[str, Any]:
         return {
             "quality_level": "good",
             "deduction_summary": "No issues.",
@@ -151,7 +152,7 @@ class MockLLMProvider(LLMProvider):
         }
 
     @staticmethod
-    def _cognitive_level_response() -> Dict[str, Any]:
+    def _cognitive_level_response() -> dict[str, Any]:
         return {
             "assigned_level": "UNDERSTAND",
             "rationale": "Mock cognitive level assignment",
@@ -164,7 +165,7 @@ class MockLLMProvider(LLMProvider):
         return match.group(1) if match else "q1"
 
     @classmethod
-    def _homogeneous_analyze_response(cls, prompt: str) -> Dict[str, Any]:
+    def _homogeneous_analyze_response(cls, prompt: str) -> dict[str, Any]:
         return {
             "question_id": cls._question_id_from_prompt(prompt),
             "applicable": True,
@@ -176,7 +177,7 @@ class MockLLMProvider(LLMProvider):
         }
 
     @classmethod
-    def _homogeneous_score_response(cls, prompt: str) -> Dict[str, Any]:
+    def _homogeneous_score_response(cls, prompt: str) -> dict[str, Any]:
         return {
             "question_id": cls._question_id_from_prompt(prompt),
             "applicable": True,
@@ -186,7 +187,7 @@ class MockLLMProvider(LLMProvider):
         }
 
     @staticmethod
-    def _detect_coverage_phase(prompt: str) -> Optional[str]:
+    def _detect_coverage_phase(prompt: str) -> str | None:
         """Identify which coverage phase produced this prompt by inspecting
         the JSON key names the prompt asks the LLM to return."""
         if '"critical_concepts"' in prompt and "must-know" in prompt:
@@ -197,7 +198,7 @@ class MockLLMProvider(LLMProvider):
             return "score"
         return None
 
-    def _sniff_response(self, prompt: str) -> Optional[Dict[str, Any]]:
+    def _sniff_response(self, prompt: str) -> dict[str, Any] | None:
         """Detect the phase from prompt content and return the appropriate mock response."""
         if '"key_correct"' in prompt:
             return self._answer_key_response()
@@ -244,11 +245,11 @@ class MockLLMProvider(LLMProvider):
 
         return None
 
-    def generate(
+    def _do_generate(
         self,
         prompt: str,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         **kwargs: Any,
     ) -> str:
         if self._responses is not None:
@@ -264,14 +265,14 @@ class MockLLMProvider(LLMProvider):
         digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
         return str(int(digest, 16) % 101)
 
-    def generate_structured(
+    def _do_generate_structured(
         self,
         prompt: str,
-        schema: Type[BaseModel],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
+        schema: type[BaseModel],
+        temperature: float | None = None,
+        max_tokens: int | None = None,
         **kwargs: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         if self._responses is not None:
             if not self._responses:
                 return {"score": 0}
@@ -303,7 +304,7 @@ def registered_metrics() -> Iterable[str]:
 
 
 @pytest.fixture
-def mock_llm_provider(monkeypatch: pytest.MonkeyPatch) -> Iterable[Dict[str, Any]]:
+def mock_llm_provider(monkeypatch: pytest.MonkeyPatch) -> Iterable[dict[str, Any]]:
     original_map = dict(LLMProviderFactory._PROVIDER_MAP)
     monkeypatch.setattr(
         LLMProviderFactory, "_PROVIDER_MAP", {**original_map, "mock": MockLLMProvider}
@@ -314,7 +315,7 @@ def mock_llm_provider(monkeypatch: pytest.MonkeyPatch) -> Iterable[Dict[str, Any
 
 @pytest.fixture
 def sample_quiz() -> Quiz:
-    questions: List[QuizQuestion] = [
+    questions: list[QuizQuestion] = [
         QuizQuestion(
             question_id="q1",
             question_type=QuestionType.SINGLE_CHOICE,
