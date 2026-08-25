@@ -40,10 +40,10 @@ class AnthropicProvider(LLMProvider):
             model_name=model,
             temperature=temperature,
             max_tokens=max_tokens,  # type: ignore[call-arg]
-            **kwargs,
+            **self.additional_params,
         )
 
-    def generate(
+    def _do_generate(
         self,
         prompt: str,
         temperature: float | None = None,
@@ -82,7 +82,7 @@ class AnthropicProvider(LLMProvider):
         # Handle case where content is a list
         return str(content)
 
-    def generate_structured(
+    def _do_generate_structured(
         self,
         prompt: str,
         schema: type[BaseModel],

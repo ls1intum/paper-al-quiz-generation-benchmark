@@ -56,10 +56,10 @@ class AzureOpenAIProvider(LLMProvider):
             api_key=api_key,
             temperature=temperature,
             max_completion_tokens=max_tokens,
-            **kwargs,
+            **self.additional_params,
         )
 
-    def generate(
+    def _do_generate(
         self,
         prompt: str,
         temperature: float | None = None,
@@ -103,7 +103,7 @@ class AzureOpenAIProvider(LLMProvider):
             return content
         return str(content)
 
-    def generate_structured(
+    def _do_generate_structured(
         self,
         prompt: str,
         schema: type[BaseModel],

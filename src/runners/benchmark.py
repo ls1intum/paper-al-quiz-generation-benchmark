@@ -5,7 +5,7 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
-from ..evaluators.base import LLMProvider
+from ..evaluators.base import LLMProvider, TransientLLMError
 from ..evaluators.factory import LLMProviderFactory
 from ..evaluators.ollama import OllamaProvider
 from ..metrics.base import BaseMetric, MetricScope
@@ -28,6 +28,8 @@ class BenchmarkRunner:
         self.metrics: dict[str, BaseMetric] = {}
         self.evaluators: dict[str, LLMProvider] = {}
         self.logger = logging.getLogger(__name__)
+        self._attempted: int = 0
+        self._cell_failures: list[dict] = []
         self._init_evaluators()
         self._init_metrics()
 
@@ -154,6 +156,7 @@ class BenchmarkRunner:
         parameters: dict,
         instructions: QuizInstructions | None = None,
     ) -> tuple[EvaluationResult, MetricResult] | None:
+        self._attempted += 1
         try:
             evaluator.reset_usage()
             result = metric.evaluate(
@@ -175,8 +178,27 @@ class BenchmarkRunner:
                 raw_response=result.raw_response,
                 usage=usage,
             )
+        except TransientLLMError as e:
+            self.logger.error("Transient failure evaluating quiz %s: %s", quiz.quiz_id, e)
+            self._cell_failures.append({
+                "category": "transient",
+                "metric": metric.name,
+                "evaluator": evaluator.model_name,
+                "quiz_id": quiz.quiz_id,
+                "question_id": None,
+                "error": str(e),
+            })
+            return None
         except Exception as e:  # noqa: BLE001
             self.logger.error("Error evaluating quiz %s: %s", quiz.quiz_id, e)
+            self._cell_failures.append({
+                "category": "skipped",
+                "metric": metric.name,
+                "evaluator": evaluator.model_name,
+                "quiz_id": quiz.quiz_id,
+                "question_id": None,
+                "error": str(e),
+            })
             return None
 
     def _expand_quiz_result(
@@ -224,6 +246,7 @@ class BenchmarkRunner:
         parameters: dict,
         instructions: QuizInstructions | None = None,
     ) -> tuple[MetricResult, dict] | None:
+        self._attempted += 1
         try:
             evaluator.reset_usage()
             result = metric.evaluate(
@@ -247,9 +270,44 @@ class BenchmarkRunner:
                 usage=usage,
             )
             return metric_result, result.metadata.get("phases", {})
+        except TransientLLMError as e:
+            self.logger.error(
+                "Transient failure evaluating question %s: %s", question.question_id, e
+            )
+            self._cell_failures.append({
+                "category": "transient",
+                "metric": metric.name,
+                "evaluator": evaluator.model_name,
+                "quiz_id": quiz.quiz_id,
+                "question_id": question.question_id,
+                "error": str(e),
+            })
+            return None
         except Exception as e:  # noqa: BLE001
             self.logger.error("Error evaluating question %s: %s", question.question_id, e)
+            self._cell_failures.append({
+                "category": "skipped",
+                "metric": metric.name,
+                "evaluator": evaluator.model_name,
+                "quiz_id": quiz.quiz_id,
+                "question_id": question.question_id,
+                "error": str(e),
+            })
             return None
+
+    def get_completeness_report(self) -> dict:
+        failed = [c for c in self._cell_failures if c["category"] == "transient"]
+        skipped = [c for c in self._cell_failures if c["category"] == "skipped"]
+        present = self._attempted - len(self._cell_failures)
+        return {
+            "expected": self._attempted,
+            "present": present,
+            "skipped": len(skipped),
+            "failed": len(failed),
+            "complete": len(failed) == 0,
+            "failed_cells": failed,
+            "skipped_cells": skipped,
+        }
 
     @staticmethod
     def _check_difficulty_compliance(

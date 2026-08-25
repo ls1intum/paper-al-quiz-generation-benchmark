@@ -246,8 +246,25 @@ def main() -> int:
                 f.write(summary_str)
             logger.info("Summary saved to %s", summary_file)
 
-        logger.info("BENCHMARK COMPLETE")
+        report = runner.get_completeness_report()
+        completeness_file = run_dir / "completeness.json"
+        with open(completeness_file, "w", encoding="utf-8") as f:
+            json.dump(report, f, indent=2)
+        logger.info(
+            "Completeness: %d attempted, %d present, %d skipped, %d failed",
+            report["expected"], report["present"], report["skipped"], report["failed"],
+        )
 
+        if not report["complete"]:
+            for cell in report["failed_cells"]:
+                logger.error(
+                    "FAILED CELL: metric=%s evaluator=%s quiz=%s question=%s error=%s",
+                    cell["metric"], cell["evaluator"], cell["quiz_id"],
+                    cell["question_id"], cell["error"],
+                )
+            return 1
+
+        logger.info("BENCHMARK COMPLETE")
         return 0
 
     except KeyboardInterrupt:

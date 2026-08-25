@@ -244,7 +244,7 @@ class MockLLMProvider(LLMProvider):
 
         return None
 
-    def generate(
+    def _do_generate(
         self,
         prompt: str,
         temperature: Optional[float] = None,
@@ -264,7 +264,7 @@ class MockLLMProvider(LLMProvider):
         digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
         return str(int(digest, 16) % 101)
 
-    def generate_structured(
+    def _do_generate_structured(
         self,
         prompt: str,
         schema: Type[BaseModel],
