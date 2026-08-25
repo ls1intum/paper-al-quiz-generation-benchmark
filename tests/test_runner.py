@@ -1,11 +1,12 @@
 """Tests for benchmark runner orchestration."""
 
+import typing
 from datetime import datetime
 
 import pytest
 
-from src.runners.benchmark import BenchmarkRunner
 from src.models.config import MetricConfig
+from src.runners.benchmark import BenchmarkRunner
 
 
 def test_runner_produces_expected_results(
@@ -299,13 +300,15 @@ def test_runner_raises_when_metric_fails_every_question(
     runner = BenchmarkRunner(config)
 
     # Make the metric's evaluate() always raise
-    with patch.object(
-        runner.metrics["clarity"],
-        "evaluate",
-        side_effect=RuntimeError("boom"),
+    with (
+        patch.object(
+            runner.metrics["clarity"],
+            "evaluate",
+            side_effect=RuntimeError("boom"),
+        ),
+        pytest.raises(RuntimeError, match="failed for every question"),
     ):
-        with pytest.raises(RuntimeError, match="failed for every question"):
-            runner.run(quizzes=[sample_quiz], source_texts={"quiz_1": "text"})
+        runner.run(quizzes=[sample_quiz], source_texts={"quiz_1": "text"})
 
 
 def test_runner_tolerates_partial_question_failure(
@@ -374,7 +377,7 @@ def test_usage_accumulator():
 
     # Simulate two LLM calls
     class FakeMsg:
-        usage_metadata = {"input_tokens": 100, "output_tokens": 25}
+        usage_metadata: typing.ClassVar[dict] = {"input_tokens": 100, "output_tokens": 25}
 
     provider._record_usage(FakeMsg())
     provider._record_usage(FakeMsg())
@@ -463,9 +466,9 @@ def test_non_transient_400_not_retried():
     with (
         patch.object(provider, "_do_generate", side_effect=FakeAPIError("Bad Request")),
         patch("src.evaluators.base.time.sleep") as mock_sleep,
+        pytest.raises(FakeAPIError),
     ):
-        with pytest.raises(FakeAPIError):
-            provider.generate("test prompt")
+        provider.generate("test prompt")
 
     mock_sleep.assert_not_called()
 

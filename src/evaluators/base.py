@@ -4,9 +4,12 @@ import logging
 import random
 import time
 from abc import ABC, abstractmethod
-from typing import Any
+from collections.abc import Callable
+from typing import Any, TypeVar
 
 from pydantic import BaseModel
+
+_T = TypeVar("_T")
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +61,7 @@ class LLMProvider(ABC):
             return True
         return type(exc).__name__ in ("APIConnectionError", "APITimeoutError")
 
-    def _call_with_retry(self, fn):
+    def _call_with_retry(self, fn: Callable[[], _T]) -> _T:
         for attempt in range(1, self.retry_max_attempts + 1):
             try:
                 return fn()
@@ -71,9 +74,7 @@ class LLMProvider(ABC):
                         original=exc,
                         attempts=attempt,
                     ) from exc
-                delay = min(
-                    self.retry_base_delay * (2 ** (attempt - 1)), self.retry_max_delay
-                )
+                delay = min(self.retry_base_delay * (2 ** (attempt - 1)), self.retry_max_delay)
                 jitter = random.uniform(0, delay * 0.25)
                 wait = delay + jitter
                 logger.warning(
@@ -84,6 +85,7 @@ class LLMProvider(ABC):
                     exc,
                 )
                 time.sleep(wait)
+        raise AssertionError("unreachable: retry_max_attempts must be >= 1")
 
     def generate(
         self,

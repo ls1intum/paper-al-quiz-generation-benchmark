@@ -6,24 +6,24 @@ import json
 import logging
 import re
 import sys
-from datetime import datetime
-from typing import Any
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from src.analysis.aggregator import ResultsAggregator
 from src.analysis.reporter import ResultsReporter
 from src.metrics import GrammaticalCorrectnessMetric
-from src.metrics.registry import MetricRegistry
-from src.metrics.difficulty import DifficultyMetric
-from src.metrics.coverage import CoverageMetric
-from src.metrics.clarity import ClarityMetric
-from src.metrics.distractor import DistractorQualityMetric
-from src.metrics.homogeneous_options import HomogeneousOptionsMetric
+from src.metrics.absence_of_cueing import AbsenceOfCueingMetric
 from src.metrics.accuracy import FactualAccuracyMetric
 from src.metrics.answer_key_correctness import AnswerKeyCorrectnessMetric
-from src.metrics.objective_alignment import ObjectiveAlignmentMetric
-from src.metrics.absence_of_cueing import AbsenceOfCueingMetric
+from src.metrics.clarity import ClarityMetric
 from src.metrics.cognitive_level import CognitiveLevelMetric
+from src.metrics.coverage import CoverageMetric
+from src.metrics.difficulty import DifficultyMetric
+from src.metrics.distractor import DistractorQualityMetric
+from src.metrics.homogeneous_options import HomogeneousOptionsMetric
+from src.metrics.objective_alignment import ObjectiveAlignmentMetric
+from src.metrics.registry import MetricRegistry
 from src.runners.benchmark import BenchmarkRunner
 from src.utils.config_loader import ConfigLoader
 from src.utils.io import IOUtils
@@ -116,7 +116,7 @@ def main() -> int:
         logger.info("Metrics: %s", [m.name for m in config.get_enabled_metrics()])
 
         # Build run bundle directory
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(tz=UTC).strftime("%Y%m%d_%H%M%S")
         slug_name = re.sub(r"[^a-zA-Z0-9_-]+", "-", config.name.strip().lower()).strip("-")
         slug_name = slug_name or "benchmark"
         run_id = f"{slug_name}-{timestamp}-{ConfigLoader.hash_config(config)[:8]}"
@@ -139,7 +139,7 @@ def main() -> int:
             json.dump(
                 {
                     "run_bundle": run_bundle_name,
-                    "started_at": datetime.now().isoformat(),
+                    "started_at": datetime.now(tz=UTC).isoformat(),
                     "config_name": config.name,
                     "config_version": config.version,
                     "config_hash": ConfigLoader.hash_config(config),
@@ -252,15 +252,21 @@ def main() -> int:
             json.dump(report, f, indent=2)
         logger.info(
             "Completeness: %d attempted, %d present, %d skipped, %d failed",
-            report["expected"], report["present"], report["skipped"], report["failed"],
+            report["expected"],
+            report["present"],
+            report["skipped"],
+            report["failed"],
         )
 
         if not report["complete"]:
             for cell in report["failed_cells"]:
                 logger.error(
                     "FAILED CELL: metric=%s evaluator=%s quiz=%s question=%s error=%s",
-                    cell["metric"], cell["evaluator"], cell["quiz_id"],
-                    cell["question_id"], cell["error"],
+                    cell["metric"],
+                    cell["evaluator"],
+                    cell["quiz_id"],
+                    cell["question_id"],
+                    cell["error"],
                 )
             return 1
 
@@ -271,8 +277,8 @@ def main() -> int:
         logging.getLogger(__name__).warning("Benchmark interrupted by user.")
         return 130
 
-    except Exception as e:
-        logging.getLogger(__name__).exception("Error: %s", e)
+    except Exception:
+        logging.getLogger(__name__).exception("Error")
         return 1
 
 
