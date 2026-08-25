@@ -5,7 +5,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..models.quiz import QuestionType, QuizQuestion
-from .base import BaseMetric, MetricScope
+from .base import BaseMetric, MetricNotApplicableError, MetricScope
 from .phase import Phase, PhaseInput
 
 QUALITY_SCORES = {
@@ -102,7 +102,7 @@ class DistractorQualityMetric(BaseMetric):
         question = inp.question
 
         if question.question_type not in (QuestionType.SINGLE_CHOICE, QuestionType.MULTIPLE_CHOICE):
-            raise ValueError(
+            raise MetricNotApplicableError(
                 f"Distractor quality cannot be evaluated for {question.question_type.value} questions. "
                 "Only single_choice and multiple_choice are supported."
             )
