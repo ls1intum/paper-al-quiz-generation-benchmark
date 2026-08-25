@@ -5,6 +5,7 @@ from datetime import datetime
 
 import pytest
 
+from src.metrics.base import MetricNotApplicableError
 from src.models.config import MetricConfig
 from src.runners.benchmark import BenchmarkRunner
 
@@ -353,8 +354,7 @@ def test_evaluator_init_failure_raises(monkeypatch, sample_config):
     """A declared evaluator that cannot be created must abort the run, not be skipped.
 
     Silently dropping one leaves a sweep with fewer judges than planned, visible only in
-    metadata.json after the calls have been spent -- and two of the four models reported in
-    the paper are locally served.
+    metadata.json after the calls have been spent.
     """
     from src.evaluators.factory import LLMProviderFactory
     from src.runners.benchmark import BenchmarkRunner
@@ -519,7 +519,7 @@ def test_transient_failure_reports_incomplete(
 def test_skipped_error_does_not_fail_completeness(
     registered_metrics, mock_llm_provider, sample_config, sample_quiz
 ):
-    """A ValueError (e.g. distractor on true/false) is a skip, not a failure."""
+    """MetricNotApplicableError (distractor on true/false) is a skip, not a failure."""
     from dataclasses import replace
     from unittest.mock import patch
 
@@ -544,7 +544,7 @@ def test_skipped_error_does_not_fail_completeness(
     def skip_first(*args, **kwargs):
         call_count[0] += 1
         if call_count[0] == 1:
-            raise ValueError("Not applicable for true/false")
+            raise MetricNotApplicableError("Not applicable for true/false")
         return original_evaluate(*args, **kwargs)
 
     with patch.object(runner.metrics["clarity"], "evaluate", side_effect=skip_first):
@@ -554,3 +554,48 @@ def test_skipped_error_does_not_fail_completeness(
     assert report["complete"]
     assert report["skipped"] == 1
     assert len(report["skipped_cells"]) == 1
+
+
+def test_truncation_error_fails_completeness(
+    registered_metrics, mock_llm_provider, sample_config, sample_quiz
+):
+    """max_tokens truncation is data loss, not a skip: it must flip `complete`.
+
+    Regression guard: 36 cells were lost to 'length limit was reached' truncation
+    yet the run reported complete and exited 0.
+    """
+    from dataclasses import replace
+    from unittest.mock import patch
+
+    config = replace(
+        sample_config,
+        runs=1,
+        metrics=[
+            MetricConfig(
+                name="clarity",
+                version="2.0",
+                evaluators=["mock_eval"],
+                parameters={},
+                enabled=True,
+            )
+        ],
+    )
+    runner = BenchmarkRunner(config)
+
+    original_evaluate = runner.metrics["clarity"].evaluate
+    call_count = [0]
+
+    def truncate_first(*args, **kwargs):
+        call_count[0] += 1
+        if call_count[0] == 1:
+            raise ValueError("Could not parse response content as the length limit was reached")
+        return original_evaluate(*args, **kwargs)
+
+    with patch.object(runner.metrics["clarity"], "evaluate", side_effect=truncate_first):
+        runner.run(quizzes=[sample_quiz], source_texts={"quiz_1": "text"})
+
+    report = runner.get_completeness_report()
+    assert not report["complete"], "truncation must not be absorbed as a skip"
+    assert report["failed"] == 1
+    assert report["skipped"] == 0
+    assert report["failed_cells"][0]["category"] == "failed"

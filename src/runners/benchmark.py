@@ -8,7 +8,7 @@ from pathlib import Path
 from ..evaluators.base import LLMProvider, TransientLLMError
 from ..evaluators.factory import LLMProviderFactory
 from ..evaluators.ollama import OllamaProvider
-from ..metrics.base import BaseMetric, MetricScope
+from ..metrics.base import BaseMetric, MetricNotApplicableError, MetricScope
 from ..metrics.registry import MetricRegistry
 from ..models.config import BenchmarkConfig
 from ..models.instruction import QuizInstructions
@@ -191,11 +191,26 @@ class BenchmarkRunner:
                 }
             )
             return None
+        except MetricNotApplicableError as e:
+            self.logger.info(
+                "Metric %s not applicable to quiz %s: %s", metric.name, quiz.quiz_id, e
+            )
+            self._cell_failures.append(
+                {
+                    "category": "skipped",
+                    "metric": metric.name,
+                    "evaluator": evaluator.model_name,
+                    "quiz_id": quiz.quiz_id,
+                    "question_id": None,
+                    "error": str(e),
+                }
+            )
+            return None
         except Exception as e:  # noqa: BLE001
             self.logger.error("Error evaluating quiz %s: %s", quiz.quiz_id, e)
             self._cell_failures.append(
                 {
-                    "category": "skipped",
+                    "category": "failed",
                     "metric": metric.name,
                     "evaluator": evaluator.model_name,
                     "quiz_id": quiz.quiz_id,
@@ -289,8 +304,10 @@ class BenchmarkRunner:
                 }
             )
             return None
-        except Exception as e:  # noqa: BLE001
-            self.logger.error("Error evaluating question %s: %s", question.question_id, e)
+        except MetricNotApplicableError as e:
+            self.logger.info(
+                "Metric %s not applicable to question %s: %s", metric.name, question.question_id, e
+            )
             self._cell_failures.append(
                 {
                     "category": "skipped",
@@ -302,9 +319,22 @@ class BenchmarkRunner:
                 }
             )
             return None
+        except Exception as e:  # noqa: BLE001
+            self.logger.error("Error evaluating question %s: %s", question.question_id, e)
+            self._cell_failures.append(
+                {
+                    "category": "failed",
+                    "metric": metric.name,
+                    "evaluator": evaluator.model_name,
+                    "quiz_id": quiz.quiz_id,
+                    "question_id": question.question_id,
+                    "error": str(e),
+                }
+            )
+            return None
 
     def get_completeness_report(self) -> dict:
-        failed = [c for c in self._cell_failures if c["category"] == "transient"]
+        failed = [c for c in self._cell_failures if c["category"] in ("transient", "failed")]
         skipped = [c for c in self._cell_failures if c["category"] == "skipped"]
         present = self._attempted - len(self._cell_failures)
         return {

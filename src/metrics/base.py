@@ -18,6 +18,15 @@ from ..models.result import EvaluationResult
 from .phase import Phase, PhaseInput, PhaseOutput
 
 
+class MetricNotApplicableError(Exception):
+    """Raised when a metric legitimately does not apply to a question.
+
+    Distinct from a failure: the cell was never scorable (e.g. distractor
+    quality on a true/false item), so completeness accounting must not treat
+    it as data loss. Every other exception is a real loss.
+    """
+
+
 class MetricScope(str, Enum):
     """Defines the scope at which a metric operates."""
 
