@@ -409,27 +409,27 @@ technical-writing standards, and terminology consistency where it affects readab
 
 | Parameter | Default | Meaning |
 |---|---|---|
-| `language` | `"English"` | Which language's grammar rules to apply. |
+| `language` | `"English"` | Fallback language, used only when an item carries no `metadata.language`. |
 
-**Language mismatch is not a grammar defect.** Items are always judged in the language they are
-actually written in — a well-written German item scores `none` even when English was requested.
-Whether the quiz matches a requested language is an *instruction compliance* question about the
-quiz as a whole, so it is checked once per quiz and reported separately as
-`adjusted_grammar` in the run metadata. Per-item scores are never modified by it, which keeps
-them meaning one thing: how well the item is written.
+**The item's own `metadata.language` drives the score** (v2.1+) — the `language` parameter above
+is a fallback for a corpus that doesn't tag its items, not an override. Items are always judged in
+the language they are actually written in — a well-written German item scores `none` even when
+English was requested. Whether the quiz matches a requested language is a separate *instruction
+compliance* question about the quiz as a whole, so it is checked once per quiz and reported
+separately as `adjusted_grammar` in the run metadata. Per-item scores are never modified by it,
+which keeps them meaning one thing: how well the item is written.
 
 **Output** (`raw_response`):
 - `severity`, `score`
 - `grammar_issues`, `spelling_issues`, `punctuation_issues` — the specific problems found, empty when that category is clean
 - `rationale`
+- `language` — the language actually applied (from `metadata.language`, or the fallback above when untagged)
 
 **Example Configuration**:
 ```yaml
 - name: "grammatical_correctness"
-  version: "2.0"
+  version: "2.1"
   evaluators: ["gpt4"]
-  parameters:
-    language: "English"
 ```
 
 ---
@@ -462,7 +462,7 @@ them meaning one thing: how well the item is written.
 **Example Configuration**:
 ```yaml
 - name: "accuracy"
-  version: "1.1"
+  version: "1.2"
   evaluators: ["gpt4", "claude_opus"]
 ```
 

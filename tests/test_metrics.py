@@ -1281,6 +1281,69 @@ def test_grammar_rejects_the_removed_error_weights_parameter():
         metric.validate_params(error_weights={"critical": 1.0})
 
 
+def _make_question_with_language(language=None) -> QuizQuestion:
+    metadata = {}
+    if language is not None:
+        metadata["language"] = language
+    return QuizQuestion(
+        question_id="q1",
+        question_type=QuestionType.SINGLE_CHOICE,
+        question_text="What is 2+2?",
+        options=["2", "3", "4", "5"],
+        correct_answer="4",
+        metadata=metadata,
+    )
+
+
+def test_grammar_language_comes_from_item_metadata():
+    """v2.1: the item's own tag drives the prompt, not just the config parameter."""
+    metric = GrammaticalCorrectnessMetric()
+    question = _make_question_with_language("de")
+    inp = make_phase_input(metric, "judge", question=question)
+
+    assert "Language: German" in inp.prompt_builder(inp)
+
+
+def test_grammar_item_language_overrides_the_parameter():
+    """The regression that matters: before v2.1 a config could never say anything but
+    English, because nothing read the item's own tag."""
+    metric = GrammaticalCorrectnessMetric()
+    question = _make_question_with_language("de")
+    inp = make_phase_input(
+        metric, "judge", question=question, params={"language": "English"}
+    )
+
+    assert "Language: German" in inp.prompt_builder(inp)
+
+
+def test_grammar_unknown_language_code_passes_through():
+    """No name for an untagged code beyond de/en -- pass the raw value rather than guess."""
+    metric = GrammaticalCorrectnessMetric()
+    question = _make_question_with_language("fr")
+    inp = make_phase_input(metric, "judge", question=question)
+
+    assert "Language: fr" in inp.prompt_builder(inp)
+
+
+def test_grammar_prompt_does_not_contradict_the_stated_language():
+    """v2.0 told the judge to apply English rules, then to ignore that if the item
+    was not English -- self-contradictory guidance, removed in v2.1."""
+    metric = GrammaticalCorrectnessMetric()
+    inp = make_phase_input(metric, "judge", question=make_question())
+    prompt = inp.prompt_builder(inp)
+
+    assert "even if that is not" not in prompt
+
+
+def test_grammar_records_the_resolved_language():
+    """The resolved language lands in the output, so a bundle carries per-row proof
+    of which language was actually applied."""
+    result, data = _evaluate_grammar(_make_question_with_language("de"), _judge_grammar("none"))
+
+    assert data["language"] == "German"
+    assert result.score == 100.0
+
+
 # ── cognitive_level ──────────────────────────────────────────────────────── #
 
 
