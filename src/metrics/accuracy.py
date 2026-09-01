@@ -8,11 +8,21 @@ from .phase import Phase, PhaseInput, PhaseOutput
 
 
 class FactualAccuracyMetric(BaseMetric):
-    """Evaluates the factual accuracy of quiz questions and answers.
+    """Evaluates the factual accuracy of what a quiz item asserts to be true.
+
+    Scope is the stem and its premises, plus any option the key marks correct. A
+    distractor is SUPPOSED to be false, so its falseness is not an error here; judged
+    otherwise, a well-built item is penalised for having working distractors. Whether the
+    key itself is right belongs to `answer_key_correctness`, so that a keying defect is
+    reported by exactly one metric.
+
+    v1.2 narrowed this scope; v1.1 asked whether "all statements" were correct, which reads
+    as requiring every option to be true. The version is recorded on each result row, so
+    output from the two remains distinguishable.
 
     Verifies that:
-    1. Questions and answers are free from errors, biases, or distortions
-    2. Answers are based on evidence rather than opinions, theories, or interpretations
+    1. The stem states nothing false and takes no false premise for granted
+    2. Claims are based on evidence rather than opinion, theory, or interpretation
     3. Content is factually correct and aligns with established knowledge
     """
 
@@ -33,7 +43,7 @@ class FactualAccuracyMetric(BaseMetric):
 
     @property
     def version(self) -> str:
-        return "1.1"
+        return "1.2"
 
     @property
     def scope(self) -> MetricScope:
@@ -74,12 +84,17 @@ Options:
 {options_text}
 Correct Answer: {question.correct_answer if hasattr(question, 'correct_answer') else "(Not specified)"}
 
+**What is in scope**:
+Judge only what the item ASSERTS AS TRUE: the claims in the stem, including any premise it takes for granted, and the content of the options marked correct.
+
+A distractor being false is NOT an error. Distractors are supposed to be false -- that is their function -- so do not report an unkeyed option as a major error merely because it states something untrue. If you believe the marked correct answer is wrong, or that an unkeyed option is also defensible, that is a defect of the answer key and is judged elsewhere; do not report it here.
+
 **Evaluation Criteria**:
-1. Factual Correctness: Are all statements correct? Are there outdated facts or clear errors?
-2. Evidence-Based Content: Is the answer verifiable fact rather than opinion or theory?
-3. Bias and Distortion: Is it free from political, cultural, or personal bias? Are all options presented fairly?
+1. Factual Correctness: Does the stem state anything false, or assume a false premise? Are there outdated facts or clear errors in what the item asserts?
+2. Evidence-Based Content: Is what the item asserts verifiable fact rather than opinion or theory?
+3. Bias and Distortion: Is the item free from political, cultural, or personal bias?
 4. Source Alignment: Does it align with the provided source material (if any)? Does it contradict it?
-5. Objectivity: Would reasonable experts agree with the factual claims?
+5. Objectivity: Would reasonable experts agree with the factual claims the item makes?
 
 **Scoring Guide**:
 - 0-20: Highly Inaccurate (major errors, built on false premises)
@@ -87,6 +102,8 @@ Correct Answer: {question.correct_answer if hasattr(question, 'correct_answer') 
 - 41-60: Moderately Accurate (mostly factual but minor inaccuracies)
 - 61-80: Accurate (factually correct and evidence-based)
 - 81-100: Highly Accurate (objective, perfectly grounded in evidence)
+
+An item whose only "errors" are false distractors is Highly Accurate, not inaccurate.
 
 Provide your evaluation and score based strictly on these criteria.
 
@@ -97,7 +114,7 @@ Respond with ONLY a JSON object matching this schema:
   "bias_and_distortion": "<reasoning>",
   "source_alignment": "<reasoning>",
   "objectivity": "<reasoning>",
-  "major_errors_found": ["error 1", "error 2"],
+  "major_errors_found": ["a definite factual error in what the item asserts", ...],
   "score": <float 0-100>
 }}"""
 
