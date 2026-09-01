@@ -436,16 +436,24 @@ which keeps them meaning one thing: how well the item is written.
 
 ### 9. Factual Accuracy
 
-**Purpose**: Verify questions and answers are factually correct, evidence-based, free from errors and biases, and aligned with provided source material.
+**Purpose**: Verify what the item asserts to be true is factually correct, evidence-based, and free from bias.
 
 **Scope**: Question-level
 
+**What is in scope** (v1.2): the stem and its premises, plus any option the answer key marks
+correct. **A false distractor is not an error** — distractors are supposed to be false, so an
+unkeyed option stating something untrue does not count against this score. Whether the key itself
+is right is a separate question, judged by `answer_key_correctness`, so a keying defect is
+reported by exactly one metric. (v1.1 asked whether "all statements" were correct, which read as
+requiring every option — distractors included — to be true; `metric_version` on every result row
+keeps v1.1 and v1.2 output distinguishable.)
+
 **Evaluation Dimensions**:
-- **Factual Correctness**: Are all statements accurate? Are there outdated facts or clear errors?
-- **Evidence-Based Content**: Is the answer verifiable fact rather than opinion or theory?
-- **Bias and Distortion**: Is it free from political, cultural, or personal bias? Are all options presented fairly?
-- **Source Alignment**: Does it align with the provided source material? Does it contradict it?
-- **Objectivity**: Would reasonable experts agree with the factual claims?
+- **Factual Correctness**: Does the stem state anything false, or assume a false premise? Are there outdated facts or clear errors in what the item asserts?
+- **Evidence-Based Content**: Is what the item asserts verifiable fact rather than opinion or theory?
+- **Bias and Distortion**: Is the item free from political, cultural, or personal bias?
+- **Source Alignment**: Does it align with the provided source material, if any? Does it contradict it?
+- **Objectivity**: Would reasonable experts agree with the factual claims the item makes?
 
 **Scoring Scale**:
 - **0-20**: Highly Inaccurate (major errors, built on false premises)
