@@ -63,10 +63,21 @@ class BenchmarkRunner:
         for metric_config in self.config.get_enabled_metrics():
             try:
                 metric = MetricRegistry.create(metric_config.name)
-                self.metrics[metric_config.name] = metric
-                self.logger.info("Initialized metric: %s v%s", metric_config.name, metric.version)
-            except Exception as e:  # noqa: BLE001
-                self.logger.warning("Failed to initialize metric %s: %s", metric_config.name, e)
+            except Exception as e:
+                # Fail loud, for the same reason _init_evaluators does. A metric that cannot be
+                # created was silently warned about and skipped, so a run whose config named
+                # metrics this checkout does not have completed with exit 0 and wrote a bundle
+                # that looks finished and holds none of their rows. That is indistinguishable
+                # from a real result until someone reads the config back months later. The
+                # concrete way in: a config generated against a branch that adds metrics, run on
+                # a checkout without it.
+                raise RuntimeError(
+                    f"Failed to initialize metric '{metric_config.name}': {e}. "
+                    f"Registered metrics: {sorted(MetricRegistry.list_metrics())}. "
+                    f"Disable it in the config if the omission is intended."
+                ) from e
+            self.metrics[metric_config.name] = metric
+            self.logger.info("Initialized metric: %s v%s", metric_config.name, metric.version)
 
     def run(
         self, quizzes: list[Quiz] | None = None, source_texts: dict[str, str] | None = None

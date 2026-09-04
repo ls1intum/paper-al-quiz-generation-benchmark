@@ -75,13 +75,16 @@ def test_runner_skips_missing_evaluator(registered_metrics, mock_llm_provider, s
     assert results[0].metrics == []
 
 
-def test_runner_skips_missing_metric(mock_llm_provider, sample_config, sample_quiz):
-    # Do not register metrics to force missing metric
-    runner = BenchmarkRunner(sample_config)
-    results = runner.run(quizzes=[sample_quiz], source_texts={"quiz_1": "source text"})
-    assert len(results) == 2
-    for result in results:
-        assert result.metrics == []
+def test_runner_refuses_to_start_with_an_unknown_metric(mock_llm_provider, sample_config):
+    """A metric the registry does not have must stop the run, not be skipped.
+
+    This used to warn and continue, and the run then exited 0 having written a bundle that
+    looks finished and contains none of that metric's rows -- indistinguishable from a real
+    result. The concrete way in: a config generated against a branch that adds metrics, run on
+    a checkout without it. `_init_evaluators` has always failed loud for the same reason.
+    """
+    with pytest.raises(RuntimeError, match="Failed to initialize metric"):
+        BenchmarkRunner(sample_config)  # no registered_metrics fixture -> registry is empty
 
 
 def test_runner_errors_on_empty_quizzes(registered_metrics, mock_llm_provider, sample_config):
