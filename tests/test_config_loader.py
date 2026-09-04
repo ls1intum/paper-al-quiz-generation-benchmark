@@ -1,7 +1,10 @@
 """Tests for configuration loading and validation."""
 
+import pathlib
+
 import pytest
 
+from src.metrics.registry import MetricRegistry
 from src.utils.config_loader import ConfigLoader
 
 
@@ -127,3 +130,41 @@ def test_parse_config_preserves_ollama_additional_params():
     assert evaluator.provider == "ollama"
     assert evaluator.model == "llama3.1:8b-instruct"
     assert evaluator.additional_params["base_url"] == "http://localhost:11434"
+
+
+# ── shipped configs ──────────────────────────────────────────────────────── #
+
+SHIPPED_CONFIGS = sorted(pathlib.Path("config").rglob("*.yaml"))
+
+
+def test_shipped_configs_are_discoverable():
+    """Guard the premise of the two tests below."""
+    assert SHIPPED_CONFIGS, "no config/*.yaml found -- the tests below would be vacuous"
+
+
+@pytest.mark.parametrize("config_path", SHIPPED_CONFIGS, ids=lambda p: p.stem)
+def test_shipped_config_parses_and_every_metric_resolves(config_path, registered_metrics):
+    """A committed config must load and name only metrics the registry has.
+
+    A config is not exercised by any other test, so a typo in a metric name or a
+    stale field sits undetected until someone spends a sweep discovering it.
+    """
+    config = ConfigLoader.parse_config(ConfigLoader.load_yaml(str(config_path)))
+    for metric in config.get_enabled_metrics():
+        assert MetricRegistry.create(metric.name).name == metric.name
+
+
+@pytest.mark.parametrize("config_path", SHIPPED_CONFIGS, ids=lambda p: p.stem)
+def test_shipped_config_input_directories_exist(config_path):
+    """Every path a committed config points at must be in the repository.
+
+    `instructions_directory` is the one that bites: `IOUtils.load_instructions`
+    warns and continues when the directory is missing, so a config that means
+    "run without instructions" and a config with a typo behave identically at
+    runtime and differ only in intent.
+    """
+    config = ConfigLoader.parse_config(ConfigLoader.load_yaml(str(config_path)))
+    for field in ("quiz_directory", "source_directory", "instructions_directory"):
+        path = getattr(config.input_output, field, None)
+        if path:
+            assert pathlib.Path(path).exists(), f"{config_path}: {field} -> {path} does not exist"

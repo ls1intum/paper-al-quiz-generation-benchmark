@@ -191,23 +191,19 @@ class BenchmarkRunner:
         for field in bucket:
             bucket[field] += usage.get(field, 0)
 
-    def _charge_usage(self, row: MetricResult | None, evaluator: LLMProvider) -> None:
+    def _charge_usage(self, row: MetricResult, evaluator: LLMProvider) -> None:
         """Add whatever the evaluator has just spent onto an existing result row.
 
-        For calls made outside a metric's own reset/read bracket. Without a row
-        to charge -- the metric failed on every question of this quiz -- the
-        tokens are held with the other unattributed ones rather than dropped.
+        For calls made outside a metric's own reset/read bracket. The caller
+        picks the row the call belongs to; a row with no usage dict never
+        reaches here, since only a cell that recorded usage produces one.
         """
         usage = evaluator.get_accumulated_usage()
-        if row is not None and row.usage is not None:
-            for field, spent in usage.items():
-                row.usage[field] = row.usage.get(field, 0) + spent
+        if row.usage is None:
+            row.usage = dict(usage)
             return
-        bucket = self._unattributed_usage.setdefault(
-            evaluator.model_name, {"prompt_tokens": 0, "completion_tokens": 0}
-        )
-        for field in bucket:
-            bucket[field] += usage.get(field, 0)
+        for field, spent in usage.items():
+            row.usage[field] = row.usage.get(field, 0) + spent
 
     @property
     def unattributed_usage(self) -> dict[str, dict[str, dict[str, int]]]:
@@ -516,8 +512,10 @@ class BenchmarkRunner:
                 )
             finally:
                 # In `finally` because a call that raised still spent whatever it
-                # sent before failing.
-                self._charge_usage(usage_rows.get(evaluator_model), evaluator)
+                # sent before failing. `usage_rows` is built in the same pass as
+                # `by_evaluator`, which this function returns on when empty, so
+                # every evaluator reached here has a row.
+                self._charge_usage(usage_rows[evaluator_model], evaluator)
 
         if not adjusted_scores:
             return None

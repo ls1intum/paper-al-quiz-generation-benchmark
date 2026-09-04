@@ -535,9 +535,12 @@ trusted — whether a quiz declares objectives is a fact about the file, not a j
 **Output** (`raw_response`):
 - `applicable`, `balance_level`, `score`
 - `declared_objectives` — the reference set the quiz was judged against
-- `objective_item_counts` — which items the judge attributed to each declared objective.
-  Attributions naming an objective the quiz never declared, or an item it does not hold, are
-  dropped before this is written.
+- `objective_item_counts` — which items the judge attributed to each declared objective, as
+  `{objective_index, objective, question_ids}`. The judge names an objective by its position in
+  the declared list rather than reproducing its text: real declared objectives run to several
+  hundred characters, and verbatim matching would discard most attributions silently.
+- `attributions_dropped` — how many attributions named a position outside the declared list.
+  Reported rather than absorbed, so an empty list cannot be confused with a discarded one.
 - `rationale`
 
 **Example Configuration**:
@@ -618,7 +621,10 @@ its key away. The cue here travels **between** items, so no per-item metric can 
 | `substantial` | `0.0` | Substantial redundancy, or an item that plainly gives away another's answer. |
 
 At `clear_overlap` and `substantial` the judge must name at least one item pair. Agreeing that a
-quiz is redundant is weaker evidence than agreeing about which pair makes it so.
+quiz is redundant is weaker evidence than agreeing about which pair makes it so. A verdict that
+arrives at either level with no surviving pair is **recorded, not corrected**: the score stands
+and `pairs_required_but_missing` is set, so an analysis can exclude a verdict its own evidence
+does not support.
 
 **Quizzes with fewer than three items**: `applicable: false`,
 `redundancy_level: "not_applicable"`, score `100.0`.
@@ -626,9 +632,11 @@ quiz is redundant is weaker evidence than agreeing about which pair makes it so.
 **Output** (`raw_response`):
 - `applicable`, `redundancy_level`, `score`, `num_questions`
 - `pairs` — each `{question_ids, kind, explanation}`, where `kind` is `redundancy` or `cueing`
-- `pairs_dropped` — how many pairs named an item the quiz does not hold, or named one item
-  twice. Reported rather than silently discarded: a judge that reaches `substantial` and then
-  cannot name a real pair is a finding.
+- `pairs_dropped` — how many pairs were unusable: naming an item the quiz does not hold, naming
+  one item twice, or carrying anything other than two distinct ids. A malformed pair costs that
+  pair, never the whole result.
+- `pairs_required_but_missing` — `true` when the verdict is `clear_overlap` or `substantial` and
+  no pair survived.
 - `rationale`
 
 **Example Configuration**:

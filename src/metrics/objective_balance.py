@@ -35,12 +35,25 @@ BalanceLevel = Literal["balanced", "slightly_uneven", "unbalanced", "skewed", "n
 
 
 class ObjectiveItemCount(BaseModel):
-    """Which of the quiz's items the judge attributes to one declared objective."""
+    """Which of the quiz's items the judge attributes to one declared objective.
+
+    The objective is identified by its 1-based position in the declared list,
+    not by its text. Declared objectives in the real corpus are multi-sentence
+    strings of 190-360 characters; asking a model to reproduce one verbatim so
+    the attribution can be matched back is a request it will fail often and
+    silently, and every near-miss would be discarded as unverifiable.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    objective: str
+    objective_index: int
     question_ids: list[str] = Field(default_factory=list)
+
+
+class ResolvedObjectiveItemCount(ObjectiveItemCount):
+    """An attribution after `_finalize` has resolved the index back to its text."""
+
+    objective: str
 
 
 class ObjectiveBalanceJudgeResponse(BaseModel):
@@ -62,8 +75,12 @@ class ObjectiveBalanceResponse(ObjectiveBalanceJudgeResponse):
     """Final output: the judge's level, the objectives it was judged against, and the score."""
 
     balance_level: BalanceLevel  # type: ignore[assignment]
+    objective_item_counts: list[ResolvedObjectiveItemCount] = Field(  # type: ignore[assignment]
+        default_factory=list
+    )
     applicable: bool
     declared_objectives: list[str] = Field(default_factory=list)
+    attributions_dropped: int = 0
     score: float = Field(ge=0, le=100)
 
 
@@ -119,7 +136,9 @@ Respond with ONLY this JSON object, exactly as written:
   "balance_level": "balanced"
 }"""
 
-        objectives_text = "\n".join(f"- {objective}" for objective in objectives)
+        objectives_text = "\n".join(
+            f"{i}. {objective}" for i, objective in enumerate(objectives, 1)
+        )
 
         return f"""Judge how evenly the quiz below spreads its items across the objectives it declares.
 
@@ -146,7 +165,7 @@ Respond with ONLY this JSON object, exactly as written:
 Respond with ONLY a JSON object matching this schema:
 {{
   "objective_item_counts": [
-    {{"objective": "<one of the declared objectives, verbatim>", "question_ids": ["<id>", ...]}}
+    {{"objective_index": <the objective's number above>, "question_ids": ["<id>", ...]}}
   ],
   "rationale": "<reasoning>",
   "balance_level": "balanced" | "slightly_uneven" | "unbalanced" | "skewed"
@@ -165,6 +184,7 @@ Respond with ONLY a JSON object matching this schema:
                 "applicable": False,
                 "declared_objectives": [],
                 "objective_item_counts": [],
+                "attributions_dropped": 0,
                 "rationale": "The quiz declares no learning objectives.",
                 "score": NOT_APPLICABLE_SCORE,
             }
@@ -176,24 +196,35 @@ Respond with ONLY a JSON object matching this schema:
         judged = judge_output.data
         level = judged["balance_level"]
 
-        # Keep only attributions the judge could actually have made: a declared
-        # objective, and ids of items that are in this quiz. A hallucinated id
-        # would otherwise travel into the analysis as evidence.
+        # Keep only attributions the judge could actually have made: an index
+        # into the declared list, and ids of items that are in this quiz. A
+        # hallucinated id would otherwise travel into the analysis as evidence.
+        # Anything discarded is counted rather than absorbed -- an empty
+        # attribution list must be distinguishable from one we threw away.
         known_ids = {question.question_id for question in inp.quiz.questions}
-        counts = [
-            {
-                "objective": entry.get("objective", ""),
-                "question_ids": [qid for qid in entry.get("question_ids", []) if qid in known_ids],
-            }
-            for entry in judged.get("objective_item_counts", [])
-            if entry.get("objective") in set(objectives)
-        ]
+        counts = []
+        dropped = 0
+        for entry in judged.get("objective_item_counts", []):
+            index = entry.get("objective_index")
+            if not isinstance(index, int) or not 1 <= index <= len(objectives):
+                dropped += 1
+                continue
+            counts.append(
+                {
+                    "objective_index": index,
+                    "objective": objectives[index - 1],
+                    "question_ids": [
+                        qid for qid in entry.get("question_ids", []) if qid in known_ids
+                    ],
+                }
+            )
 
         return {
             "balance_level": level,
             "applicable": True,
             "declared_objectives": objectives,
             "objective_item_counts": counts,
+            "attributions_dropped": dropped,
             "rationale": judged.get("rationale", ""),
             "score": BALANCE_SCORES[level],
         }
@@ -232,6 +263,10 @@ Respond with ONLY a JSON object matching this schema:
                     f"  - {entry.get('objective')}: {len(question_ids)} "
                     f"({', '.join(question_ids) if question_ids else 'none'})"
                 )
+
+            dropped = data.get("attributions_dropped", 0)
+            if dropped:
+                lines.append(f"Dropped:    {dropped} attribution(s) naming no declared objective")
 
             lines.append(f"Rationale:  {data.get('rationale')}")
             lines.append("-" * 50)

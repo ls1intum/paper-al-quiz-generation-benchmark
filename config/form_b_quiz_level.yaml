@@ -8,9 +8,11 @@
 # criteria are meaningless on them.
 #
 # NO INSTRUCTIONS ARE SUPPLIED, DELIBERATELY. `instructions_directory` points at
-# a directory that holds none, so `IOUtils.load_instructions` logs a warning per
-# quiz and proceeds without them -- the choice is visible in run.log rather than
-# silent. A generated quiz ships the intent file it was generated from and a
+# `data/no-instructions`, which holds none. A quiz that declares an intent file
+# logs a warning and proceeds without it; a quiz that declares none is dropped
+# earlier still, by `IOUtils.load_instructions`, and logs nothing -- so read the
+# config line, not run.log, to know this was chosen rather than forgotten.
+# A generated quiz ships the intent file it was generated from and a
 # human-authored quiz cannot; loading them would hand the judge the generation
 # brief (which states the quality requirements outright) for one provenance
 # only, and `BaseMetric.evaluate` would additionally interpret its

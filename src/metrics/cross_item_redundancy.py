@@ -43,7 +43,10 @@ class ItemPair(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    question_ids: list[str] = Field(min_length=2, max_length=2)
+    # Not length-constrained by the schema. A judge that emits three ids in one
+    # pair would fail validation and take the whole quiz-level cell down with
+    # it; `_finalize` drops the malformed pair instead and keeps the verdict.
+    question_ids: list[str] = Field(default_factory=list)
     kind: Literal["redundancy", "cueing"]
     explanation: str
 
@@ -70,6 +73,7 @@ class CrossItemRedundancyResponse(CrossItemRedundancyJudgeResponse):
     applicable: bool
     num_questions: int
     pairs_dropped: int = 0
+    pairs_required_but_missing: bool = False
     score: float = Field(ge=0, le=100)
 
 
@@ -174,6 +178,7 @@ Respond with ONLY a JSON object matching this schema:
                 "num_questions": num_questions,
                 "pairs": [],
                 "pairs_dropped": 0,
+                "pairs_required_but_missing": False,
                 "rationale": (
                     f"A quiz of {num_questions} item(s) has no cross-item redundancy to judge; "
                     f"{MIN_QUIZ_ITEMS} are required."
@@ -214,6 +219,12 @@ Respond with ONLY a JSON object matching this schema:
             "num_questions": num_questions,
             "pairs": pairs,
             "pairs_dropped": dropped,
+            # The rubric obliges a rater who scores at the lower two levels to
+            # name the pairs, and the prompt obliges the judge to. A verdict
+            # that arrives without them is a verdict its own evidence does not
+            # support -- recorded, not corrected, so the analysis can exclude
+            # it the way it already excludes self-contradictory C2 rows.
+            "pairs_required_but_missing": level in LEVELS_REQUIRING_PAIRS and not pairs,
             "rationale": judged.get("rationale", ""),
             "score": REDUNDANCY_SCORES[level],
         }
@@ -260,6 +271,9 @@ Respond with ONLY a JSON object matching this schema:
             dropped = data.get("pairs_dropped", 0)
             if dropped:
                 lines.append(f"Dropped:    {dropped} pair(s) naming items not in this quiz")
+
+            if data.get("pairs_required_but_missing"):
+                lines.append("Warning:    verdict requires named pairs, none survived")
 
             lines.append(f"Rationale:  {data.get('rationale')}")
             lines.append("-" * 50)

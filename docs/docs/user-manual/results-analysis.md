@@ -223,9 +223,10 @@ no result row and would otherwise vanish from the report while
 `completeness.json` recorded the cell as lost. A truncated cell is the expensive
 case: hitting the completion cap is what made it fail.
 
-The file is written only when some usage was recorded. A provider that reports no
-usage metadata logs a warning once and contributes nothing, so an evaluator missing
-from this file is unmeasured, not free.
+The file is written whenever any result row carries a usage dict, including one
+recording zeroes. A provider that reports no usage metadata logs a warning once and
+contributes zeroes from then on, so an evaluator whose totals are zero here is
+unmeasured, not free.
 
 ### 5. `completeness.json` — Cell Accounting
 

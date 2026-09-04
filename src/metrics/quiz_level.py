@@ -13,7 +13,6 @@ levels and be silently rounded into the wrong one.
 """
 
 from ..models.quiz import Quiz
-from .base import MetricScope
 
 # Four evenly spaced levels, best to worst, with no midpoint -- the same scale
 # the human raters use. "Somewhere in the middle" is not a useful verdict about
@@ -28,11 +27,11 @@ NOT_APPLICABLE_SCORE = 100.0
 
 # Difficulty spread and cross-item redundancy have nothing to measure on a
 # one- or two-item quiz: there is no spread in a pair and barely a pair to be
-# redundant. The same floor governs which quizzes the human raters are shown,
-# so both arms abstain on the same units rather than on different ones.
+# redundant. Three is the floor the human study uses too, but as a SELECTION
+# rule -- quizzes below it never reach a rater, and the rating form offers no
+# abstention. So this is not a symmetric abstention: it is the judge declining
+# to score a unit no rater would ever have been shown.
 MIN_QUIZ_ITEMS = 3
-
-QUIZ_LEVEL = MetricScope.QUIZ_LEVEL
 
 
 def verdict_scores(best_to_worst: tuple[str, str, str, str]) -> dict[str, float]:

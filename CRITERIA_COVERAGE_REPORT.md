@@ -455,8 +455,9 @@ For the quiz-level criteria specifically:
   hands the judge the generation brief — which states the quality requirements outright — and
   `BaseMetric.evaluate` would additionally interpret its `custom_prompt` and adjust the score by
   it. Any provenance comparison would then measure that asymmetry. Pointing the config's
-  `instructions_directory` at a directory holding none has the same effect and logs a warning
-  per quiz.
+  `instructions_directory` at `data/no-instructions` has the same effect; note that a quiz
+  declaring no intent file at all is dropped by `IOUtils.load_instructions` before the directory
+  is consulted, so the config line is the record of this decision, not the log.
 - `analysis-benchmark/harmonise.py` — `METRIC_TO_CRITERION` needs the three new entries, and the
   join needs a quiz-level path: these rows carry `question_id: null`.
 

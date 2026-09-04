@@ -1315,9 +1315,7 @@ def test_grammar_item_language_overrides_the_parameter():
     English, because nothing read the item's own tag."""
     metric = GrammaticalCorrectnessMetric()
     question = _make_question_with_language("de")
-    inp = make_phase_input(
-        metric, "judge", question=question, params={"language": "English"}
-    )
+    inp = make_phase_input(metric, "judge", question=question, params={"language": "English"})
 
     assert "Language: German" in inp.prompt_builder(inp)
 
@@ -1675,9 +1673,10 @@ def test_objective_balance_without_declared_objectives_is_not_applicable():
     assert result["declared_objectives"] == []
 
 
-def test_objective_balance_drops_attributions_it_cannot_verify():
-    """An item id the quiz does not hold, or an objective it did not declare, is
-    not evidence -- it would otherwise travel into the analysis as if it were."""
+def test_objective_balance_drops_attributions_it_cannot_verify_and_counts_them():
+    """An item id the quiz does not hold, or an index outside the declared list,
+    is not evidence. Dropping silently would make "the judge attributed nothing"
+    indistinguishable from "we threw the attribution away"."""
     metric = ObjectiveBalanceMetric()
     quiz = make_form_b_quiz()
     declared = quiz.metadata["learning_objectives"][0]
@@ -1687,25 +1686,51 @@ def test_objective_balance_drops_attributions_it_cannot_verify():
         {
             "balance_level": "balanced",
             "objective_item_counts": [
-                {"objective": declared, "question_ids": ["IT6483", "IT0000"]},
-                {"objective": "An objective this quiz never declared", "question_ids": ["IT5423"]},
+                {"objective_index": 1, "question_ids": ["IT6483", "IT0000"]},
+                {"objective_index": 9, "question_ids": ["IT5423"]},
+                {"objective_index": None, "question_ids": ["IT8689"]},
             ],
             "rationale": "test",
         },
     )
-    assert result["objective_item_counts"] == [{"objective": declared, "question_ids": ["IT6483"]}]
+    assert result["objective_item_counts"] == [
+        {"objective_index": 1, "objective": declared, "question_ids": ["IT6483"]}
+    ]
+    assert result["attributions_dropped"] == 2
+
+
+def test_objective_balance_resolves_the_index_to_the_declared_objective():
+    """The judge names an objective by position, not by reproducing 200-350
+    characters of prose. Verbatim matching would discard most real attributions
+    silently, on a corpus whose objectives are multi-sentence strings."""
+    metric = ObjectiveBalanceMetric()
+    quiz = make_form_b_quiz()
+    inp = make_phase_input(metric, "judge", quiz=quiz)
+    prompt = inp.prompt_builder(inp)
+
+    for position, objective in enumerate(quiz.metadata["learning_objectives"], 1):
+        assert f"{position}. {objective}" in prompt
+
+    result = _finalize_quiz_metric(
+        metric,
+        quiz,
+        {
+            "balance_level": "balanced",
+            "objective_item_counts": [{"objective_index": 2, "question_ids": ["IT8689"]}],
+            "rationale": "test",
+        },
+    )
+    assert result["objective_item_counts"][0]["objective"] == (
+        quiz.metadata["learning_objectives"][1]
+    )
+    assert result["attributions_dropped"] == 0
 
 
 def test_objective_balance_end_to_end():
     metric = ObjectiveBalanceMetric()
     quiz = make_form_b_quiz()
     judged = {
-        "objective_item_counts": [
-            {
-                "objective": quiz.metadata["learning_objectives"][0],
-                "question_ids": ["IT6483", "IT5423"],
-            }
-        ],
+        "objective_item_counts": [{"objective_index": 1, "question_ids": ["IT6483", "IT5423"]}],
         "rationale": "Scalability carries two of three items.",
         "balance_level": "slightly_uneven",
     }
@@ -1913,6 +1938,60 @@ def test_cross_item_redundancy_drops_unverifiable_pairs_and_counts_them():
     assert [pair["question_ids"] for pair in result["pairs"]] == [["IT6483", "IT5423"]]
     assert result["pairs_dropped"] == 2
     assert result["score"] == 33.3
+
+
+def test_cross_item_redundancy_flags_a_verdict_its_evidence_does_not_support():
+    """The rubric obliges a rater scoring at the lower two levels to name the
+    pairs, and the prompt obliges the judge to. A verdict that arrives without
+    them is recorded rather than corrected, so the analysis can exclude it."""
+    metric = CrossItemRedundancyMetric()
+    result = _finalize_quiz_metric(
+        metric,
+        make_form_b_quiz(),
+        {"redundancy_level": "substantial", "pairs": [], "rationale": "test"},
+    )
+    assert result["pairs_required_but_missing"] is True
+    assert result["score"] == 0.0, "the verdict still stands; only the gap is recorded"
+
+
+@pytest.mark.parametrize("level", ["none", "mild_overlap"])
+def test_cross_item_redundancy_does_not_flag_levels_that_need_no_pairs(level):
+    metric = CrossItemRedundancyMetric()
+    result = _finalize_quiz_metric(
+        metric,
+        make_form_b_quiz(),
+        {"redundancy_level": level, "pairs": [], "rationale": "test"},
+    )
+    assert result["pairs_required_but_missing"] is False
+
+
+def test_cross_item_redundancy_survives_a_malformed_pair():
+    """A pair carrying three ids must cost that pair, not the whole quiz.
+
+    The schema deliberately does not constrain the list length: a validation
+    error here propagates out of the phase and loses the entire quiz-run
+    datapoint, which is a far worse outcome than one dropped pair.
+    """
+    metric = CrossItemRedundancyMetric()
+    judged = {
+        "pairs": [
+            {
+                "question_ids": ["IT6483", "IT5423", "IT8689"],
+                "kind": "redundancy",
+                "explanation": "Three ids in a pair.",
+            }
+        ],
+        "rationale": "The scalability items overlap.",
+        "redundancy_level": "clear_overlap",
+    }
+    mock_llm = MockLLMProvider(model="mock-model", responses=[judged])
+    result = metric.evaluate(quiz=make_form_b_quiz(), llm_client=mock_llm)
+    data = json.loads(result.raw_response)
+
+    assert result.score == 33.3
+    assert data["pairs"] == []
+    assert data["pairs_dropped"] == 1
+    assert data["pairs_required_but_missing"] is True
 
 
 def test_cross_item_redundancy_end_to_end():
