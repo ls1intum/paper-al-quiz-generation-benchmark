@@ -1,22 +1,30 @@
 # Quality Criteria Coverage Report
 
-This report assesses how well the benchmark's metrics cover the nine quality
-criteria extracted from the literature in the paper
+This report assesses how well the benchmark's metrics cover the quality criteria
+extracted from the literature in the paper
 (`paper-al-quiz-generation/paper/sections/relatedwork.tex`, Table
-`tab:quality-criteria`). For each criterion it states the coverage status,
-documents divergences from the definition, and lists actionable improvements.
+`tab:quality-criteria`): **nine item-level criteria (C1-C9)** applied to individual
+items and **three quiz-level criteria (Q1-Q3)** applied to intact quizzes. For each
+criterion it states the coverage status, documents divergences from the definition,
+and lists actionable improvements.
 
 ## Summary
 
-The benchmark registers **10 metrics** (`src/metrics/__init__.py`):
+The benchmark registers **14 metrics** (`src/metrics/__init__.py`):
 `coverage`, `difficulty`, `accuracy`, `clarity`, `distractor_quality`,
 `homogeneous_options`, `grammatical_correctness`, `answer_key_correctness`,
-`objective_alignment`, `absence_of_cueing`.
+`objective_alignment`, `absence_of_cueing`, `cognitive_level`, `objective_balance`,
+`difficulty_spread`, `cross_item_redundancy`.
+
+`coverage` and `difficulty` map to no criterion: `coverage` measures how well a quiz
+covers its *source material* (a content-coverage construct, not an objective one),
+and `difficulty` was superseded by `cognitive_level`. Both remain available and are
+not part of the instrument.
 
 | # | Criterion (paper) | Metric | Status |
 |---|---|---|---|
 | 1 | Alignment with Learning Objectives | `objective_alignment` | ✅ Covered |
-| 2 | Cognitive Level Appropriateness | `difficulty` (+ `coverage` depth) | ⚠️ Partial — scores *absolute* level, not appropriateness vs. a target |
+| 2 | Cognitive Level Appropriateness | `cognitive_level` | ✅ Covered — assigns a Bloom level blind, then compares it with the catalogue's intended level |
 | 3 | Factual Accuracy | `accuracy` | ✅ Covered |
 | 4 | Clarity and Precision | `clarity` | ⚠️ Partial — negative phrasing not checked |
 | 5 | Answer Key Correctness | `answer_key_correctness` | ✅ Covered |
@@ -25,8 +33,17 @@ The benchmark registers **10 metrics** (`src/metrics/__init__.py`):
 | 8 | Absence of Cueing | `absence_of_cueing` | ✅ Covered |
 | 9 | Grammatical Correctness | `grammatical_correctness` | ✅ Covered — now reported per item |
 
+Quiz-level criteria, each producing one result per quiz with `question_id` empty:
+
+| # | Criterion (paper) | Metric | Status |
+|---|---|---|---|
+| Q1 | Learning-Objective Balance | `objective_balance` | ✅ Covered |
+| Q2 | Difficulty Spread | `difficulty_spread` | ✅ Covered |
+| Q3 | Redundancy and Cross-Item Cueing | `cross_item_redundancy` | ✅ Covered |
+
 **Headline gaps:** Criterion 4 omits the explicit negative-phrasing check named
-in its definition. Every other criterion now has a dedicated metric.
+in its definition. Every other criterion, item-level and quiz-level, now has a
+dedicated metric.
 
 ---
 
@@ -75,7 +92,13 @@ item that already exists.
 
 **Definition:** *Questions target appropriate levels of Bloom's taxonomy (remembering, understanding, applying, analyzing, evaluating, creating).*
 
-**Status: ⚠️ Partial.**
+**Status: ✅ Covered** — by `cognitive_level`, which post-dates the assessment
+below. It assigns a Bloom level blind to the intended one (an anti-anchoring
+control), then compares the two as `below` / `matches` / `above`, so it scores
+appropriateness against a target rather than absolute level. The reference value
+is `question.metadata.bloom_intended`, and an item without one is reported
+`applicable: false`. The rest of this section documents the earlier `difficulty`
+proxy, which the instrument no longer uses.
 
 `DifficultyMetric` (`src/metrics/difficulty.py`) scores cognitive complexity
 using a full 6-level Bloom rubric (or Webb's DoK). `CoverageMetric` also assigns
@@ -315,26 +338,150 @@ adjustment fires once per (quiz, metric, evaluator), as before.
 
 ---
 
+## Provenance of the quiz-level metrics
+
+The three metrics below were authored on **2026-09-04**, from the frozen rubric text
+(`paper-al-quiz-generation/tools/corpus/rubric.json` v1.1.0, `form_b`).
+
+One rater had completed Form B by that date. **No Q1–Q3 rating file had reached the preparer or
+either repository** — `tools/corpus/out/ratings/main/` was empty at paper-repo commit `9cbfedf`
+— so the prompts cannot have been tuned toward the comparison they feed.
+
+This is the wording the paper's deviation note should carry. An earlier draft of the pull
+request claimed the metrics were written "before any human rating on Q1–Q3 exists", which was
+too strong: a rating existed in a rater's possession, it had simply not reached the author. The
+narrower claim is the one that is verifiable from the repositories.
+
+The judge sweep for these metrics is to be run and committed **before** any Form B rating file
+enters the corpus repository, so that the ordering is a property of the commit history rather
+than an assertion.
+
+---
+
+## Criterion Q1 — Learning-Objective Balance
+
+**Definition:** *Given the objectives declared for the quiz, are they weighted sensibly across the item set — or does the quiz over-invest in one and barely touch another?*
+
+**Status: ✅ Covered** by `objective_balance` (`src/metrics/objective_balance.py`), quiz-level, one result per quiz.
+
+The judge receives `quiz.metadata.learning_objectives` and every item, attributes items to
+objectives, and only then picks one of four evenly spaced levels. The reference set is what the
+quiz declares for itself — not the per-item `learning_objective` that `objective_alignment` uses.
+
+**Deliberate exclusions**, each stated in the prompt because a judge left to itself will
+otherwise fold them in:
+- **Coverage is not judged.** A declared objective with no item is not penalized here. Balance of
+  emphasis and coverage are different constructs with different reference values.
+- **The objectives themselves are not judged.** A badly scoped objective whose items are evenly
+  spread scores at the top.
+- **Whether an item assesses its objective well is not judged.** That is Criterion 1, per item.
+
+**Divergences:**
+- Item count is the evidence, so a longer or harder item counts once. A quiz that spends one
+  demanding item on one objective and three trivial ones on another reads as unbalanced by count
+  even where the effort is even.
+- Objectives are weighed as equally important unless the quiz says otherwise; the format carries
+  no per-objective weight.
+
+**Not applicable:** a quiz declaring no objectives — `applicable: false`, score `100.0`, the
+judge's answer discarded.
+
+---
+
+## Criterion Q2 — Difficulty Spread
+
+**Definition:** *Does the quiz mix difficulty sensibly, rather than being uniformly trivial or uniformly hard?*
+
+**Status: ✅ Covered** by `difficulty_spread` (`src/metrics/difficulty_spread.py`), quiz-level, one result per quiz.
+
+The verdict is holistic and reached in one call over the whole quiz, which is the unit and the
+judgement a human rater applies to the same material. The judge first names the least and most
+demanding item, then picks a level from that range.
+
+**Deliberate exclusions:**
+- **Order is not judged.** A demanding item placed first is badly arranged, not badly spread.
+- **This is not Criterion 2.** Cognitive level is assessed per item against a catalogue reference
+  value; difficulty here is the effort an item demands of a prepared learner. Two items at one
+  Bloom level can differ sharply in difficulty, and a quiz spread across Bloom levels can still
+  be uniformly easy. The prompt says so outright.
+
+**Divergences:**
+- Difficulty is judged from the item text alone. No response data exists, so this is the judge's
+  estimate of demand, not an empirical *p*-value — the same information a human rater has.
+- Deriving the level from per-item difficulty labels would be more reproducible and would measure
+  a different construct: a computed statistic over a scale with no reference value. Rejected for
+  that reason, not for cost.
+
+**Not applicable:** fewer than three items — `applicable: false`, score `100.0`. A pair has no
+spread. The same floor governs which quizzes human raters are shown, so both arms abstain on the
+same units.
+
+---
+
+## Criterion Q3 — Redundancy and Cross-Item Cueing
+
+**Definition:** *Do items duplicate each other, or does one item reveal another's answer? If either, which item pairs?*
+
+**Status: ✅ Covered** by `cross_item_redundancy` (`src/metrics/cross_item_redundancy.py`), quiz-level, one result per quiz.
+
+Both halves of the criterion are cross-item relations, invisible to any per-item metric.
+Distinct from Criterion 8 (`absence_of_cueing`), which asks whether an item's **own** options
+give its key away.
+
+The judge names the pairs first, with a kind (`redundancy` or `cueing`) and an explanation each,
+and only then picks a level — the prompt requires at least one pair at the lower two levels, as
+the rater instrument does. Naming the pair is what makes a depth-of-agreement comparison
+possible: agreeing that a quiz is redundant is weaker evidence than agreeing which pair makes it so.
+
+**Divergences:**
+- A pair naming an item the quiz does not hold, or naming one item twice, is dropped, and the
+  count is reported as `pairs_dropped` rather than absorbed. A judge that reaches `substantial`
+  and then cannot name a real pair is a finding, not noise to smooth over.
+- The verdict stays authoritative for the score even when every pair is dropped. Recomputing the
+  level from the surviving pairs would silently rewrite the judge's answer.
+
+**Not applicable:** fewer than three items — `applicable: false`, score `100.0`.
+
+---
+
 ## Prioritized Action List
 
 Ordered by impact on faithfulness to the literature-derived criteria.
 
 1. ~~**[P0] Add an Answer Key Correctness metric (Criterion 5).**~~ **Done** — `answer_key_correctness`, binary per Form A §3.2, with a deterministic "none/all of the above" detector. Directly addresses the AI-specific failure mode (multiple defensible answers) emphasized in the related work.
 2. ~~**[P0] Add an Absence-of-Cueing metric (Criterion 8).**~~ **Done** — `absence_of_cueing`, binary detection over five cue types, checking stem→key, key→distractors and option-set convergence, with a deterministic length signal feeding the prompt.
-3. **[P1] Score against stated learning objectives (Criterion 1).** Add a `learning_objectives` input and an alignment sub-score; stop equating source-topic coverage with objective alignment, or document the proxy explicitly.
+3. ~~**[P1] Score against stated learning objectives (Criterion 1).**~~ **Done** — `objective_alignment` judges each item against its own stated objective, and `objective_balance` (Q1) judges how the quiz weights the objectives it declares. Neither uses source-topic coverage as a proxy.
 4. **[P1] Add negative-phrasing detection to `clarity` (Criterion 4).** Named in the definition but absent from the prompt.
-5. **[P2] Reconcile cognitive-level handling (Criterion 2).** Unify the Bloom taxonomy between `coverage` (3-level) and `difficulty` (6-level); separate Bloom level from the easy/medium/hard band; score appropriateness against a target when available.
-6. **[P2] Reflect contested/AI-specific evidence in weighting & docs.** Flag `homogeneous_options` as a contested guideline (Applegate 2019); strengthen `accuracy`'s explicit source-grounded hallucination check.
-7. **[P3] Cosmetic robustness.** Guard `accuracy` against `source_text=None`; document T/F exclusions for `distractor_quality`/`homogeneous_options`; add per-item breakdowns for quiz-level grammar.
+5. **[P2] Reconcile cognitive-level handling (Criterion 2).** ~~Score appropriateness against a target when available~~ **done** — `cognitive_level` compares the assigned level against `bloom_intended`, and `difficulty_spread` (Q2) keeps difficulty separate from Bloom level at the quiz level. Still open: `coverage` uses its own 3-level depth scale (`coverage.py:168-172`) where every other metric uses 6-level Bloom.
+6. **[P2] Add the three quiz-level criteria (Q1-Q3).** ~~The judge implemented nine of the instrument's twelve criteria: nothing scored objective balance, difficulty spread or cross-item redundancy, so no quiz-level criterion could be compared against a human rating.~~ **Done** — `objective_balance`, `difficulty_spread`, `cross_item_redundancy`, with `config/form_b_quiz_level.yaml` as a runnable example.
+7. **[P2] Reflect contested/AI-specific evidence in weighting & docs.** Flag `homogeneous_options` as a contested guideline (Applegate 2019); strengthen `accuracy`'s explicit source-grounded hallucination check.
+8. **[P3] Cosmetic robustness.** Guard `accuracy` against `source_text=None`; document T/F exclusions for `distractor_quality`/`homogeneous_options`; add per-item breakdowns for quiz-level grammar.
 
 ---
 
 ## Follow-up in the paper repository
 
-`answer_key_correctness` is registered in this repository and in
-`config/multi_judge_benchmark.yaml`, but the actual data-collection run config lives in
-`paper-al-quiz-generation` and is **generated**, so it must be regenerated rather than
-hand-edited:
+The actual data-collection run config lives in `paper-al-quiz-generation` and is **generated**,
+so it must be regenerated rather than hand-edited.
+
+For the quiz-level criteria specifically:
+
+- `tools/corpus/build_pools.py` — the pool configs must **not** gain `objective_balance`,
+  `difficulty_spread` or `cross_item_redundancy`: pool files are containers for standalone
+  items, and all three criteria are meaningless on them. Q1-Q3 need their own config over the
+  intact Form B quizzes, modelled on `config/form_b_quiz_level.yaml`.
+- **Build the Form B judge inputs with `instructions` stripped.** Only the generated quizzes
+  carry an intent file; the human-authored ones cannot. Supplying it for one provenance only
+  hands the judge the generation brief — which states the quality requirements outright — and
+  `BaseMetric.evaluate` would additionally interpret its `custom_prompt` and adjust the score by
+  it. Any provenance comparison would then measure that asymmetry. Pointing the config's
+  `instructions_directory` at `data/no-instructions` has the same effect; note that a quiz
+  declaring no intent file at all is dropped by `IOUtils.load_instructions` before the directory
+  is consulted, so the config line is the record of this decision, not the log.
+- `analysis-benchmark/harmonise.py` — `METRIC_TO_CRITERION` needs the three new entries, and the
+  join needs a quiz-level path: these rows carry `question_id: null`.
+
+For the item-level metrics:
 
 - `tools/corpus/build_pools.py` — add `("answer_key_correctness", "1.0")`,
   `("objective_alignment", "1.0")` and `("absence_of_cueing", "1.0")` to `METRICS`, and bump

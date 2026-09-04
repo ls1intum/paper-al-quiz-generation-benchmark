@@ -47,3 +47,18 @@ def test_objective_alignment_is_registered(registered_metrics):
 def test_absence_of_cueing_is_registered(registered_metrics):
     assert "absence_of_cueing" in registered_metrics
     assert MetricRegistry.create("absence_of_cueing").name == "absence_of_cueing"
+
+
+def test_objective_balance_is_registered(registered_metrics):
+    assert "objective_balance" in registered_metrics
+    assert MetricRegistry.create("objective_balance").name == "objective_balance"
+
+
+def test_difficulty_spread_is_registered(registered_metrics):
+    assert "difficulty_spread" in registered_metrics
+    assert MetricRegistry.create("difficulty_spread").name == "difficulty_spread"
+
+
+def test_cross_item_redundancy_is_registered(registered_metrics):
+    assert "cross_item_redundancy" in registered_metrics
+    assert MetricRegistry.create("cross_item_redundancy").name == "cross_item_redundancy"

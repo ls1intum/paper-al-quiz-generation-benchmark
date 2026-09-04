@@ -175,6 +175,7 @@ class MetricResult:
     evaluated_at: datetime
     raw_response: Optional[str] = None
     evaluation_details: Optional[Dict[str, Any]] = None
+    usage: Optional[Dict[str, int]] = None  # prompt_tokens, completion_tokens
 
 @dataclass
 class BenchmarkResult:
@@ -188,6 +189,22 @@ class BenchmarkResult:
     completed_at: datetime
     metadata: Dict[str, Any] = None
 ```
+
+**Token attribution.** `usage` is measured once per *cell* — one
+`metric.evaluate()` call — not once per row. A question-level metric produces one
+row per question, each carrying its own figure. A quiz-level metric is measured
+once for the whole quiz; if it expands into per-question rows (see
+`expand_question_results`), the figure sits on the first row and the rest carry
+`None`. **Sum over rows; never assume every row carries a figure.** Copying it
+onto each row instead made every consumer that sums overcount such a metric by
+its question count.
+
+Tokens spent on cells that produced no result — a call that failed or was
+truncated after spending them — belong to no row at all. The runner holds them
+per evaluator and they are reported under the synthetic metric name
+`__failed_cells__`, so `usage.json` totals what the run was billed rather than
+only what it has results for.
+
 
 #### 2. Metric Interface (`src/metrics/`)
 
@@ -505,6 +522,9 @@ paper-al-quiz-generation-benchmark/
 │           ├── aggregated.json
 │           ├── summary.txt
 │           ├── metadata.json
+│           ├── usage.json            # token usage per evaluator x metric
+│           ├── completeness.json     # cells attempted, skipped, failed
+│           ├── detailed_responses.json
 │           └── run.log
 │
 ├── config/

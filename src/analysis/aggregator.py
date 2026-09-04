@@ -23,7 +23,14 @@ class CeilingEffectResult(TypedDict):
     rater_std_devs: list[float]
 
 
-_METRICS_WITH_APPLICABLE = {"objective_alignment", "homogeneous_options", "cognitive_level"}
+_METRICS_WITH_APPLICABLE = {
+    "objective_alignment",
+    "homogeneous_options",
+    "cognitive_level",
+    "objective_balance",
+    "difficulty_spread",
+    "cross_item_redundancy",
+}
 
 
 class ResultsAggregator:

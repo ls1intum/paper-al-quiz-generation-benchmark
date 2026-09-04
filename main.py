@@ -19,10 +19,13 @@ from src.metrics.answer_key_correctness import AnswerKeyCorrectnessMetric
 from src.metrics.clarity import ClarityMetric
 from src.metrics.cognitive_level import CognitiveLevelMetric
 from src.metrics.coverage import CoverageMetric
+from src.metrics.cross_item_redundancy import CrossItemRedundancyMetric
 from src.metrics.difficulty import DifficultyMetric
+from src.metrics.difficulty_spread import DifficultySpreadMetric
 from src.metrics.distractor import DistractorQualityMetric
 from src.metrics.homogeneous_options import HomogeneousOptionsMetric
 from src.metrics.objective_alignment import ObjectiveAlignmentMetric
+from src.metrics.objective_balance import ObjectiveBalanceMetric
 from src.metrics.registry import MetricRegistry
 from src.runners.benchmark import BenchmarkRunner
 from src.utils.config_loader import ConfigLoader
@@ -43,6 +46,9 @@ def register_metrics() -> None:
     MetricRegistry.register(ObjectiveAlignmentMetric)
     MetricRegistry.register(AbsenceOfCueingMetric)
     MetricRegistry.register(CognitiveLevelMetric)
+    MetricRegistry.register(ObjectiveBalanceMetric)
+    MetricRegistry.register(DifficultySpreadMetric)
+    MetricRegistry.register(CrossItemRedundancyMetric)
 
 
 def main() -> int:
@@ -181,10 +187,13 @@ def main() -> int:
                 json.dump(all_phase_details, f, indent=2)
             logger.info("Detailed responses saved to %s", detailed_file)
 
-        # Token usage
-        usage_text = ResultsReporter.usage_summary(results)
+        # Token usage. Cells that failed after spending tokens have no result
+        # row to carry their cost, so the runner's own bucket is merged in --
+        # otherwise usage.json cannot be reconciled with completeness.json.
+        unattributed = runner.unattributed_usage
+        usage_text = ResultsReporter.usage_summary(results, unattributed)
         logger.info(usage_text)
-        usage_data = ResultsReporter.usage_dict(results)
+        usage_data = ResultsReporter.usage_dict(results, unattributed)
         if usage_data:
             usage_file = run_dir / "usage.json"
             with open(usage_file, "w", encoding="utf-8") as f:
