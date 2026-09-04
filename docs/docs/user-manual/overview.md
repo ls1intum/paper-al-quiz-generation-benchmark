@@ -27,6 +27,12 @@ Systematically evaluate the quality of quizzes using research-backed metrics:
 - **Grammatical Correctness**: Ensure proper language usage throughout
 - **Factual Accuracy**: Verify content is factually correct, evidence-based, and free from errors and biases
 
+Three further criteria judge the quiz as a whole, where reading items one at a time cannot reach:
+
+- **Learning-Objective Balance**: Check the declared objectives carry a fair share of the items
+- **Difficulty Spread**: Check the items vary in difficulty rather than clustering at one level
+- **Redundancy and Cross-Item Cueing**: Detect items that duplicate or give away one another
+
 ### Key Features
 
 ✅ **Multiple LLM Support** — Azure OpenAI, OpenAI API, Anthropic Claude, Ollama, and OpenAI-compatible local models  

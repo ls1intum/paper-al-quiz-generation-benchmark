@@ -1,0 +1,57 @@
+# Quiz-level criteria over intact quizzes.
+#
+# The three metrics here judge a property of a quiz that no per-item metric can
+# see: how its items are weighted across the objectives it declares, whether
+# their difficulty varies, and whether any two of them duplicate or give each
+# other away. Run this over REAL quizzes only -- container "pool" files that
+# batch standalone items for item-level scoring are not quizzes, and all three
+# criteria are meaningless on them.
+#
+# NO INSTRUCTIONS ARE SUPPLIED, DELIBERATELY. `instructions_directory` points at
+# a directory that holds none, so `IOUtils.load_instructions` logs a warning per
+# quiz and proceeds without them -- the choice is visible in run.log rather than
+# silent. A generated quiz ships the intent file it was generated from and a
+# human-authored quiz cannot; loading them would hand the judge the generation
+# brief (which states the quality requirements outright) for one provenance
+# only, and `BaseMetric.evaluate` would additionally interpret its
+# `custom_prompt` and adjust the score by it. Any comparison across provenance
+# would then be measuring the asymmetry rather than the quizzes. Supply intent
+# for every quiz or for none.
+
+benchmark:
+  name: "form_b_quiz_level"
+  version: "1.0.0"
+  runs: 3 # >=3 per quiz for judge test-retest
+
+evaluators:
+  # Temperature 1.0, not 0.0: at greedy decoding the repeated runs measure API
+  # and kernel nondeterminism rather than judge consistency.
+  judge:
+    provider: "openai_compatible"
+    model: "Qwen/Qwen3.8-27B"
+    base_url: "https://logos.aet.cit.tum.de/v1"
+    temperature: 1.0
+    max_tokens: 8000
+
+metrics:
+  - name: "objective_balance"
+    version: "1.0"
+    evaluators: ["judge"]
+    enabled: true
+  - name: "difficulty_spread"
+    version: "1.0"
+    evaluators: ["judge"]
+    enabled: true
+  - name: "cross_item_redundancy"
+    version: "1.0"
+    evaluators: ["judge"]
+    enabled: true
+
+inputs:
+  quiz_directory: "data/quizzes/example_quiz.json"
+  source_directory: "data/inputs"
+  instructions_directory: "data/no-instructions"
+
+outputs:
+  results_directory: "data/results/form_b_quiz_level"
+  aggregate: true

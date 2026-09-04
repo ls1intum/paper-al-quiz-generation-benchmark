@@ -20,6 +20,12 @@ from ..utils.io import IOUtils
 logger = logging.getLogger(__name__)
 
 
+# Metric name under which tokens spent on cells that produced no result are reported.
+# Not a metric: the double underscores mark it as a bucket, so a reader of usage.json
+# does not go looking for a `failed_cells` metric in the registry.
+FAILED_CELL_BUCKET = "__failed_cells__"
+
+
 class BenchmarkRunner:
 
     def __init__(self, config: BenchmarkConfig) -> None:
@@ -30,6 +36,7 @@ class BenchmarkRunner:
         self.logger = logging.getLogger(__name__)
         self._attempted: int = 0
         self._cell_failures: list[dict] = []
+        self._unattributed_usage: dict[str, dict[str, int]] = {}
         self._init_evaluators()
         self._init_metrics()
 
@@ -147,6 +154,74 @@ class BenchmarkRunner:
 
         return combined_text
 
+    def _record_failure(
+        self,
+        category: str,
+        metric: BaseMetric,
+        evaluator: LLMProvider,
+        quiz: Quiz,
+        question_id: str | None,
+        error: Exception,
+    ) -> None:
+        """Record a cell that produced no result, together with what it cost.
+
+        A failed cell still spent whatever its completed phases consumed, and a
+        truncated one spent the most of all -- hitting the token cap is what
+        made it fail. Dropping that from the usage report makes `usage.json`
+        irreconcilable with `completeness.json`: the run is billed for calls
+        that appear nowhere. The tokens cannot be attributed to a metric row
+        that does not exist, so they are held per evaluator and reported
+        separately.
+        """
+        usage = evaluator.get_accumulated_usage()
+        self._cell_failures.append(
+            {
+                "category": category,
+                "metric": metric.name,
+                "evaluator": evaluator.model_name,
+                "quiz_id": quiz.quiz_id,
+                "question_id": question_id,
+                "error": str(error),
+                "usage": usage,
+            }
+        )
+        bucket = self._unattributed_usage.setdefault(
+            evaluator.model_name, {"prompt_tokens": 0, "completion_tokens": 0}
+        )
+        for field in bucket:
+            bucket[field] += usage.get(field, 0)
+
+    def _charge_usage(self, row: MetricResult | None, evaluator: LLMProvider) -> None:
+        """Add whatever the evaluator has just spent onto an existing result row.
+
+        For calls made outside a metric's own reset/read bracket. Without a row
+        to charge -- the metric failed on every question of this quiz -- the
+        tokens are held with the other unattributed ones rather than dropped.
+        """
+        usage = evaluator.get_accumulated_usage()
+        if row is not None and row.usage is not None:
+            for field, spent in usage.items():
+                row.usage[field] = row.usage.get(field, 0) + spent
+            return
+        bucket = self._unattributed_usage.setdefault(
+            evaluator.model_name, {"prompt_tokens": 0, "completion_tokens": 0}
+        )
+        for field in bucket:
+            bucket[field] += usage.get(field, 0)
+
+    @property
+    def unattributed_usage(self) -> dict[str, dict[str, dict[str, int]]]:
+        """Tokens spent on cells that produced no result, as a usage bucket.
+
+        Shaped like the reporter's own buckets ({evaluator: {metric: tokens}})
+        so it can be merged into the usage report rather than parsed out of it.
+        """
+        return {
+            evaluator: {FAILED_CELL_BUCKET: dict(totals)}
+            for evaluator, totals in self._unattributed_usage.items()
+            if any(totals.values())
+        }
+
     def _evaluate_quiz_level(
         self,
         metric: BaseMetric,
@@ -180,44 +255,17 @@ class BenchmarkRunner:
             )
         except TransientLLMError as e:
             self.logger.error("Transient failure evaluating quiz %s: %s", quiz.quiz_id, e)
-            self._cell_failures.append(
-                {
-                    "category": "transient",
-                    "metric": metric.name,
-                    "evaluator": evaluator.model_name,
-                    "quiz_id": quiz.quiz_id,
-                    "question_id": None,
-                    "error": str(e),
-                }
-            )
+            self._record_failure("transient", metric, evaluator, quiz, None, e)
             return None
         except MetricNotApplicableError as e:
             self.logger.info(
                 "Metric %s not applicable to quiz %s: %s", metric.name, quiz.quiz_id, e
             )
-            self._cell_failures.append(
-                {
-                    "category": "skipped",
-                    "metric": metric.name,
-                    "evaluator": evaluator.model_name,
-                    "quiz_id": quiz.quiz_id,
-                    "question_id": None,
-                    "error": str(e),
-                }
-            )
+            self._record_failure("skipped", metric, evaluator, quiz, None, e)
             return None
         except Exception as e:  # noqa: BLE001
             self.logger.error("Error evaluating quiz %s: %s", quiz.quiz_id, e)
-            self._cell_failures.append(
-                {
-                    "category": "failed",
-                    "metric": metric.name,
-                    "evaluator": evaluator.model_name,
-                    "quiz_id": quiz.quiz_id,
-                    "question_id": None,
-                    "error": str(e),
-                }
-            )
+            self._record_failure("failed", metric, evaluator, quiz, None, e)
             return None
 
     def _expand_quiz_result(
@@ -235,6 +283,13 @@ class BenchmarkRunner:
         expand_question_results. Returning them as separate rows is what makes
         the scores joinable per question; an empty list means the caller keeps
         the quiz-level row as-is.
+
+        `usage` is measured once per quiz -- the accumulator resets per
+        metric.evaluate() call (see _evaluate_quiz) -- so there is no per-question
+        figure to report. It goes on the first row only; the rest carry None.
+        Stamping it on every row made every consumer that sums over rows
+        (reporter.usage_summary, reporter.usage_dict, IOUtils) overcount a
+        quiz-level metric by its question count.
         """
         try:
             return [
@@ -247,9 +302,11 @@ class BenchmarkRunner:
                     question_id=question_id,
                     parameters=parameters,
                     raw_response=raw_response,
-                    usage=usage,
+                    usage=usage if i == 0 else None,
                 )
-                for question_id, score, raw_response in metric.expand_question_results(result)
+                for i, (question_id, score, raw_response) in enumerate(
+                    metric.expand_question_results(result)
+                )
             ]
         except Exception as e:  # noqa: BLE001
             self.logger.error("Error expanding %s for quiz %s: %s", metric.name, quiz.quiz_id, e)
@@ -293,44 +350,17 @@ class BenchmarkRunner:
             self.logger.error(
                 "Transient failure evaluating question %s: %s", question.question_id, e
             )
-            self._cell_failures.append(
-                {
-                    "category": "transient",
-                    "metric": metric.name,
-                    "evaluator": evaluator.model_name,
-                    "quiz_id": quiz.quiz_id,
-                    "question_id": question.question_id,
-                    "error": str(e),
-                }
-            )
+            self._record_failure("transient", metric, evaluator, quiz, question.question_id, e)
             return None
         except MetricNotApplicableError as e:
             self.logger.info(
                 "Metric %s not applicable to question %s: %s", metric.name, question.question_id, e
             )
-            self._cell_failures.append(
-                {
-                    "category": "skipped",
-                    "metric": metric.name,
-                    "evaluator": evaluator.model_name,
-                    "quiz_id": quiz.quiz_id,
-                    "question_id": question.question_id,
-                    "error": str(e),
-                }
-            )
+            self._record_failure("skipped", metric, evaluator, quiz, question.question_id, e)
             return None
         except Exception as e:  # noqa: BLE001
             self.logger.error("Error evaluating question %s: %s", question.question_id, e)
-            self._cell_failures.append(
-                {
-                    "category": "failed",
-                    "metric": metric.name,
-                    "evaluator": evaluator.model_name,
-                    "quiz_id": quiz.quiz_id,
-                    "question_id": question.question_id,
-                    "error": str(e),
-                }
-            )
+            self._record_failure("failed", metric, evaluator, quiz, question.question_id, e)
             return None
 
     def get_completeness_report(self) -> dict:
@@ -443,9 +473,15 @@ class BenchmarkRunner:
             return None
 
         by_evaluator: dict[str, list[float]] = {}
+        # The row each evaluator's compliance tokens are charged to. The call
+        # belongs to grammatical_correctness -- it asks that metric's own
+        # quiz-level question -- but it is made outside the metric's evaluate()
+        # bracket, so nothing would otherwise count it.
+        usage_rows: dict[str, MetricResult] = {}
         for result in metric_results:
             if result.metric_name == "grammatical_correctness":
                 by_evaluator.setdefault(result.evaluator_model, []).append(result.score)
+                usage_rows.setdefault(result.evaluator_model, result)
         if not by_evaluator:
             return None
 
@@ -463,6 +499,7 @@ class BenchmarkRunner:
                 continue
             try:
                 # Each judge assesses its own compliance, over its own scores.
+                evaluator.reset_usage()
                 adjusted_scores.append(
                     metric.adjust_score_for_custom_prompt(
                         raw_score=round(sum(scores) / len(scores), 1),
@@ -477,6 +514,10 @@ class BenchmarkRunner:
                 self.logger.error(
                     "Error checking language compliance for quiz %s: %s", quiz.quiz_id, e
                 )
+            finally:
+                # In `finally` because a call that raised still spent whatever it
+                # sent before failing.
+                self._charge_usage(usage_rows.get(evaluator_model), evaluator)
 
         if not adjusted_scores:
             return None

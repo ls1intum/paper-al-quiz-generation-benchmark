@@ -66,7 +66,8 @@ Contains **every individual score** from every run, useful for detailed analysis
         "score": 78.5,
         "evaluator_model": "gpt-4",
         "evaluated_at": "2025-05-12T12:34:56Z",
-        "raw_response": "{...full LLM response...}"
+        "raw_response": "{...full LLM response...}",
+        "usage": {"prompt_tokens": 812, "completion_tokens": 145}
       }
     ]
   },
@@ -88,6 +89,12 @@ Contains **every individual score** from every run, useful for detailed analysis
   }
 ]
 ```
+
+`usage` is the token cost of the **cell** that produced the row — one
+`metric.evaluate()` call. A question-level metric records it on every row, one per
+question. A quiz-level metric is measured once for the whole quiz, so where it
+expands into per-question rows only the first carries the figure and the rest carry
+`null`. **Sum over rows** rather than reading any single one, and guard for `null`.
 
 ### 2. `aggregated.json` — Aggregated Statistics
 
@@ -192,6 +199,39 @@ CLARITY
 DISTRACTOR_QUALITY
 ...
 ```
+
+---
+
+### 4. `usage.json` — Token Usage
+
+Token totals per evaluator and metric, the same figures the `TOKEN USAGE SUMMARY`
+table in `run.log` prints:
+
+```json
+{
+  "gpt-4": {
+    "clarity": {"prompt_tokens": 41230, "completion_tokens": 7180},
+    "homogeneous_options": {"prompt_tokens": 19909, "completion_tokens": 8520},
+    "__failed_cells__": {"prompt_tokens": 700, "completion_tokens": 8000}
+  }
+}
+```
+
+`__failed_cells__` is not a metric. It holds tokens spent on cells that produced no
+result — a call that failed or was truncated after spending them — which belong to
+no result row and would otherwise vanish from the report while
+`completeness.json` recorded the cell as lost. A truncated cell is the expensive
+case: hitting the completion cap is what made it fail.
+
+The file is written only when some usage was recorded. A provider that reports no
+usage metadata logs a warning once and contributes nothing, so an evaluator missing
+from this file is unmeasured, not free.
+
+### 5. `completeness.json` — Cell Accounting
+
+Which cells were attempted, skipped as not applicable, and failed, with the reason
+for each. Read alongside `usage.json`: the failed cells listed here are the ones
+whose tokens appear under `__failed_cells__`.
 
 ---
 

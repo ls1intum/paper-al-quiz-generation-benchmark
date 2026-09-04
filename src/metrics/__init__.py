@@ -7,11 +7,14 @@ from .base import BaseMetric, MetricParameter, MetricScope
 from .clarity import ClarityMetric
 from .cognitive_level import CognitiveLevelMetric
 from .coverage import CoverageMetric
+from .cross_item_redundancy import CrossItemRedundancyMetric
 from .difficulty import DifficultyMetric
+from .difficulty_spread import DifficultySpreadMetric
 from .distractor import DistractorQualityMetric
 from .grammatic import GrammaticalCorrectnessMetric
 from .homogeneous_options import HomogeneousOptionsMetric
 from .objective_alignment import ObjectiveAlignmentMetric
+from .objective_balance import ObjectiveBalanceMetric
 from .registry import MetricRegistry
 
 __all__ = [
@@ -21,7 +24,9 @@ __all__ = [
     "ClarityMetric",
     "CognitiveLevelMetric",
     "CoverageMetric",
+    "CrossItemRedundancyMetric",
     "DifficultyMetric",
+    "DifficultySpreadMetric",
     "DistractorQualityMetric",
     "FactualAccuracyMetric",
     "GrammaticalCorrectnessMetric",
@@ -30,4 +35,5 @@ __all__ = [
     "MetricRegistry",
     "MetricScope",
     "ObjectiveAlignmentMetric",
+    "ObjectiveBalanceMetric",
 ]

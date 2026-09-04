@@ -13,16 +13,7 @@ from pydantic import BaseModel
 
 from src.evaluators.base import LLMProvider
 from src.evaluators.factory import LLMProviderFactory
-from src.metrics.absence_of_cueing import AbsenceOfCueingMetric
-from src.metrics.accuracy import FactualAccuracyMetric
-from src.metrics.answer_key_correctness import AnswerKeyCorrectnessMetric
-from src.metrics.clarity import ClarityMetric
-from src.metrics.cognitive_level import CognitiveLevelMetric
-from src.metrics.coverage import CoverageMetric
-from src.metrics.difficulty import DifficultyMetric
-from src.metrics.grammatic import GrammaticalCorrectnessMetric
-from src.metrics.homogeneous_options import HomogeneousOptionsMetric
-from src.metrics.objective_alignment import ObjectiveAlignmentMetric
+from main import register_metrics
 from src.metrics.registry import MetricRegistry
 from src.models.config import BenchmarkConfig, EvaluatorConfig, InputOutputConfig, MetricConfig
 from src.models.quiz import QuestionType, Quiz, QuizQuestion
@@ -187,6 +178,37 @@ class MockLLMProvider(LLMProvider):
         }
 
     @staticmethod
+    def _question_ids_from_prompt(prompt: str) -> list[str]:
+        """Every item id the quiz-level prompt listed, in order."""
+        return re.findall(r"\(id: (\S+?),", prompt)
+
+    @staticmethod
+    def _objective_balance_response() -> dict[str, Any]:
+        return {
+            "objective_item_counts": [],
+            "rationale": "Mock balance verdict",
+            "balance_level": "balanced",
+        }
+
+    @classmethod
+    def _difficulty_spread_response(cls, prompt: str) -> dict[str, Any]:
+        ids = cls._question_ids_from_prompt(prompt)
+        return {
+            "easiest_question_id": ids[0] if ids else "",
+            "hardest_question_id": ids[-1] if ids else "",
+            "rationale": "Mock spread verdict",
+            "spread_level": "varied",
+        }
+
+    @staticmethod
+    def _cross_item_redundancy_response() -> dict[str, Any]:
+        return {
+            "pairs": [],
+            "rationale": "Mock redundancy verdict",
+            "redundancy_level": "none",
+        }
+
+    @staticmethod
     def _detect_coverage_phase(prompt: str) -> str | None:
         """Identify which coverage phase produced this prompt by inspecting
         the JSON key names the prompt asks the LLM to return."""
@@ -227,6 +249,16 @@ class MockLLMProvider(LLMProvider):
         # cognitive_level judge
         if '"assigned_level"' in prompt and "Bloom" in prompt:
             return self._cognitive_level_response()
+
+        # quiz-level criteria
+        if '"balance_level"' in prompt:
+            return self._objective_balance_response()
+
+        if '"spread_level"' in prompt:
+            return self._difficulty_spread_response(prompt)
+
+        if '"redundancy_level"' in prompt:
+            return self._cross_item_redundancy_response()
 
         # homogeneous options phases
         if '"dominant_grammatical_pattern"' in prompt:
@@ -288,17 +320,15 @@ class MockLLMProvider(LLMProvider):
 
 @pytest.fixture
 def registered_metrics() -> Iterable[str]:
+    """Register exactly what the CLI registers.
+
+    This used to be a hand-copied second list, which had already drifted --
+    `distractor_quality` was registered in `main.py` and missing here, so every
+    runner test exercised a roster the CLI does not have. Calling the real
+    function removes the class of bug rather than the instance of it.
+    """
     MetricRegistry.clear()
-    MetricRegistry.register(DifficultyMetric)
-    MetricRegistry.register(CoverageMetric)
-    MetricRegistry.register(ClarityMetric)
-    MetricRegistry.register(HomogeneousOptionsMetric)
-    MetricRegistry.register(FactualAccuracyMetric)
-    MetricRegistry.register(AnswerKeyCorrectnessMetric)
-    MetricRegistry.register(ObjectiveAlignmentMetric)
-    MetricRegistry.register(AbsenceOfCueingMetric)
-    MetricRegistry.register(GrammaticalCorrectnessMetric)
-    MetricRegistry.register(CognitiveLevelMetric)
+    register_metrics()
     yield MetricRegistry.list_metrics()
     MetricRegistry.clear()
 

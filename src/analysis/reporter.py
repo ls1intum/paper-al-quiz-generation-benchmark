@@ -204,8 +204,19 @@ class ResultsReporter:
         return "\n".join(lines)
 
     @staticmethod
-    def usage_summary(results: list[BenchmarkResult]) -> str:
-        """One-line-per-cell token usage table grouped by evaluator x metric."""
+    def _usage_buckets(
+        results: list[BenchmarkResult],
+        extra: dict[str, dict[str, dict[str, int]]] | None = None,
+    ) -> dict[str, dict[str, dict[str, int]]]:
+        """Sum token usage per evaluator x metric.
+
+        A quiz-level metric that expands into per-question rows records its
+        usage on one row and None on the rest, so summing over rows is the only
+        reading that gives the cell's real cost. `extra` carries usage that
+        belongs to no result row at all -- cells that failed after spending
+        tokens -- so the report totals what the run was billed rather than only
+        what it has results for.
+        """
         buckets: dict[str, dict[str, dict[str, int]]] = defaultdict(
             lambda: defaultdict(lambda: {"prompt_tokens": 0, "completion_tokens": 0})
         )
@@ -215,6 +226,22 @@ class ResultsReporter:
                     b = buckets[m.evaluator_model][m.metric_name]
                     b["prompt_tokens"] += m.usage.get("prompt_tokens", 0)
                     b["completion_tokens"] += m.usage.get("completion_tokens", 0)
+
+        for evaluator, metrics in (extra or {}).items():
+            for metric_name, usage in metrics.items():
+                b = buckets[evaluator][metric_name]
+                b["prompt_tokens"] += usage.get("prompt_tokens", 0)
+                b["completion_tokens"] += usage.get("completion_tokens", 0)
+
+        return buckets
+
+    @staticmethod
+    def usage_summary(
+        results: list[BenchmarkResult],
+        extra: dict[str, dict[str, dict[str, int]]] | None = None,
+    ) -> str:
+        """One-line-per-cell token usage table grouped by evaluator x metric."""
+        buckets = ResultsReporter._usage_buckets(results, extra)
 
         if not buckets:
             return "No token usage data recorded."
@@ -249,17 +276,12 @@ class ResultsReporter:
         return "\n".join(lines)
 
     @staticmethod
-    def usage_dict(results: list[BenchmarkResult]) -> dict[str, Any]:
+    def usage_dict(
+        results: list[BenchmarkResult],
+        extra: dict[str, dict[str, dict[str, int]]] | None = None,
+    ) -> dict[str, Any]:
         """Machine-readable usage breakdown: {evaluator: {metric: {tokens}}}."""
-        buckets: dict[str, dict[str, dict[str, int]]] = defaultdict(
-            lambda: defaultdict(lambda: {"prompt_tokens": 0, "completion_tokens": 0})
-        )
-        for result in results:
-            for m in result.metrics:
-                if m.usage:
-                    b = buckets[m.evaluator_model][m.metric_name]
-                    b["prompt_tokens"] += m.usage.get("prompt_tokens", 0)
-                    b["completion_tokens"] += m.usage.get("completion_tokens", 0)
+        buckets = ResultsReporter._usage_buckets(results, extra)
         # Convert nested defaultdicts to plain dicts for JSON serialization
         return {ev: dict(metrics) for ev, metrics in buckets.items()}
 

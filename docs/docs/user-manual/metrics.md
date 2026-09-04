@@ -475,3 +475,167 @@ keeps v1.1 and v1.2 output distinguishable.)
 ```
 
 ---
+
+## Quiz-Level Criteria
+
+The three criteria below judge a property of a **whole quiz** that is invisible when its items
+are read one at a time. Each produces a single result per quiz, with `question_id` empty, and
+each derives its score from a four-level verdict on the same scale, so a verdict and its number
+can never disagree.
+
+Run them on **real quizzes only**. A container file that batches standalone items so they can be
+scored one by one is not a quiz: it declares no objectives of its own, its items were never
+meant to sit together, and all three criteria are meaningless on it.
+
+:::warning
+All three report `applicable: false` with a score of `100.0` when there is nothing to judge, so
+**filter on `applicable` before averaging**. A naive mean counts every abstention as a perfect
+score.
+:::
+
+:::warning
+Supply generation instructions for **every** quiz in a run or for none. A generated quiz can ship
+the intent file it was produced from and a human-authored quiz cannot; loading them for only some
+quizzes hands the judge the generation brief — which typically states the quality requirements
+outright — for one provenance only, and `BaseMetric.evaluate` additionally interprets a
+`custom_prompt` and adjusts the score by it. A comparison across provenance would then measure
+that asymmetry rather than the quizzes. See `config/form_b_quiz_level.yaml`.
+:::
+
+### 10. Learning-Objective Balance
+
+**Metric name**: `objective_balance`
+
+**Purpose**: Measure whether the objectives a quiz declares for itself are weighted sensibly
+across its items, or whether the quiz over-invests in one objective and barely touches another.
+
+**Scope**: Quiz-level — one result per quiz, `question_id` empty.
+
+**Required input**: `quiz.metadata.learning_objectives`. Note the singular/plural split:
+this is the set the quiz claims to cover, while `question.metadata.learning_objective` is one
+item's reference value and belongs to `objective_alignment`.
+
+**What is out of scope**: this is a question about *emphasis*, not coverage. A quiz is not
+penalized here for leaving a declared objective untested, the objectives themselves are not
+judged, and whether an item assesses its objective well is `objective_alignment`'s question.
+
+**Scoring**:
+
+| Level | Score | Meaning |
+|---|---|---|
+| `balanced` | `100.0` | Emphasis is spread sensibly; every declared objective gets a fair share of the items. |
+| `slightly_uneven` | `66.7` | One objective carries a little more or less weight than it warrants. |
+| `unbalanced` | `33.3` | One objective clearly dominates while another is represented by a single thin item. |
+| `skewed` | `0.0` | Badly lopsided; the quiz effectively tests one objective and pays lip service to the rest. |
+
+**Quizzes with no declared objectives**: `applicable: false`,
+`balance_level: "not_applicable"`, score `100.0`. The judge's answer is discarded rather than
+trusted — whether a quiz declares objectives is a fact about the file, not a judgement call.
+
+**Output** (`raw_response`):
+- `applicable`, `balance_level`, `score`
+- `declared_objectives` — the reference set the quiz was judged against
+- `objective_item_counts` — which items the judge attributed to each declared objective.
+  Attributions naming an objective the quiz never declared, or an item it does not hold, are
+  dropped before this is written.
+- `rationale`
+
+**Example Configuration**:
+```yaml
+- name: "objective_balance"
+  version: "1.0"
+  evaluators: ["gpt4"]
+```
+
+---
+
+### 11. Difficulty Spread
+
+**Metric name**: `difficulty_spread`
+
+**Purpose**: Measure whether a quiz mixes difficulty sensibly rather than sitting uniformly at
+one level. A quiz whose items are all trivial, or all hard, separates nobody: every learner
+either clears all of it or none of it.
+
+**Scope**: Quiz-level — one result per quiz, `question_id` empty.
+
+**What is out of scope**: the **order** items appear in is not assessed — a demanding item placed
+first is badly arranged, not badly spread. It is also **not a Bloom-level judgement**: cognitive
+level is assessed per item by `cognitive_level` against a catalogue reference value, while
+difficulty here is the effort an item demands of a learner who has studied the material. Two
+items at one Bloom level can differ sharply in difficulty, and a quiz spread across Bloom levels
+can still be uniformly easy.
+
+**Scoring**: the verdict is holistic and reached in a single call. Deriving it instead from
+per-item difficulty labels would measure a computed statistic over a scale with no reference
+value, which is a different construct from the one a human rater applies to the same quiz.
+
+| Level | Score | Meaning |
+|---|---|---|
+| `varied` | `100.0` | A sensible mix, from straightforward to demanding. |
+| `mostly_uniform` | `66.7` | Mostly at one level, with some variation. |
+| `nearly_uniform` | `33.3` | Nearly all at one level; little to distinguish strong learners from weak ones. |
+| `uniform` | `0.0` | Entirely trivial or entirely hard; the quiz discriminates nothing. |
+
+**Quizzes with fewer than three items**: `applicable: false`,
+`spread_level: "not_applicable"`, score `100.0`. A pair of items has no spread to judge.
+
+**Output** (`raw_response`):
+- `applicable`, `spread_level`, `score`, `num_questions`
+- `easiest_question_id`, `hardest_question_id` — the range the verdict was read off. An id the
+  quiz does not hold is replaced with `null` rather than passed through.
+- `rationale`
+
+**Example Configuration**:
+```yaml
+- name: "difficulty_spread"
+  version: "1.0"
+  evaluators: ["gpt4"]
+```
+
+---
+
+### 12. Redundancy and Cross-Item Cueing
+
+**Metric name**: `cross_item_redundancy`
+
+**Purpose**: Detect items that duplicate each other, or where one item reveals another's answer.
+An item that is flawless read on its own becomes a bad item when the quiz already asked the same
+thing three questions earlier, or when its stem states the fact another item's key turns on.
+
+**Scope**: Quiz-level — one result per quiz, `question_id` empty.
+
+**Relationship to `absence_of_cueing`**: that metric asks whether an item's **own** options give
+its key away. The cue here travels **between** items, so no per-item metric can see it.
+
+**Scoring**:
+
+| Level | Score | Meaning |
+|---|---|---|
+| `none` | `100.0` | No redundancy; no item helps answer another. |
+| `mild_overlap` | `66.7` | Mild overlap in topic, but each item still tests something of its own. |
+| `clear_overlap` | `33.3` | A clear duplicate pair, or one item that narrows another's options. |
+| `substantial` | `0.0` | Substantial redundancy, or an item that plainly gives away another's answer. |
+
+At `clear_overlap` and `substantial` the judge must name at least one item pair. Agreeing that a
+quiz is redundant is weaker evidence than agreeing about which pair makes it so.
+
+**Quizzes with fewer than three items**: `applicable: false`,
+`redundancy_level: "not_applicable"`, score `100.0`.
+
+**Output** (`raw_response`):
+- `applicable`, `redundancy_level`, `score`, `num_questions`
+- `pairs` — each `{question_ids, kind, explanation}`, where `kind` is `redundancy` or `cueing`
+- `pairs_dropped` — how many pairs named an item the quiz does not hold, or named one item
+  twice. Reported rather than silently discarded: a judge that reaches `substantial` and then
+  cannot name a real pair is a finding.
+- `rationale`
+
+**Example Configuration**:
+```yaml
+- name: "cross_item_redundancy"
+  version: "1.0"
+  evaluators: ["gpt4"]
+```
+
+---

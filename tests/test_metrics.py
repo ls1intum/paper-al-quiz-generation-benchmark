@@ -8,7 +8,7 @@ from src.metrics.difficulty import DifficultyMetric
 from src.metrics.coverage import CoverageMetric
 from src.metrics.clarity import ClarityMetric
 from src.metrics.distractor import DistractorQualityMetric
-from src.metrics.base import ScoreResponse
+from src.metrics.base import MetricScope, ScoreResponse
 from src.metrics.homogeneous_options import HomogeneousOptionsMetric
 from src.metrics.phase import Phase, PhaseInput, PhaseOutput
 from src.metrics.accuracy import FactualAccuracyMetric
@@ -26,6 +26,12 @@ from src.metrics.absence_of_cueing import (
 )
 from src.metrics.grammatic import GrammaticalCorrectnessMetric
 from src.metrics.cognitive_level import CognitiveLevelMetric, get_bloom_intended
+from src.metrics.objective_balance import ObjectiveBalanceMetric, BALANCE_SCORES
+from src.metrics.difficulty_spread import DifficultySpreadMetric, SPREAD_SCORES
+from src.metrics.cross_item_redundancy import (
+    CrossItemRedundancyMetric,
+    REDUNDANCY_SCORES,
+)
 from src.models.quiz import QuizQuestion, QuestionType, Quiz
 from src.models.result import EvaluationResult
 from tests.conftest import MockLLMProvider
@@ -1483,3 +1489,451 @@ def test_accuracy_source_present_includes_material():
     prompt = inp.prompt_builder(inp)
     assert "Source Material:" in prompt
     assert "Some content" in prompt
+
+
+# ── quiz-level criteria: objective_balance, difficulty_spread, cross_item_redundancy ── #
+
+
+def _form_b_question(question_id: str, text: str, options: list[str], key: list[str]):
+    return QuizQuestion(
+        question_id=question_id,
+        question_type=QuestionType.MULTIPLE_CHOICE,
+        question_text=text,
+        options=options,
+        correct_answer=key,
+    )
+
+
+def make_form_b_quiz(num_questions: int = 3, objectives: list[str] | None = None) -> Quiz:
+    """A quiz shaped like the ones the quiz-level criteria are rated on.
+
+    Modelled on a real three-item quiz from the human-validation corpus: two
+    near-parallel scalability items and one design-pattern item, against two
+    declared objectives. The parallel pair is what makes it a useful fixture --
+    a redundancy verdict on it is not vacuous.
+    """
+    questions = [
+        _form_b_question(
+            "IT6483",
+            "Which techniques improve concurrency (scale-up) in packet processing?",
+            [
+                "Upgrading the processor speed of a single server.",
+                "Implementing parallel processing using multiple threads on a single server.",
+                "Distributing the workload across multiple servers in a cluster.",
+                "Increasing the memory capacity of a single server.",
+            ],
+            [
+                "Implementing parallel processing using multiple threads on a single server.",
+                "Distributing the workload across multiple servers in a cluster.",
+            ],
+        ),
+        _form_b_question(
+            "IT5423",
+            "Which techniques improve scalability (scale-out) in a web application?",
+            [
+                "Adding more CPU cores to a single server.",
+                "Implementing load balancing across multiple servers.",
+                "Increasing the storage capacity of a single server.",
+                "Utilizing database replication or sharding.",
+            ],
+            [
+                "Implementing load balancing across multiple servers.",
+                "Utilizing database replication or sharding.",
+            ],
+        ),
+        _form_b_question(
+            "IT8689",
+            "Component A must integrate with an incompatible interface. Which patterns apply?",
+            [
+                "Component A should use the Strategy pattern.",
+                "Component A should use the Adapter pattern.",
+                "Component B should use the Observer pattern.",
+                "Component B should use the Strategy pattern.",
+            ],
+            [
+                "Component A should use the Adapter pattern.",
+                "Component B should use the Observer pattern.",
+            ],
+        ),
+    ]
+    if objectives is None:
+        objectives = [
+            "Concurrency and Scalability - Differentiate scaling up from scaling out.",
+            "Design Patterns - Choose the right design pattern for a specific problem.",
+        ]
+    return Quiz(
+        quiz_id="QZ39",
+        title="Software Engineering Quiz",
+        source_material="EIST",
+        questions=questions[:num_questions],
+        metadata={"target_audience": "undergraduate", "learning_objectives": objectives},
+    )
+
+
+def _finalize_quiz_metric(metric, quiz: Quiz, judged: dict) -> dict:
+    """Drive a quiz-level metric's deterministic phase over a judge verdict."""
+    inp = PhaseInput(
+        prompt_builder=None,
+        quiz=quiz,
+        accumulated={"judge": PhaseOutput(phase_name="judge", data=judged)},
+    )
+    return metric.phases[-1].process(inp, llm_client=None)
+
+
+@pytest.mark.parametrize(
+    "metric_cls",
+    [ObjectiveBalanceMetric, DifficultySpreadMetric, CrossItemRedundancyMetric],
+)
+def test_quiz_level_metrics_are_quiz_scoped_and_do_not_expand(metric_cls):
+    """One row per quiz, keyed by quiz alone.
+
+    These criteria have no per-item value to report -- a balance verdict belongs
+    to the set -- so they must not expand into per-question rows the way
+    homogeneous_options does.
+    """
+    metric = metric_cls()
+    assert metric.scope == MetricScope.QUIZ_LEVEL
+    assert metric.version == "1.0"
+    assert (
+        metric.expand_question_results(
+            EvaluationResult(score=100.0, raw_response="{}", metadata={})
+        )
+        == []
+    )
+
+
+@pytest.mark.parametrize(
+    "scores",
+    [BALANCE_SCORES, SPREAD_SCORES, REDUNDANCY_SCORES],
+)
+def test_quiz_level_scores_land_on_the_four_shared_levels(scores):
+    """The analysis maps a judge score back onto the raters' 1-4 scale by nearest
+    level. A metric that emitted 75.0 would be rounded into the wrong one."""
+    assert sorted(scores.values()) == [0.0, 33.3, 66.7, 100.0]
+    assert len(scores) == 4
+
+
+# ── objective_balance ────────────────────────────────────────────────────── #
+
+
+def test_objective_balance_prompt_requires_quiz():
+    metric = ObjectiveBalanceMetric()
+    inp = make_phase_input(metric, "judge")
+    with pytest.raises(ValueError, match="requires a quiz"):
+        inp.prompt_builder(inp)
+
+
+def test_objective_balance_prompt_carries_objectives_items_and_scope_limits():
+    """The declared objectives are the reference set, every item is evidence, and
+    the prompt must rule out the two constructs this criterion is not."""
+    metric = ObjectiveBalanceMetric()
+    quiz = make_form_b_quiz()
+    inp = make_phase_input(metric, "judge", quiz=quiz)
+    prompt = inp.prompt_builder(inp)
+
+    for objective in quiz.metadata["learning_objectives"]:
+        assert objective in prompt
+    for question in quiz.questions:
+        assert question.question_id in prompt
+        assert question.question_text in prompt
+    assert "Do NOT judge coverage" in prompt
+    assert "Do NOT judge the objectives themselves" in prompt
+
+
+@pytest.mark.parametrize(
+    ("level", "expected"),
+    [
+        ("balanced", 100.0),
+        ("slightly_uneven", 66.7),
+        ("unbalanced", 33.3),
+        ("skewed", 0.0),
+    ],
+)
+def test_objective_balance_level_determines_score(level, expected):
+    metric = ObjectiveBalanceMetric()
+    result = _finalize_quiz_metric(
+        metric,
+        make_form_b_quiz(),
+        {"balance_level": level, "objective_item_counts": [], "rationale": "test"},
+    )
+    assert result["score"] == expected
+    assert result["applicable"] is True
+
+
+def test_objective_balance_without_declared_objectives_is_not_applicable():
+    """No declared objective set means nothing to weigh the items against. The
+    judge's answer is discarded rather than trusted."""
+    metric = ObjectiveBalanceMetric()
+    result = _finalize_quiz_metric(
+        metric,
+        make_form_b_quiz(objectives=[]),
+        {"balance_level": "skewed", "objective_item_counts": [], "rationale": "ignored"},
+    )
+    assert result["applicable"] is False
+    assert result["balance_level"] == "not_applicable"
+    assert result["score"] == 100.0
+    assert result["declared_objectives"] == []
+
+
+def test_objective_balance_drops_attributions_it_cannot_verify():
+    """An item id the quiz does not hold, or an objective it did not declare, is
+    not evidence -- it would otherwise travel into the analysis as if it were."""
+    metric = ObjectiveBalanceMetric()
+    quiz = make_form_b_quiz()
+    declared = quiz.metadata["learning_objectives"][0]
+    result = _finalize_quiz_metric(
+        metric,
+        quiz,
+        {
+            "balance_level": "balanced",
+            "objective_item_counts": [
+                {"objective": declared, "question_ids": ["IT6483", "IT0000"]},
+                {"objective": "An objective this quiz never declared", "question_ids": ["IT5423"]},
+            ],
+            "rationale": "test",
+        },
+    )
+    assert result["objective_item_counts"] == [{"objective": declared, "question_ids": ["IT6483"]}]
+
+
+def test_objective_balance_end_to_end():
+    metric = ObjectiveBalanceMetric()
+    quiz = make_form_b_quiz()
+    judged = {
+        "objective_item_counts": [
+            {
+                "objective": quiz.metadata["learning_objectives"][0],
+                "question_ids": ["IT6483", "IT5423"],
+            }
+        ],
+        "rationale": "Scalability carries two of three items.",
+        "balance_level": "slightly_uneven",
+    }
+    mock_llm = MockLLMProvider(model="mock-model", responses=[judged])
+    result = metric.evaluate(quiz=quiz, llm_client=mock_llm)
+    data = json.loads(result.raw_response)
+
+    assert result.score == 66.7
+    assert data["balance_level"] == "slightly_uneven"
+    assert data["declared_objectives"] == quiz.metadata["learning_objectives"]
+    for field in ("objective_item_counts", "rationale", "applicable"):
+        assert f'"{field}"' in result.raw_response
+
+
+# ── difficulty_spread ────────────────────────────────────────────────────── #
+
+
+def test_difficulty_spread_prompt_requires_quiz():
+    metric = DifficultySpreadMetric()
+    inp = make_phase_input(metric, "judge")
+    with pytest.raises(ValueError, match="requires a quiz"):
+        inp.prompt_builder(inp)
+
+
+def test_difficulty_spread_prompt_excludes_order_and_bloom():
+    """Spread only: item order is a different defect, and cognitive level is a
+    different criterion assessed per item against a catalogue value."""
+    metric = DifficultySpreadMetric()
+    inp = make_phase_input(metric, "judge", quiz=make_form_b_quiz())
+    prompt = inp.prompt_builder(inp)
+
+    assert "Judge the SPREAD only" in prompt
+    assert "order the items appear in is not being assessed" in prompt
+    assert "NOT a judgement of cognitive level" in prompt
+
+
+@pytest.mark.parametrize(
+    ("level", "expected"),
+    [
+        ("varied", 100.0),
+        ("mostly_uniform", 66.7),
+        ("nearly_uniform", 33.3),
+        ("uniform", 0.0),
+    ],
+)
+def test_difficulty_spread_level_determines_score(level, expected):
+    metric = DifficultySpreadMetric()
+    result = _finalize_quiz_metric(
+        metric,
+        make_form_b_quiz(),
+        {
+            "spread_level": level,
+            "easiest_question_id": "IT6483",
+            "hardest_question_id": "IT8689",
+            "rationale": "test",
+        },
+    )
+    assert result["score"] == expected
+    assert result["applicable"] is True
+
+
+@pytest.mark.parametrize("num_questions", [1, 2])
+def test_difficulty_spread_below_minimum_items_is_not_applicable(num_questions):
+    """A pair of items has no spread. The human instrument abstains on the same
+    floor, so both arms abstain on the same quizzes."""
+    metric = DifficultySpreadMetric()
+    result = _finalize_quiz_metric(
+        metric,
+        make_form_b_quiz(num_questions=num_questions),
+        {
+            "spread_level": "uniform",
+            "easiest_question_id": "IT6483",
+            "hardest_question_id": "IT6483",
+            "rationale": "ignored",
+        },
+    )
+    assert result["applicable"] is False
+    assert result["spread_level"] == "not_applicable"
+    assert result["score"] == 100.0
+    assert result["num_questions"] == num_questions
+
+
+def test_difficulty_spread_drops_unknown_extreme_ids():
+    metric = DifficultySpreadMetric()
+    result = _finalize_quiz_metric(
+        metric,
+        make_form_b_quiz(),
+        {
+            "spread_level": "varied",
+            "easiest_question_id": "IT6483",
+            "hardest_question_id": "NOT_IN_THIS_QUIZ",
+            "rationale": "test",
+        },
+    )
+    assert result["easiest_question_id"] == "IT6483"
+    assert result["hardest_question_id"] is None
+
+
+def test_difficulty_spread_end_to_end():
+    metric = DifficultySpreadMetric()
+    judged = {
+        "easiest_question_id": "IT6483",
+        "hardest_question_id": "IT8689",
+        "rationale": "The pattern item demands more than the two recall items.",
+        "spread_level": "mostly_uniform",
+    }
+    mock_llm = MockLLMProvider(model="mock-model", responses=[judged])
+    result = metric.evaluate(quiz=make_form_b_quiz(), llm_client=mock_llm)
+    data = json.loads(result.raw_response)
+
+    assert result.score == 66.7
+    assert data["spread_level"] == "mostly_uniform"
+    assert data["num_questions"] == 3
+    for field in ("easiest_question_id", "hardest_question_id", "rationale", "applicable"):
+        assert f'"{field}"' in result.raw_response
+
+
+# ── cross_item_redundancy ────────────────────────────────────────────────── #
+
+
+def test_cross_item_redundancy_prompt_requires_quiz():
+    metric = CrossItemRedundancyMetric()
+    inp = make_phase_input(metric, "judge")
+    with pytest.raises(ValueError, match="requires a quiz"):
+        inp.prompt_builder(inp)
+
+
+def test_cross_item_redundancy_prompt_carries_every_item_and_demands_pairs():
+    """Every item has to be visible for a cross-item comparison to be possible,
+    and the lower two levels oblige the judge to name the pair, as the rater is."""
+    metric = CrossItemRedundancyMetric()
+    quiz = make_form_b_quiz()
+    inp = make_phase_input(metric, "judge", quiz=quiz)
+    prompt = inp.prompt_builder(inp)
+
+    for question in quiz.questions:
+        assert question.question_id in prompt
+        assert question.question_text in prompt
+    assert 'For "clear_overlap" and "substantial" you MUST name at least one pair.' in prompt
+
+
+@pytest.mark.parametrize(
+    ("level", "expected"),
+    [
+        ("none", 100.0),
+        ("mild_overlap", 66.7),
+        ("clear_overlap", 33.3),
+        ("substantial", 0.0),
+    ],
+)
+def test_cross_item_redundancy_level_determines_score(level, expected):
+    metric = CrossItemRedundancyMetric()
+    result = _finalize_quiz_metric(
+        metric,
+        make_form_b_quiz(),
+        {"redundancy_level": level, "pairs": [], "rationale": "test"},
+    )
+    assert result["score"] == expected
+    assert result["applicable"] is True
+
+
+@pytest.mark.parametrize("num_questions", [1, 2])
+def test_cross_item_redundancy_below_minimum_items_is_not_applicable(num_questions):
+    metric = CrossItemRedundancyMetric()
+    result = _finalize_quiz_metric(
+        metric,
+        make_form_b_quiz(num_questions=num_questions),
+        {"redundancy_level": "substantial", "pairs": [], "rationale": "ignored"},
+    )
+    assert result["applicable"] is False
+    assert result["redundancy_level"] == "not_applicable"
+    assert result["score"] == 100.0
+
+
+def test_cross_item_redundancy_drops_unverifiable_pairs_and_counts_them():
+    """A pair naming an item this quiz does not hold, or naming one item twice,
+    is not evidence. Dropping it silently would hide a judge that reached a
+    verdict it cannot support, so the count is reported."""
+    metric = CrossItemRedundancyMetric()
+    result = _finalize_quiz_metric(
+        metric,
+        make_form_b_quiz(),
+        {
+            "redundancy_level": "clear_overlap",
+            "pairs": [
+                {
+                    "question_ids": ["IT6483", "IT5423"],
+                    "kind": "redundancy",
+                    "explanation": "Both ask scale-up versus scale-out.",
+                },
+                {
+                    "question_ids": ["IT6483", "IT0000"],
+                    "kind": "cueing",
+                    "explanation": "Names an item that is not in this quiz.",
+                },
+                {
+                    "question_ids": ["IT8689", "IT8689"],
+                    "kind": "redundancy",
+                    "explanation": "Names one item twice.",
+                },
+            ],
+            "rationale": "test",
+        },
+    )
+    assert [pair["question_ids"] for pair in result["pairs"]] == [["IT6483", "IT5423"]]
+    assert result["pairs_dropped"] == 2
+    assert result["score"] == 33.3
+
+
+def test_cross_item_redundancy_end_to_end():
+    metric = CrossItemRedundancyMetric()
+    judged = {
+        "pairs": [
+            {
+                "question_ids": ["IT6483", "IT5423"],
+                "kind": "redundancy",
+                "explanation": "Parallel scale-up and scale-out items.",
+            }
+        ],
+        "rationale": "The two scalability items overlap in topic.",
+        "redundancy_level": "mild_overlap",
+    }
+    mock_llm = MockLLMProvider(model="mock-model", responses=[judged])
+    result = metric.evaluate(quiz=make_form_b_quiz(), llm_client=mock_llm)
+    data = json.loads(result.raw_response)
+
+    assert result.score == 66.7
+    assert data["redundancy_level"] == "mild_overlap"
+    assert data["pairs"][0]["kind"] == "redundancy"
+    for field in ("pairs", "pairs_dropped", "rationale", "applicable"):
+        assert f'"{field}"' in result.raw_response

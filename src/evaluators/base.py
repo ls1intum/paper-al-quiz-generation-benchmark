@@ -53,6 +53,7 @@ class LLMProvider(ABC):
         self.retry_max_delay = kwargs.pop("retry_max_delay", 300)
         self.additional_params = kwargs
         self._usage_log: list[dict[str, int]] = []
+        self._warned_missing_usage: bool = False
 
     @staticmethod
     def _is_transient_error(exc: Exception) -> bool:
@@ -153,6 +154,20 @@ class LLMProvider(ABC):
                     "prompt_tokens": usage.get("input_tokens", 0),
                     "completion_tokens": usage.get("output_tokens", 0),
                 }
+            )
+            return
+
+        # A response with no usage metadata is not a zero-token call, it is an
+        # unmeasured one -- some self-hosted OpenAI-compatible servers omit the
+        # field entirely. Counting it as nothing silently produces a complete,
+        # plausible and wrong usage report, so say it once per provider rather
+        # than never.
+        if not self._warned_missing_usage:
+            self._warned_missing_usage = True
+            logging.getLogger(__name__).warning(
+                "%s returned no token usage metadata; token totals for this evaluator "
+                "will under-report. Every later call is affected, this warning is not.",
+                self.model_name,
             )
 
     @property
