@@ -338,6 +338,26 @@ adjustment fires once per (quiz, metric, evaluator), as before.
 
 ---
 
+## Provenance of the quiz-level metrics
+
+The three metrics below were authored on **2026-09-04**, from the frozen rubric text
+(`paper-al-quiz-generation/tools/corpus/rubric.json` v1.1.0, `form_b`).
+
+One rater had completed Form B by that date. **No Q1–Q3 rating file had reached the preparer or
+either repository** — `tools/corpus/out/ratings/main/` was empty at paper-repo commit `9cbfedf`
+— so the prompts cannot have been tuned toward the comparison they feed.
+
+This is the wording the paper's deviation note should carry. An earlier draft of the pull
+request claimed the metrics were written "before any human rating on Q1–Q3 exists", which was
+too strong: a rating existed in a rater's possession, it had simply not reached the author. The
+narrower claim is the one that is verifiable from the repositories.
+
+The judge sweep for these metrics is to be run and committed **before** any Form B rating file
+enters the corpus repository, so that the ordering is a property of the commit history rather
+than an assertion.
+
+---
+
 ## Criterion Q1 — Learning-Objective Balance
 
 **Definition:** *Given the objectives declared for the quiz, are they weighted sensibly across the item set — or does the quiz over-invest in one and barely touch another?*
